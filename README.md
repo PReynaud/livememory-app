@@ -24,7 +24,7 @@ pnpm dev
 
 Add `http://localhost:3000/confirm` to the local Supabase Auth redirect URLs.
 
-Production URL: https://livememory-app.pierre-reynaud.fr
+Production URL: https://livememory.pierre-reynaud.fr
 
 ## Tests
 
