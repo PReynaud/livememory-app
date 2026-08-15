@@ -82,6 +82,7 @@ Plan and implement features through **BMAD Method** workflows (spec → PRD/arch
 
 - Import `defineAppConfig` from `#imports` in `app/app.config.ts`. Auto-imports are off; omitting it fails `pnpm build:vercel` prerender with `defineAppConfig is not defined` while lint and unit tests still pass.
 - GitHub Actions has no `.env`. The CI Vercel build must set `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_KEY` (local demo values) or prerender of `/` fails with `Cannot read properties of undefined (reading 'state')`.
+- Commit `app/types/database.types.ts` from `pnpm db:types` after schema changes. CI regenerates that file and fails on any diff.
 
 ## Commands
 
