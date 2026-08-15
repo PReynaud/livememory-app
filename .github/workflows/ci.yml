@@ -43,6 +43,11 @@ jobs:
 
       - name: Build (Vercel preset)
         run: pnpm build:vercel
+        env:
+          # Local Supabase demo publishable values (not secrets). CI has no .env;
+          # without them prerender of `/` dies in Pinia (`undefined.state`).
+          NUXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NUXT_PUBLIC_SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
 
       - name: Setup Supabase CLI
         id: supabase-cli
