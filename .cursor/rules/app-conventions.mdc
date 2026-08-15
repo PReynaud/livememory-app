@@ -1,0 +1,11 @@
+---
+description: Language, BMAD delivery, and stack conventions
+alwaysApply: true
+---
+
+# App conventions
+
+- Chat in **English or French**, matching the user. Produce **English only** for every artifact (code, comments, commits, PRs, BMAD docs, tests, UI copy, error messages).
+- Plan and implement product features through **BMAD Method** workflows, not ad-hoc feature dumps.
+- Keep the stack: Nuxt 4, Nuxt UI, Pinia, Supabase SQL migrations, Playwright, Vitest.
+- Disable auto-imports: import Vue, Nuxt, and project modules explicitly.

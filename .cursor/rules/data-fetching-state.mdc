@@ -1,0 +1,12 @@
+---
+description: Keep data fetching and shared state out of page components
+alwaysApply: true
+---
+
+# Data fetching and shared state
+
+- Keep remote data fetching and shared or global data management in Pinia stores, not inside pages or presentational components.
+- Pages and components render UI, hold local UI-only state, and call store actions.
+- When a page owns async entity state (loading, saving, lists that may be reused), create or extend a store first.
+- Reserve local component refs for ephemeral UI such as toggles, open state, and one-off feedback.
+- Async store actions return `{ data, error }` and reset `loading` in `finally`.

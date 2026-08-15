@@ -1,0 +1,10 @@
+{
+  "templateVersion": "0.1.0",
+  "createdAt": "2026-08-15",
+  "bmad": {
+    "version": "6.11.0",
+    "modules": ["core", "bmm"]
+  },
+  "skillsLock": "skills-lock.json",
+  "notes": "New apps install latest stable BMAD and skills, then lock hashes here."
+}

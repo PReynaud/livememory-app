@@ -1,0 +1,13 @@
+---
+description: Import Vue, Nuxt, and project modules explicitly
+alwaysApply: true
+---
+
+# No auto-imports
+
+`imports.autoImport` is `false`. Always import:
+
+- Vue APIs (`ref`, `computed`, `watch`, …) from `vue`
+- Nuxt helpers from `#imports`
+- Stores from `@/stores/...`
+- Utils from `@/utils/...`

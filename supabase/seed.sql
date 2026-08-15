@@ -1,0 +1,1 @@
+-- Reference data only. User accounts are created per Playwright test.

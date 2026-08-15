@@ -1,0 +1,12 @@
+---
+description: Require tests with every story
+alwaysApply: true
+---
+
+# Test discipline
+
+- Every story or product change must add or update tests in `tests/unit` and/or `tests/e2e`.
+- Prefer writing failing tests first (red-green-refactor) for `bmad-dev-story` and `bmad-quick-dev`.
+- Vitest covers stores, utils, and server handlers. Playwright covers user journeys against **local** Supabase only.
+- Do not claim a story is done while relevant suites are failing or missing.
+- Do not point Playwright at a remote Supabase URL.
