@@ -72,6 +72,7 @@ export const useMyStore = defineStore('myStore', () => {
 - Every story must add or update tests (`tests/unit` and/or `tests/e2e`).
 - Prefer red-green-refactor for `bmad-dev-story` and `bmad-quick-dev`.
 - E2E accounts are created per test against local Supabase and deleted afterwards.
+- Pre-commit runs `eslint --fix` on staged JS/TS/Vue via lint-staged. Do not skip hooks (`--no-verify`).
 
 ## Product delivery
 
@@ -87,6 +88,7 @@ Plan and implement features through **BMAD Method** workflows (spec → PRD/arch
 pnpm install
 pnpm dev
 pnpm lint
+pnpm lint:fix
 pnpm typecheck
 pnpm test:unit
 pnpm test:e2e

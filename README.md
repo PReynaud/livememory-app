@@ -35,6 +35,8 @@ pnpm test:unit
 pnpm test:e2e
 ```
 
+A pre-commit hook runs `eslint --fix` on staged JS/TS/Vue files. Do not skip it with `--no-verify`.
+
 Playwright refuses non-local Supabase URLs. Create accounts per test; they are deleted afterwards.
 
 ## Language
