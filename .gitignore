@@ -27,6 +27,7 @@ Thumbs.db
 
 # BMAD local artifacts
 _bmad-output/
+*.bak
 
 # Local tooling / OS
 test-results

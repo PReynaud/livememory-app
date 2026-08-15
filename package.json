@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "livememory-app",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,6 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local --schema public > app/types/database.types.ts",
-    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
     "secret-scan": "node scripts/secret-scan.mjs"
   },
   "dependencies": {
@@ -26,7 +25,6 @@
     "@nuxt/ui": "^4.10.0",
     "@nuxtjs/supabase": "2.0.9",
     "@pinia/nuxt": "^0.11.3",
-    "@vite-pwa/nuxt": "1.1.1",
     "nuxt": "^4.4.8",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.3.2"

@@ -6,8 +6,7 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@nuxt/test-utils',
     '@nuxtjs/supabase',
-    '@pinia/nuxt',
-    '@vite-pwa/nuxt'
+    '@pinia/nuxt'
   ],
 
   imports: {
@@ -22,7 +21,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      appName: 'App'
+      appName: 'LiveMemory App'
     }
   },
 
@@ -39,52 +38,6 @@ export default defineNuxtConfig({
         commaDangle: 'never',
         braceStyle: '1tbs'
       }
-    }
-  },
-
-  pwa: {
-    registerType: 'autoUpdate',
-    manifest: {
-      name: 'App',
-      short_name: 'App',
-      description: 'Nuxt app template with Supabase auth.',
-      theme_color: '#0f766e',
-      background_color: '#ffffff',
-      display: 'standalone',
-      orientation: 'portrait',
-      start_url: '/',
-      lang: 'en',
-      icons: [
-        {
-          src: 'pwa-192x192.png',
-          sizes: '192x192',
-          type: 'image/png'
-        },
-        {
-          src: 'pwa-512x512.png',
-          sizes: '512x512',
-          type: 'image/png'
-        },
-        {
-          src: 'pwa-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'maskable'
-        }
-      ]
-    },
-    workbox: {
-      navigateFallback: '/',
-      cleanupOutdatedCaches: true,
-      globPatterns: ['**/*.{js,css,html,png,svg,ico,txt,woff2}']
-    },
-    client: {
-      installPrompt: true
-    },
-    devOptions: {
-      enabled: false,
-      suppressWarnings: true,
-      type: 'module'
     }
   },
 

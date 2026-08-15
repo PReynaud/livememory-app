@@ -27,8 +27,8 @@ const appName = computed(() => config.public.appName);
 
     <UPageSection
       id="features"
-      title="Ready to ship a new app"
-      description="This template is the factory shell: auth, Pinia, tests, and agent tooling already wired."
+      title="Ready to grow LiveMemory App"
+      description="This factory shell already wires auth, Pinia, tests, and agent tooling. Product features land through BMAD."
       :features="[{
         icon: 'i-lucide-shield-check',
         title: 'Supabase auth',
@@ -42,9 +42,9 @@ const appName = computed(() => config.public.appName);
         title: 'Tests first',
         description: 'Vitest for stores and helpers, Playwright against local Supabase.'
       }, {
-        icon: 'i-lucide-smartphone',
-        title: 'Installable PWA',
-        description: 'Remove the PWA files with factory-new-app --no-pwa if you do not need them.'
+        icon: 'i-lucide-map',
+        title: 'BMAD delivery',
+        description: 'Specs, stories, and implementation stay in the factory workflow.'
       }]"
     />
   </div>

@@ -1,5 +1,5 @@
 export default defineAppConfig({
-  name: 'App',
+  name: 'LiveMemory App',
   ui: {
     colors: {
       primary: 'green',

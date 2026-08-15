@@ -1,8 +1,8 @@
 {
   "version": 1,
   "tokens": {
-    "APP_NAME": "App",
-    "APP_SLUG": "app"
+    "APP_NAME": "LiveMemory App",
+    "APP_SLUG": "livememory-app"
   },
   "files": [
     "package.json",
@@ -14,9 +14,5 @@
     "supabase/config.toml",
     ".factory-version"
   ],
-  "pwa": [
-    "scripts/generate-pwa-icons.mjs",
-    "public/pwa-192x192.png",
-    "public/pwa-512x512.png"
-  ]
+  "pwa": []
 }
