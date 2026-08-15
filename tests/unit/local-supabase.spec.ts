@@ -22,3 +22,18 @@ describe('ci workflow', () => {
     expect(source).toContain(LOCAL_SUPABASE_ANON_KEY);
   });
 });
+
+describe('e2e auth fixture', () => {
+  it('imports helpers from the sibling e2e helpers folder', () => {
+    const source = readFileSync(resolve(process.cwd(), 'tests/e2e/fixtures/auth.fixture.ts'), 'utf8');
+
+    expect(source).toContain('from \'../helpers/e2e-account\'');
+    expect(source).toContain('from \'../helpers/wait-for-hydration\'');
+  });
+
+  it('resolves local supabase helpers from the e2e root', () => {
+    const source = readFileSync(resolve(process.cwd(), 'tests/e2e/helpers/e2e-account.ts'), 'utf8');
+
+    expect(source).toContain('from \'../local-supabase\'');
+  });
+});
