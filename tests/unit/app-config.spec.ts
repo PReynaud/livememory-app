@@ -6,6 +6,6 @@ describe('app.config.ts', () => {
   it('imports defineAppConfig because auto-imports are disabled', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/app.config.ts'), 'utf8');
 
-    expect(source).toContain("import { defineAppConfig } from '#imports'");
+    expect(source).toMatch(/import \{ defineAppConfig \} from '#imports'/);
   });
 });

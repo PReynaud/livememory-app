@@ -21,7 +21,7 @@ This document guides agents working in apps generated from `nuxt-app-template`.
 
 ## Design decisions
 
-- Auto-imports are disabled. Import Vue, Nuxt, Pinia, and project modules explicitly.
+- Auto-imports are disabled. Import Vue, Nuxt, Pinia, and project modules explicitly — including `defineAppConfig` in `app/app.config.ts`.
 - Pages and presentational components do not fetch remote data. Use Pinia stores.
 - Schema lives in SQL migrations. Never add Prisma unless the product explicitly opts in.
 - Playwright must target **local** Supabase only.
@@ -76,6 +76,10 @@ export const useMyStore = defineStore('myStore', () => {
 ## Product delivery
 
 Plan and implement features through **BMAD Method** workflows (spec → PRD/architecture/stories → `bmad-dev-story`), not ad-hoc dumps.
+
+## Known pitfalls
+
+- Import `defineAppConfig` from `#imports` in `app/app.config.ts`. Auto-imports are off; omitting it fails `pnpm build:vercel` prerender with `defineAppConfig is not defined` while lint and unit tests still pass.
 
 ## Commands
 

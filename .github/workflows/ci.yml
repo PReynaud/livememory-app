@@ -45,6 +45,7 @@ jobs:
         run: pnpm build:vercel
 
       - name: Setup Supabase CLI
+        id: supabase-cli
         uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -77,5 +78,5 @@ jobs:
           if-no-files-found: ignore
 
       - name: Stop local Supabase
-        if: always()
+        if: always() && steps.supabase-cli.outcome == 'success'
         run: supabase stop

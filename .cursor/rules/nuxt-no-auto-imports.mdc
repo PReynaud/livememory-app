@@ -8,6 +8,8 @@ alwaysApply: true
 `imports.autoImport` is `false`. Always import:
 
 - Vue APIs (`ref`, `computed`, `watch`, …) from `vue`
-- Nuxt helpers from `#imports`
+- Nuxt helpers from `#imports` — including compiler macros (`defineAppConfig`, `definePageMeta`, `defineNuxtRouteMiddleware`, `defineNuxtPlugin`)
 - Stores from `@/stores/...`
 - Utils from `@/utils/...`
+
+`app/app.config.ts` must import `defineAppConfig` from `#imports`. Omitting it passes lint and unit tests, then fails `pnpm build:vercel` prerender with `defineAppConfig is not defined`.
