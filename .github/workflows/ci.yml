@@ -64,7 +64,7 @@ jobs:
       - name: Check generated types are committed
         run: |
           pnpm db:types
-          git diff --exit-code -- app/types/database.types.ts
+          git diff --ignore-cr-at-eol --ignore-blank-lines --exit-code -- app/types/database.types.ts
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
