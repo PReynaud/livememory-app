@@ -8,7 +8,9 @@
     "dev": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "prepare": "simple-git-hooks",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "test:unit": "vitest run",
@@ -36,10 +38,18 @@
     "@vue/test-utils": "^2.4.6",
     "eslint": "^10.7.0",
     "happy-dom": "^20.0.0",
+    "lint-staged": "^17.3.0",
+    "simple-git-hooks": "^2.13.1",
     "supabase": "^2.76.0",
     "typescript": "^6.0.3",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.3.7"
   },
-  "packageManager": "pnpm@11.13.1"
+  "packageManager": "pnpm@11.13.1",
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,vue}": "eslint --fix"
+  }
 }

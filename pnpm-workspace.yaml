@@ -4,3 +4,4 @@ allowBuilds:
   vue-demi: true
   '@parcel/watcher': false
   '@tailwindcss/oxide': false
+  simple-git-hooks: true

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test as base } from '@playwright/test';
-import { createE2EAccountForTest, deleteE2EAccountForTest, type E2EAccount } from './helpers/e2e-account';
-import { waitForNuxtHydration } from './helpers/wait-for-hydration';
+import { createE2EAccountForTest, deleteE2EAccountForTest, type E2EAccount } from '../helpers/e2e-account';
+import { waitForNuxtHydration } from '../helpers/wait-for-hydration';
 
 interface AuthFixtures {
   account: E2EAccount;

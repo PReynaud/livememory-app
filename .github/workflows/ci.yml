@@ -43,11 +43,17 @@ jobs:
 
       - name: Build (Vercel preset)
         run: pnpm build:vercel
+        env:
+          # Local Supabase demo publishable values (not secrets). CI has no .env;
+          # without them prerender of `/` dies in Pinia (`undefined.state`).
+          NUXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NUXT_PUBLIC_SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
 
       - name: Setup Supabase CLI
+        id: supabase-cli
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.114.0
 
       - name: Start local Supabase
         run: supabase start
@@ -58,7 +64,7 @@ jobs:
       - name: Check generated types are committed
         run: |
           pnpm db:types
-          git diff --exit-code -- app/types/database.types.ts
+          git diff --ignore-cr-at-eol --ignore-blank-lines --exit-code -- app/types/database.types.ts
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
@@ -77,5 +83,5 @@ jobs:
           if-no-files-found: ignore
 
       - name: Stop local Supabase
-        if: always()
+        if: always() && steps.supabase-cli.outcome == 'success'
         run: supabase stop

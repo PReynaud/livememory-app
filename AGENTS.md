@@ -21,7 +21,7 @@ This document guides agents working in apps generated from `nuxt-app-template`.
 
 ## Design decisions
 
-- Auto-imports are disabled. Import Vue, Nuxt, Pinia, and project modules explicitly.
+- Auto-imports are disabled. Import Vue, Nuxt, Pinia, and project modules explicitly — including `defineAppConfig` in `app/app.config.ts`.
 - Pages and presentational components do not fetch remote data. Use Pinia stores.
 - Schema lives in SQL migrations. Never add Prisma unless the product explicitly opts in.
 - Playwright must target **local** Supabase only.
@@ -72,10 +72,17 @@ export const useMyStore = defineStore('myStore', () => {
 - Every story must add or update tests (`tests/unit` and/or `tests/e2e`).
 - Prefer red-green-refactor for `bmad-dev-story` and `bmad-quick-dev`.
 - E2E accounts are created per test against local Supabase and deleted afterwards.
+- Pre-commit runs `eslint --fix` on staged JS/TS/Vue via lint-staged. Do not skip hooks (`--no-verify`).
 
 ## Product delivery
 
 Plan and implement features through **BMAD Method** workflows (spec → PRD/architecture/stories → `bmad-dev-story`), not ad-hoc dumps.
+
+## Known pitfalls
+
+- Import `defineAppConfig` from `#imports` in `app/app.config.ts`. Auto-imports are off; omitting it fails `pnpm build:vercel` prerender with `defineAppConfig is not defined` while lint and unit tests still pass.
+- GitHub Actions has no `.env`. The CI Vercel build must set `NUXT_PUBLIC_SUPABASE_URL` and `NUXT_PUBLIC_SUPABASE_KEY` (local demo values) or prerender of `/` fails with `Cannot read properties of undefined (reading 'state')`.
+- Commit `app/types/database.types.ts` from `pnpm db:types` after schema changes. CI regenerates that file and fails on any diff.
 
 ## Commands
 
@@ -83,6 +90,7 @@ Plan and implement features through **BMAD Method** workflows (spec → PRD/arch
 pnpm install
 pnpm dev
 pnpm lint
+pnpm lint:fix
 pnpm typecheck
 pnpm test:unit
 pnpm test:e2e

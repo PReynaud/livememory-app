@@ -24,7 +24,7 @@ pnpm dev
 
 Add `http://localhost:3000/confirm` to the local Supabase Auth redirect URLs.
 
-Production URL: https://livememory-app.pierre-reynaud.fr
+Production URL: https://livememory.pierre-reynaud.fr
 
 ## Tests
 
@@ -34,6 +34,8 @@ pnpm typecheck
 pnpm test:unit
 pnpm test:e2e
 ```
+
+A pre-commit hook runs `eslint --fix` on staged JS/TS/Vue files. Do not skip it with `--no-verify`.
 
 Playwright refuses non-local Supabase URLs. Create accounts per test; they are deleted afterwards.
 

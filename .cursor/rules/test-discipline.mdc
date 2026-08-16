@@ -10,3 +10,4 @@ alwaysApply: true
 - Vitest covers stores, utils, and server handlers. Playwright covers user journeys against **local** Supabase only.
 - Do not claim a story is done while relevant suites are failing or missing.
 - Do not point Playwright at a remote Supabase URL.
+- Do not skip the pre-commit hook (`--no-verify`); it runs `eslint --fix` on staged files.
