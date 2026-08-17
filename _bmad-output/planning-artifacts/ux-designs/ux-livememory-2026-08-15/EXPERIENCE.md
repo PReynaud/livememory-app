@@ -10,7 +10,7 @@ updated: 2026-08-17
 
 # LiveMemory — Experience Spine
 
-Product nouns follow `entities.md`: **Event**, **Event owner**, **Event link**, **Concert**, **Bill**, **Attendance**, **Shared List**. A **joiner** is a signed-in User who opened an Event link and is not the Event owner. Visual tokens live in sibling `DESIGN.md` (`{path.to.token}`). Spines win on conflict with `imports/` and any mock. Spec/PRD win on product rules except where this spine records an explicit UX delta (Leave Event).
+Product nouns follow `entities.md`: **Event**, **Event owner**, **Event link**, **Concert**, **Bill**, **Attendance**, **Shared List**, **Home**, **Concerts**. A **joiner** is a signed-in User who opened an Event link and is not the Event owner. Visual tokens live in sibling `DESIGN.md` (`{path.to.token}`). Spines win on conflict with `imports/` and any mock. Spec/PRD win on product rules. Leave Event is in the PRD.
 
 ## Foundation
 
@@ -20,21 +20,21 @@ UI system: **Nuxt UI 4** on Nuxt 4. Behavioral delta only; do not restyle the li
 
 Product UI language: **English**. On-screen Attendance label is **"Going"**. PRD token `going` / "J'y vais" is the glossary synonym only — this spine overrides FR-4 testable copy for the English UI.
 
-Auth is individual accounts. Two share paths: **Shared List** (public profile; visitors may be signed out; look-only) and **Event link** (unguessable Event URL; joiners must be signed in; own Attendance only). MCP is not a screen; agent-created rows must look identical to UI-created rows.
+Auth is individual accounts. Two share paths: **Shared List** (public profile; visitors may be signed out; tap an Event to open it and join) and **Event link** (unguessable Event URL; joiners must be signed in; own Attendance only). MCP is not a screen; agent-created rows must look identical to UI-created rows.
 
 ## Information Architecture
 
 | Surface | Reached from | Purpose | Who |
 |---|---|---|---|
-| Sign in / Register | Marketing/login URL; Event-link redirect | Email + password. Default land: Home. Event-link: return to that Event after sign-in | Anyone |
+| Sign in / Register | Marketing/login URL; Event-link redirect | Email + password + unique username (FR-1). Default land: Home. Event-link: return to that Event after sign-in | Anyone |
 | Home | Glass nav / side nav | Accueil: featured upcoming Events (owned **and** joined), then nostalgic stats. Not the full log. | Signed-in User |
 | Concerts | Glass nav / side nav | Full Event list: owned and joined, upcoming then past. **2+ Concerts:** Event group. **1 Concert:** compact card (artist once). | Signed-in User |
 | Event (owner) | Group header; Concert row; Event URL while owner | Full Bill, own Attendance, **Add to this festival** / **Add to this night**, soirée attend-all, edit/delete Event. The page URL **is** the Event link (FR-18). No share-sheet product. | Event owner |
-| Event (joiner) | Event link after sign-in; Concerts row | Same Event details and Bill Concerts. Own Attendance only (soirée attend-all for self; festival per Concert). No Add-to-this-Event, no Edit Concert, no Edit/Delete Event. **Leave Event**. | Joiner |
+| Event (joiner) | Event link after sign-in; Concerts row; Shared List tap | Same Event details and Bill Concerts. Own Attendance only (soirée attend-all for self; festival per Concert). No Add-to-this-Event, no Edit Concert, no Edit/Delete Event. **Leave Event**. | Joiner |
 | Add Concert | Nav **Add** (new Event/Concert); owner Event scoped CTA | Create a Concert on an Event the User **owns**. From Event: that Event is prefilled. From nav: picker or transparent single-night. Never writes a joined Bill. | Event owner |
 | Edit Concert | Concert row (owner) | Update fields, Attendance, notes, move Event | Event owner |
 | Profile | Glass nav / side nav | Username, sharing on/off + copy public-profile URL, sign out | Signed-in User |
-| Shared List | Username-derived public URL | Same chrome, read-only that User's `going` + `attended`. Separate from Event links. | Visitor |
+| Shared List | Username-derived public URL | Same chrome, that User's `going` + `attended`. Tap a grouping to open the Event (sign-in then join, FR-18). No write on this page. | Visitor |
 
 Default signed-in landing is **Home**. The rest of the log lives on **Concerts**, not under the Home stats.
 
@@ -97,13 +97,13 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 
 | Component | Use | Behavioral rules |
 |---|---|---|
-| Event group | Concerts, Shared List, Event bill | **2+ Concerts.** Header opens Event. Body lists Concerts by day. Same-day rows: spacing only, **no** hairline. Hairline **above the next day header**. First day under the header: no extra divider. Do not also list those Concerts as standalone rows. |
-| Compact Event | Concerts, Shared List, Home featured when Bill has 1 Concert | Artist once (`{typography.title}`; `{typography.display-sm}` on Home featured). Meta: date · Place · time · Stage if any. If Event name ≠ artist, Event name is a second muted line. Chip on the right. Whole card opens Event (owner/joiner lists). Not a Concert-without-Event. Empty Bills stay a header-only Event group. |
+| Event group | Concerts, Shared List, Event bill | **2+ Concerts.** Header opens Event (on Shared List that is the join path). Body lists Concerts by day. Same-day rows: spacing only, **no** hairline. Hairline **above the next day header**. First day under the header: no extra divider. Do not also list those Concerts as standalone rows. |
+| Compact Event | Concerts, Shared List, Home featured when Bill has 1 Concert | Artist once (`{typography.title}`; `{typography.display-sm}` on Home featured). Meta: date · Place · time · Stage if any. If Event name ≠ artist, Event name is a second muted line. Chip on the right (not on Shared List). Whole card opens Event. Empty Bills stay a header-only Event group. |
 | Featured Event | Home, top | Next 1–3 upcoming Events, larger than a group. **2+ Concerts:** Event name + day-grouped rows (same day-break rule). **1 Concert:** compact anatomy, artist as the featured title. Same tap → Event. Not a "for you" feed. Not followed by the rest of the log. |
-| Concert row | Event, multi-concert groups | Owner: tap row → Edit Concert. Attendance chip cycles **that User's** `going` ↔ clear (future) or `attended` ↔ clear (past). Joiner: chip only — no edit. Shared List visitor: no tap-to-edit, no chips that look like controls. |
+| Concert row | Event, multi-concert groups | Owner: tap row → Edit Concert. Attendance chip cycles **that User's** `going` ↔ clear (future) or `attended` ↔ clear (past). Joiner: chip only — no edit, no notes. Shared List visitor: no chips that look like controls; tap the grouping/card to open Event. |
 | Add sheet | Add Concert, Edit Concert (owner) | Bottom-anchored **glass** panel (`{components.add-sheet}`). Partial height: the Event or list remains visible through the frost. Field order: **Artist** (focused) → Event (picker or "New night") → date → Place → optional time, Stage or Scene, notes. From an owned Event: date/Place/Event locked-prefilled per **FR-7**; festival still asks for **day**. Festival day chips: unselected stay dark; **selected** is filled `{colors.going}` + black label (`{components.choice-chip-selected}`) — selected choice, not a CTA. Place is a field in v1, not a chip. After save: toast + **Add another** with the same Event prefill. Dismiss: swipe down, tap scrim, or Esc. Virtual keyboard docks the sheet above it. Picker lists **owned** Events only. |
 | Event picker | Add sheet | Search **owned** Events; "New night" collects name, date, Place and creates `single_night`. "New festival" is a second explicit choice in the picker, not a toggle buried in settings. Joined Events do not appear. |
-| Attend this night | Event (`single_night` only) | Owner **or** joiner. Sets **that User's** Attendance on current and later Concerts (`going` before Europe/Paris boundary, `attended` after). Hidden on `festival` — per Concert only. |
+| Attend this night | Event (`single_night` only) | Owner **or** joiner. One-shot: sets **that User's** Attendance on Concerts currently on the Bill (`going` before Europe/Paris boundary, `attended` after). Concerts added later start unset. Hidden on `festival` — per Concert only. |
 | Attendance chip | Owner and joiner Event, lists | Confirmed `Going` hollow neon. Confirmed `Attended` solid muted outline. **Unset:** dashed muted ghost of the **next state** — visible **Going** if upcoming, **Attended** if past (`{components.attendance-unset}`). Tap confirms that state. Accessible name "Mark as going" / "Mark as attended". Never "Set", "On the bill", Skipped, +/−, or a third chroma. Never shows another User's Attendance. Shared List: confirmed Going/Attended only (hides ghosts). |
 | Glass nav | Mobile `< lg` | Four targets: Home, Concerts, Add, Profile. Frosted `{components.glass-nav}`. Active = selected choice (filled going icon pill). Add is the white launcher: opens Add sheet for a **new** Event/Concert flow (picker). Never adds a Concert to a joined Event. Hit target ≥ 44px. Not a fifth list. |
 | Primary button | Save; Add to this Event; Attend this night; Copy public-profile link | Large outline `{components.button-primary}` only. Never the Going badge geometry. Never Leave Event. |
@@ -113,7 +113,7 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Leave Event | Event (joiner) | Quiet control, not `{components.button-primary}`. Confirm. Event leaves the joiner's Home and Concerts. Owner Bill unchanged. Rejoin = open the Event URL again while signed in. |
 | Event link | Event (owner) page URL | The Event URL **is** the unguessable link (FR-18). Giving that URL is the share. Optional quiet copy; **no** share sheet, invite modal, or directory. Public-profile off does not disable it. |
 | Stat count | Home, inside `{components.stats-block}` under featured | Three numbers: all-time attended Concerts, all-time Events (owned + joined), current going Concerts. One card, one horizontal row. Not tappable, not charts, not year-over-year, not duplicated on Profile. |
-| Sharing controls | Profile | Toggle enables username URL. Copy link. Helper: "Friends see Going and Attended only — not notes, not the rest of the Bill." |
+| Sharing controls | Profile | Toggle enables username URL. Copy link. Helper: "Friends see Going and Attended. They can open an Event to join — they never edit your bill or see notes." |
 | Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Duplicate artist+date+Event+stage: warning, then confirm to save anyway. |
 
 ## State Patterns
@@ -192,11 +192,11 @@ Phone and desktop are both first-class for **reading**. **Writing a Concert** is
 ## Attendance & Bill (product-specific)
 
 - One shared Event record. Only the **Event owner** edits the Bill. Joiners set **their** Attendance (FR-18).
-- Event view shows the Bill. Each User sees only their Attendance and notes. Unset Concerts show a dashed ghost of the next state (Going / Attended), not "Set" or "On the bill".
-- **Attend this night** is `single_night` only (owner or joiner, self). Festival = per Concert.
-- **Leave Event** is a joiner UX delta (not yet a PRD FR): confirm; drop from their lists; Bill unchanged; URL to rejoin.
+- Event view shows the Bill. The Event owner sees their Attendance and notes. Joiners see only their Attendance (no notes field). Unset Concerts show a dashed ghost of the next state (Going / Attended), not "Set" or "On the bill".
+- **Attend this night** is `single_night` only (owner or joiner, self), one-shot on current Concerts. Festival = per Concert.
+- **Leave Event** is a joiner action (FR-18): confirm; drop from Home and Concerts; Bill unchanged; URL to rejoin.
 - Home featured includes joined upcoming Events. Concerts lists owned + joined.
-- Shared List is a separate look-only profile. Event links work with public profile off.
+- Shared List is a public profile. Tap an Event to open it and join (FR-18). The Shared List page itself has no write. After join, the visitor sees the full Bill.
 
 ## Key Flows
 
@@ -232,8 +232,8 @@ Failure: Concert date outside the range → "This date is outside the Event." pl
 
 1. Pierre enabled sharing on Profile and texted Sam the username URL.
 2. Sam opens it signed out. Same dark app chrome, no glass Add, no edit.
-3. He sees Pierre's `going` and `attended` grouped by Event. No notes. No bill-only rows.
-4. **Climax:** Sam understands what Pierre is going to and what he saw, and cannot change anything.
+3. He sees Pierre's `going` and `attended` grouped by Event. No notes. No bill-only rows. He taps an Event.
+4. **Climax:** Sign-in if needed, then the Event: full Bill, his own Attendance. He cannot edit the Bill.
 
 Failure: sharing off or unknown username → not-found empty, no account enumeration copy.
 
@@ -255,7 +255,9 @@ FR-1 first-run (register → Home → first Concert under 3 minutes) is Flow 1 a
 - New festival is an explicit picker choice. Add sheet never writes a joined Bill.
 - Empty future **owned** Events show on Concerts, and on Home featured when they are among the next 1–3.
 - Event URL is the Event link; no share-sheet product.
-- Leave Event is a joiner action (PRD should align).
+- Leave Event is a joiner action (FR-18).
+- Shared List groupings open the Event (join path).
+- Register collects username (FR-1).
 - v1 no offline write queue.
 - Desktop: left rail; mobile: glass nav. Frost is required on mobile chrome.
 - Factory green is out (**locked**). `{colors.primary}` is `{colors.going}`. Primary buttons are **large outline** (2px, 44px, no glow). Going attendance is **small neon** (1px, 24px, glow). Selected choice is **filled**. Add (+) stays white. Sparse touches only — never a second accent hue.
