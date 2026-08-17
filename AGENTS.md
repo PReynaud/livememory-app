@@ -96,3 +96,15 @@ pnpm test:unit
 pnpm test:e2e
 pnpm build
 ```
+
+## Cursor Cloud specific instructions
+
+Standard commands live in `## Commands` above, `README.md`, and `package.json` scripts. The update script only runs `pnpm install` (its `postinstall` runs `nuxt prepare`) and ensures `.env` exists. Anything below must be started manually per session; do not add service startup to the update script.
+
+- **Docker daemon (required for Supabase).** Local Supabase runs in Docker. Docker is preinstalled but the daemon does not auto-start (PID 1 is `tini`, not systemd). If `docker ps` fails, start it once: `sudo dockerd > /tmp/dockerd.log 2>&1 &`. The daemon is configured for this VM's kernel in `/etc/docker/daemon.json` (`fuse-overlayfs` storage driver + `containerd-snapshotter` disabled — required for Docker 29) and `iptables` is set to the legacy backend. The `ubuntu` user is in the `docker` group, so `docker`/`supabase` work without `sudo`.
+- **Supabase CLI is a devDependency**, not a global binary. Invoke it via `pnpm exec supabase ...` or the `db:*` scripts (`pnpm db:start`, `pnpm db:reset`, `pnpm db:stop`, `pnpm db:types`). First `supabase start` pulls several images (slow); later starts are fast.
+- **`.env`:** `.env` is gitignored (never committed); copy it from `.env.example` (the update script does this if missing). Its `NUXT_PUBLIC_SUPABASE_URL` + anon `NUXT_PUBLIC_SUPABASE_KEY` demo values are the real local Supabase values and are all `pnpm dev` needs. `.env.example` leaves `SUPABASE_SERVICE_ROLE_KEY` as a placeholder — E2E does not depend on it because `playwright.config.ts` and `tests/e2e/helpers/e2e-account.ts` fall back to `LOCAL_SUPABASE_SERVICE_ROLE_KEY` from `tests/e2e/local-supabase.ts` (the standard local demo key). Only set it in `.env` if you run service-role calls outside Playwright.
+- **Bring the stack up:** with the Docker daemon running, `pnpm db:start` then `pnpm db:reset` (applies `supabase/migrations` + `supabase/seed.sql`). After changing schema, run `pnpm db:types` and commit `app/types/database.types.ts` (CI fails on any diff — see Known pitfalls).
+- **Dev server:** `pnpm dev` serves on `http://localhost:3000`. Routes compile on demand, so the very first request to a page can take several seconds or briefly fail to connect before it is ready. For manual auth flows, note `README.md` mentions adding `http://localhost:3000/confirm` to Supabase Auth redirect URLs while `supabase/config.toml` uses `127.0.0.1`; `localhost` and `127.0.0.1` are not interchangeable in the redirect allow-list.
+- **E2E:** `pnpm test:e2e` launches its own dev server on port `4173` and targets local Supabase only (it refuses remote URLs). It needs local Supabase running and Playwright's Chromium installed. Chromium is already in the VM snapshot; if it is missing use `pnpm exec playwright install chromium`, and add `--with-deps` (matches CI) when system libraries are also missing. Creating accounts requires email confirmation to be off, which it is in `supabase/config.toml`.
+- **Ports:** app `3000` (e2e dev server `4173`), Supabase API `54321`, Studio `54323`, Postgres `54322`, Mailpit `54324`.
