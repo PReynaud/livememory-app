@@ -7,7 +7,6 @@ companions:
 sources:
   - ../../planning-artifacts/prds/prd-livememory-2026-08-17/prd.md
   - ../../planning-artifacts/prds/prd-livememory-2026-08-17/addendum.md
-  - C:/Users/pierr/Documents/Projects/LiveMemorySpec/specs/001-concert-attendance-log/spec.md
 ---
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability — consult them only if you need narrative rationale or prose color this contract intentionally omits.

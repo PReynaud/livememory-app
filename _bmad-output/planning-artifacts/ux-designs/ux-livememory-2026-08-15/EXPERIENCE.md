@@ -73,6 +73,8 @@ Modal stack: one level. Add sheet may sit on Event; never a dialog on a dialog.
 
 Pierre accepted spine-only for Sign in, Profile, Shared List, and joiner Event at Finalize.
 
+HTML mocks are visual comps. Implement Attendance chips as `<button>` with accessible names from Component Patterns; do not copy `<span>` markup from mocks. Spines win on conflict.
+
 ## Voice and Tone
 
 Microcopy. Brand posture is in `DESIGN.md`.
@@ -128,6 +130,7 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Fetch error | Home, Concerts, Event, Shared List | Named failure: "Couldn't load." Retry. |
 | Empty upcoming on Home | Home | Featured empty: `{typography.display-sm}` "Nothing upcoming." Stats still show (zeros allowed). Body: "Add a night or a concert." Primary: Add concert. No substitute list of past Events on Home. |
 | Empty Concerts | Concerts | "No shows yet." Same primary. |
+| Long Concerts list | Concerts, Shared List | Window or paginate to hit the 1,000-Concert NFR. No infinite scroll. Muted "Loading more" row at the list end while the next page fetches. |
 | Empty Event Bill | Event (owner) | "No concerts on this bill." Primary: **Add to this festival** / **Add to this night** (prefilled). |
 | Empty Event Bill | Event (joiner) | "No concerts on this bill." No Add CTA. |
 | Unsigned Event link | Event URL | Redirect to Sign in. After success, open that Event as joiner (or as owner if it is theirs). |
