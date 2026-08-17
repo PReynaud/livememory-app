@@ -25,8 +25,12 @@ Thumbs.db
 .env.*
 !.env.example
 
-# BMAD local artifacts
-_bmad-output/
+# BMAD local artifacts (keep UX spines and mocks in git)
+_bmad-output/**
+!_bmad-output/planning-artifacts/
+!_bmad-output/planning-artifacts/ux-designs/
+!_bmad-output/planning-artifacts/ux-designs/**
+_bmad-output/planning-artifacts/ux-designs/**/.working/
 *.bak
 
 # Local tooling / OS
