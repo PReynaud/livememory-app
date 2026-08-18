@@ -1,0 +1,21 @@
+import { expect, test } from './fixtures/auth.fixture';
+
+test('shows empty Home and Concerts copy with a no-op Add concert control', async ({ authenticatedPage }) => {
+  await expect(authenticatedPage.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Nothing upcoming.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Add a night or a concert.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Attended')).toBeVisible();
+  await expect(authenticatedPage.getByText('0').first()).toBeVisible();
+
+  await authenticatedPage.locator('main').getByRole('button', { name: 'Add concert' }).click();
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expect(authenticatedPage).toHaveURL(/\/home/);
+
+  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await expect(authenticatedPage).toHaveURL(/\/concerts/);
+  await expect(authenticatedPage.getByText('No shows yet.')).toBeVisible();
+
+  await authenticatedPage.locator('main').getByRole('button', { name: 'Add concert' }).click();
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expect(authenticatedPage).toHaveURL(/\/concerts/);
+});

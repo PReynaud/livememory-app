@@ -4,6 +4,7 @@ export interface E2EAccount {
   userId: string;
   email: string;
   password: string;
+  username: string;
 }
 
 const toToken = (seed: string) => seed.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10) || 'e2euser';
@@ -13,7 +14,8 @@ export const generateE2EAccountData = (seed: string) => {
   const suffix = Date.now();
   return {
     email: `e2e_${token}_${suffix}@example.com`,
-    password: `Pw_${token}_${suffix}!`
+    password: `Pw_${token}_${suffix}!`,
+    username: `u_${token}_${suffix}`
   };
 };
 
@@ -28,9 +30,10 @@ const adminHeaders = () => {
   };
 };
 
-export const createE2EAccountForTest = async (seed: string): Promise<E2EAccount> => {
+export const createE2EAccountForTest = async (seed: string, username?: string): Promise<E2EAccount> => {
   const { supabaseUrl, serviceRoleKey } = adminHeaders();
   const generated = generateE2EAccountData(seed);
+  const accountUsername = username ?? generated.username;
 
   const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: 'POST',
@@ -42,7 +45,10 @@ export const createE2EAccountForTest = async (seed: string): Promise<E2EAccount>
     body: JSON.stringify({
       email: generated.email,
       password: generated.password,
-      email_confirm: true
+      email_confirm: true,
+      user_metadata: {
+        username: accountUsername
+      }
     })
   });
 
@@ -55,7 +61,8 @@ export const createE2EAccountForTest = async (seed: string): Promise<E2EAccount>
   return {
     userId: payload.id,
     email: payload.email || generated.email,
-    password: generated.password
+    password: generated.password,
+    username: accountUsername
   };
 };
 
@@ -72,5 +79,35 @@ export const deleteE2EAccountForTest = async (userId: string): Promise<void> => 
 
   if (!response.ok && response.status !== 404) {
     throw new Error(`Failed to delete E2E account: ${await response.text()}`);
+  }
+};
+
+export const deleteE2EAccountByEmail = async (email: string): Promise<void> => {
+  const { supabaseUrl, serviceRoleKey } = adminHeaders();
+
+  for (let page = 1; page <= 5; page += 1) {
+    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=200`, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to list E2E accounts: ${await response.text()}`);
+    }
+
+    const payload = await response.json() as { users?: { id: string; email?: string }[] };
+    const users = payload.users ?? [];
+    const user = users.find(entry => entry.email === email);
+
+    if (user) {
+      await deleteE2EAccountForTest(user.id);
+      return;
+    }
+
+    if (users.length < 200) {
+      return;
+    }
   }
 };

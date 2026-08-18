@@ -2,6 +2,13 @@ import { defineStore } from 'pinia';
 import { computed } from 'vue';
 import { navigateTo, useSupabaseClient, useSupabaseUser } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
+import {
+  EMAIL_TAKEN_ERROR,
+  isDuplicateEmailSignUp,
+  mapSignInError,
+  mapSignUpError
+} from '@/utils/auth-errors';
+import { isValidUsername, USERNAME_CHARSET_ERROR } from '@/utils/username';
 
 export const useAuthStore = defineStore('auth', () => {
   const supabase = useSupabaseClient();
@@ -25,26 +32,45 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error: unknown) {
       return {
         data: null,
-        error: getErrorMessage(error, 'An error occurred during sign in')
+        error: mapSignInError(error)
       };
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, username: string) => {
+    if (!isValidUsername(username)) {
+      return {
+        data: null,
+        error: USERNAME_CHARSET_ERROR
+      };
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          data: {
+            username
+          }
+        }
       });
 
       if (error) {
         throw error;
       }
 
-      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      if (isDuplicateEmailSignUp(data.user)) {
         return {
           data: null,
-          error: 'An account already exists with this email. Please sign in.'
+          error: EMAIL_TAKEN_ERROR
+        };
+      }
+
+      if (!data.user) {
+        return {
+          data: null,
+          error: 'An error occurred during sign up'
         };
       }
 
@@ -52,7 +78,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error: unknown) {
       return {
         data: null,
-        error: getErrorMessage(error, 'An error occurred during sign up')
+        error: mapSignUpError(error)
       };
     }
   };

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { assertLocalSupabaseUrl, LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from '../e2e/local-supabase';
+import { generateE2EAccountData } from '../e2e/helpers/e2e-account';
 
 describe('assertLocalSupabaseUrl', () => {
   it('allows loopback hosts', () => {
@@ -35,5 +36,13 @@ describe('e2e auth fixture', () => {
     const source = readFileSync(resolve(process.cwd(), 'tests/e2e/helpers/e2e-account.ts'), 'utf8');
 
     expect(source).toContain('from \'../local-supabase\'');
+    expect(source).toContain('user_metadata');
+    expect(source).toMatch(/username:\s*accountUsername/);
+  });
+
+  it('generates a charset-valid username with the email and password', () => {
+    const account = generateE2EAccountData('Unit User');
+    expect(account.username).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(account.email).toContain('@example.com');
   });
 });
