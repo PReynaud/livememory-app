@@ -5,7 +5,7 @@ sources:
   - _bmad-output/specs/spec-livememory/SPEC.md
   - _bmad-output/specs/spec-livememory/entities.md
   - _bmad-output/planning-artifacts/prds/prd-livememory-2026-08-17/prd.md
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # LiveMemory — Experience Spine
@@ -116,7 +116,7 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Event link | Event (owner) page URL | The Event URL **is** the unguessable link (FR-18). Giving that URL is the share. Optional quiet copy; **no** share sheet, invite modal, or directory. Public-profile off does not disable it. |
 | Stat count | Home, inside `{components.stats-block}` under featured | Three numbers: all-time attended Concerts, all-time Events (owned + joined), current going Concerts. One card, one horizontal row. Not tappable, not charts, not year-over-year, not duplicated on Profile. |
 | Sharing controls | Profile | Toggle enables username URL. Copy link. Helper: "Friends see Going and Attended. They can open an Event to join — they never edit your bill or see notes." |
-| Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Duplicate artist+date+Event+stage: warning, then confirm to save anyway. |
+| Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Concert identity (FR-13): timed match attaches (navigate to existing); different Place is a named refuse; missing time asks attach vs create. |
 
 ## State Patterns
 
@@ -140,7 +140,7 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Empty Shared List | Shared List | If sharing on but nothing visible: "Nothing to show yet." No add CTA. |
 | Sharing off / unknown user | Shared List URL | Not found. Same quiet empty as unknown slug — do not say "this user exists but is private." |
 | Invalid save | Add / Edit | Inline + named rule. Stay in the sheet. |
-| Duplicate warning | Add / Edit | Confirm to proceed; cancel keeps the draft. |
+| Concert identity | Add / Edit | Timed match: navigate to the existing Concert (draft not saved as a second row). Impossible Place: named refuse, stay in the sheet. Missing time: choose attach or create; cancel keeps the draft. |
 | Delete Event | Event | Confirm: Event **and** all Concerts are deleted. No keep-standalone. |
 | `going` becomes `attended` | Home / Concerts / Event | After Europe/Paris past, the Concert leaves Home featured (if it was there) and sits with past Events on Concerts. No interstitial "How was it?" |
 | Visitor signed in as someone else | Shared List | Read-only. No edit chrome. |

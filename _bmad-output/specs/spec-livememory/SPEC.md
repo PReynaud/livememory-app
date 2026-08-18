@@ -21,7 +21,7 @@ A music fan needs one private record of the shows they plan to attend and attend
 
 - **CAP-1**
   - **intent:** A music fan can register (email, password, unique username), sign in and out, and create, view, update, and delete Events they own and Concerts on those Events so a lasting personal history exists.
-  - **success:** After register and sign-in the User lands on Home; adding a Concert to an owned Event persists after sign-out and sign-in; other Users do not see it unless they open that Event (Event URL or Shared List tap).
+  - **success:** After register and sign-in the User lands on Home; adding a Concert to an owned Event persists after sign-out and sign-in; a timed identity match in the owner's journal attaches to the existing Concert instead of inserting a second row; other Users do not see it unless they open that Event (Event URL or Shared List tap).
 - **CAP-2**
   - **intent:** A user can manage Events as groups of Concerts (single-night lineups or multi-day festivals), create an Event before its Concerts or transparently with the first Concert, and use Event data to prefill later entries.
   - **success:** Every Concert belongs to exactly one Event; Concerts lists owned and joined Events grouped (festivals by day); Home shows the next 1–3 upcoming plus three souvenir stats; transparent create names the Event `Concerts on {DD/MM/YYYY} at {Place}`.
@@ -36,7 +36,7 @@ A music fan needs one private record of the shows they plan to attend and attend
   - **success:** `going` becomes `attended` after optional time or Europe/Paris end-of-day; unset stays Bill-only; owner default `going`/`attended` applies only to transparent one-Concert create; attend-all is a one-shot on current `single_night` Concerts; past allows `attended` or unset, future allows `going` or unset.
 - **CAP-6**
   - **intent:** An authenticated agent can read and manipulate the same Events, Concerts, and Attendance as the UI under the same product rules.
-  - **success:** After UI CRUD exists, MCP operations produce the same records, validation, duplicate handling, and access control as the acting User's UI rights; unauthenticated callers cannot write.
+  - **success:** After UI CRUD exists, MCP operations produce the same records, validation, Concert-identity outcomes (attach, refuse, or the same attach-or-create choice), and access control as the acting User's UI rights; unauthenticated callers cannot write.
 - **CAP-7**
   - **intent:** A signed-in User can open an Event (via its URL or from a Shared List), see the shared Bill, record their own Attendance, and leave, without editing the Event or Bill.
   - **success:** The joiner sees the same Concerts as the Event owner, can set or clear only their Attendance (including one-shot soirée attend-all), cannot add/edit/delete Concerts or the Event, cannot write notes, does not see other Users' Attendance or owner notes, can leave (Event leaves Home and Concerts; their Attendance is deleted), and is not auto-joined when the owner moves a Concert to another Event.
@@ -56,7 +56,7 @@ A music fan needs one private record of the shows they plan to attend and attend
 - Event Place is inherited by default; an Event may opt in to per-Concert Place overrides.
 - An Event with no Stage/Scene list allows Concerts without a Stage/Scene. A defined list restricts selection to those names.
 - Event edits that would invalidate existing Concerts are blocked and list the conflicts unless the owner saves Event dates and Concert dates together.
-- Same artist or group + date + Event + Stage/Scene may be saved twice only after a warning (separate performances).
+- Concert create identity is the Event owner's journal, not all Users. Artist match is case-insensitive. Same owner + artist + date + clock time: do not insert; attach to the existing Concert (do not move it to another Event). Same identity at a different effective Place: refuse. Same owner + artist + date with time missing on one or both: ask attach (may then set time on the existing Concert) or create a second Concert; UI and MCP must offer the same choice. Same artist + date + different times: allowed without asking. Moving a Concert between Events is a separate owner operation, not create/attach.
 - Deleting a non-empty Event is owner-only, requires explicit confirmation naming joiner impact, deletes its Concerts and Attendance, and removes the Event for every joiner. Concerts are never kept standalone. Empty Events are owner-deletable without the Concert warning; the Event URL becomes unknown.
 - Moving a Concert does not auto-join source joiners to the target. Attendance follows the Concert id and remains visible only where that User may view the Concert.
 - Attendance is `going`, `attended`, or unset (Bill-only). There is no skipped value. Past: `attended` or unset (`going` on a past Concert stores `attended`). Future: `going` or unset (`attended` on a future Concert is rejected). `attended` cannot become `going`. Clear at the past boundary stays unset.
@@ -64,7 +64,7 @@ A music fan needs one private record of the shows they plan to attend and attend
 - MCP authenticates as the acting User and follows UI validation and access rules. Screenshot or running-order interpretation happens outside LiveMemory.
 - Factory stack is binding: Nuxt 4, Nuxt UI, Pinia for remote data, SQL migrations with RLS, no Prisma, no PWA. Playwright targets local Supabase only. Every story adds or updates tests.
 - Personal lists of about 1,000 concerts must remain usable (target: complete list within 2 seconds under normal use).
-- Validation copy must name the failed rule (dates, stage, required fields, or ownership).
+- Validation copy must name the failed rule (dates, stage, required fields, ownership, or Concert identity).
 
 ## Non-goals
 
