@@ -13,7 +13,7 @@ const showAppChrome = computed(() => {
     return false;
   }
 
-  return /^\/(home|concerts|profile)(\/|$)/.test(route.path);
+  return /^\/(home|concerts|profile|e)(\/|$)/.test(route.path);
 });
 
 useHead({

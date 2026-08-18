@@ -14,6 +14,8 @@ test('shows empty Home and Concerts copy with a no-op Add concert control', asyn
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
   await expect(authenticatedPage.getByText('No shows yet.')).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: 'New night' })).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: 'New festival' })).toBeVisible();
 
   await authenticatedPage.locator('main').getByRole('button', { name: 'Add concert' }).click();
   await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
