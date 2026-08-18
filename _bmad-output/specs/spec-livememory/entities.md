@@ -20,7 +20,7 @@ The signed-in User's full Event log: Events they own (including empty) and Event
 
 ## Concert
 
-One artist or group performing on a date, with an optional time. Belongs to exactly one Event. Optional Stage/Scene. Attendance is per User. Notes are Event-owner-only in v1. On create, identity is the Event owner's journal (artist case-insensitive + date + clock time): an exact timed match attaches to the existing Concert; the same identity at a different effective Place is refused; missing time on either side asks attach (may then set time) or create a second Concert.
+One artist or group performing on a date, with an optional time. Belongs to exactly one Event. Optional Stage/Scene. Attendance is per User. Notes are Event-owner-only in v1. On create, identity is the Event owner's journal (artist case-insensitive + date + clock time). Event and Stage/Scene are not part of that key. An exact timed match attaches to the existing Concert (including on another owned Event or another stage; attach does not reparent); the same identity at a different effective Place is refused; missing time on either side asks attach (may then set time) or create a second Concert.
 
 ## Event
 

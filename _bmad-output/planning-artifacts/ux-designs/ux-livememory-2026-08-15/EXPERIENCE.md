@@ -116,7 +116,7 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Event link | Event (owner) page URL | The Event URL **is** the unguessable link (FR-18). Giving that URL is the share. Optional quiet copy; **no** share sheet, invite modal, or directory. Public-profile off does not disable it. |
 | Stat count | Home, inside `{components.stats-block}` under featured | Three numbers: all-time attended Concerts, all-time Events (owned + joined), current going Concerts. One card, one horizontal row. Not tappable, not charts, not year-over-year, not duplicated on Profile. |
 | Sharing controls | Profile | Toggle enables username URL. Copy link. Helper: "Friends see Going and Attended. They can open an Event to join — they never edit your bill or see notes." |
-| Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Concert identity (FR-13): timed match attaches (navigate to existing); different Place is a named refuse; missing time asks attach vs create. |
+| Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Concert identity (FR-13): timed match attaches and navigates to the existing Concert (including another owned Event or another Stage/Scene — those are not identity keys); different Place is a named refuse; missing time asks attach vs create. |
 
 ## State Patterns
 

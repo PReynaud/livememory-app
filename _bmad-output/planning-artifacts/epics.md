@@ -50,7 +50,7 @@ FR-11: Deleting a non-empty Event is Event-owner-only and requires explicit conf
 
 FR-12: A Concert cannot be saved or moved outside its Event dates, on a disallowed Stage/Scene, or with a conflicting Place when override is off. Event start and end dates are inclusive Europe/Paris calendar dates. A defined Stage/Scene list restricts selection to those names. Event Place is inherited by default. Incompatible Event updates are blocked and list every affected Concert. The Event owner can change Event dates and Concert dates in one save so a range correction cannot deadlock.
 
-FR-13: Validation copy names the failed rule (dates, Stage/Scene, required fields, ownership, or Concert identity). Concert identity is the Event owner's journal, not a worldwide catalog. Same owner, artist (case-insensitive), date, and clock time: no new row; return the existing Concert (attach) without moving it. Same owner, artist, date, and time at a different effective Place: create is refused. Same owner, artist, and date with time missing on one or both sides: User (and MCP) must choose attach (may then set time on the existing Concert) or create a second Concert. Same artist and date with different times: create is allowed without that choice.
+FR-13: Validation copy names the failed rule (dates, Stage/Scene, required fields, ownership, or Concert identity). Concert identity is the Event owner's journal, not a worldwide catalog. Same owner, artist (case-insensitive), date, and clock time: no new row; return the existing Concert (attach) without moving it. Event and Stage/Scene are not part of that identity key: a timed match on another owned Event still attaches (does not reparent); the same timed match on a different Stage/Scene still attaches. Same owner, artist, date, and time at a different effective Place: create is refused. Same owner, artist, and date with time missing on one or both sides: User (and MCP) must choose attach (may then set time on the existing Concert) or create a second Concert. Same artist and date with different times: create is allowed without that choice.
 
 FR-14: A User's Shared List is off until they enable it. With the public profile off, the username URL is not visible. Event links still work (FR-18).
 
@@ -394,6 +394,15 @@ So that my journal stays one Concert per identity in my own log.
 **Given** I already have a Concert with the same artist (case-insensitive), date, and clock time
 **When** I create again with that identity
 **Then** the domain returns `attached`, no new row is inserted, `event_id` does not change, and the UI navigates to the existing Concert (FR-13, AD-10)
+
+**Given** that timed identity already exists on Event A that I own
+**When** I create the same artist, date, and clock time under Event B that I also own
+**Then** the domain returns `attached`, no new row is inserted, and `event_id` stays Event A (attach does not reparent)
+**And** the UI navigates to the existing Concert on Event A and copy names that it already exists on another Event (FR-13, AD-10)
+
+**Given** that timed identity already exists on one Stage/Scene
+**When** I create the same owner, artist, date, and clock time on a different Stage/Scene
+**Then** the domain returns `attached` to the existing row — Stage/Scene is not part of Concert identity (FR-13, AD-10)
 
 **Given** that same timed identity at a different effective Place
 **When** I create

@@ -274,6 +274,7 @@ Validation copy names the failed rule (dates, Stage/Scene, required fields, owne
 **Consequences (testable):**
 - The message identifies which rule failed.
 - Same owner, artist (case-insensitive), date, and clock time: no new row; the existing Concert is returned (attach). Attach does not move the Concert to the Event being created under.
+- Event and Stage/Scene are not part of Concert identity. A timed match on a different owned Event still attaches (does not reparent). A timed match on a different Stage/Scene still attaches.
 - Same owner, artist, date, and time at a different effective Place: create is refused.
 - Same owner, artist, and date, with time missing on one or both sides: the User (and MCP) must choose attach (may then set time on the existing Concert) or create a second Concert.
 - Same artist and date with different times: create is allowed without that choice.
