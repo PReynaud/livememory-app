@@ -25,13 +25,15 @@ Thumbs.db
 .env.*
 !.env.example
 
-# BMAD local artifacts (keep UX, PRD, and spec contracts in git)
+# BMAD local artifacts (keep UX, PRD, spec, and architecture contracts in git)
 _bmad-output/**
 !_bmad-output/planning-artifacts/
 !_bmad-output/planning-artifacts/ux-designs/
 !_bmad-output/planning-artifacts/ux-designs/**
 !_bmad-output/planning-artifacts/prds/
 !_bmad-output/planning-artifacts/prds/**
+!_bmad-output/planning-artifacts/architecture/
+!_bmad-output/planning-artifacts/architecture/**
 !_bmad-output/specs/
 !_bmad-output/specs/**
 _bmad-output/planning-artifacts/ux-designs/**/.working/
@@ -40,6 +42,7 @@ _bmad-output/planning-artifacts/ux-designs/**/validation-report.*
 _bmad-output/planning-artifacts/prds/**/.working/
 _bmad-output/planning-artifacts/prds/**/review-*.md
 _bmad-output/planning-artifacts/prds/**/validation-report.*
+_bmad-output/planning-artifacts/architecture/**/reviews/
 *.bak
 
 # Local tooling / OS
