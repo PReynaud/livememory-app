@@ -2,7 +2,7 @@
 title: LiveMemory
 status: final
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # PRD: LiveMemory
@@ -267,13 +267,17 @@ A Concert cannot be saved or moved outside its Event dates, on a disallowed Stag
 - Incompatible Event updates are blocked and list every affected Concert.
 - The Event owner can change Event dates and Concert dates in one save so a range correction cannot deadlock against existing Concerts.
 
-#### FR-13: Named validation and duplicate warning
+#### FR-13: Named validation and Concert identity on create
 
-Validation copy names the failed rule (dates, Stage/Scene, required fields, or ownership). A Concert matching an existing artist or group, date, Event, and Stage/Scene may be saved only after the User acknowledges a duplicate warning.
+Validation copy names the failed rule (dates, Stage/Scene, required fields, ownership, or Concert identity). Creating a Concert uses the Event owner's journal, not a worldwide artist catalog. This overrides the earlier warn-then-allow duplicate rule.
 
 **Consequences (testable):**
 - The message identifies which rule failed.
-- A second matching Concert is not saved until the User confirms the warning.
+- Same owner, artist (case-insensitive), date, and clock time: no new row; the existing Concert is returned (attach). Attach does not move the Concert to the Event being created under.
+- Event and Stage/Scene are not part of Concert identity. A timed match on a different owned Event still attaches (does not reparent). A timed match on a different Stage/Scene still attaches.
+- Same owner, artist, date, and time at a different effective Place: create is refused.
+- Same owner, artist, and date, with time missing on one or both sides: the User (and MCP) must choose attach (may then set time on the existing Concert) or create a second Concert.
+- Same artist and date with different times: create is allowed without that choice.
 
 ### 5.4 Shared List
 
@@ -345,11 +349,11 @@ The Event owner can copy an unguessable Event link. A signed-in User who opens i
 
 #### FR-17: Machine interface with the same rules
 
-An authenticated agent can list, read, create, update, move, and delete Events and Concerts, including Attendance, subject to the same Event-owner vs joiner rights, validation, duplicate-confirmation, and deletion rules as the UI.
+An authenticated agent can list, read, create, update, move, and delete Events and Concerts, including Attendance, subject to the same Event-owner vs joiner rights, validation, Concert-identity (FR-13), and deletion rules as the UI.
 
 **Consequences (testable):**
 - An agent-created Concert is indistinguishable in the UI from one created in the form (same fields, same rules).
-- Agent deletion follows FR-11; moves and updates follow FR-12; duplicate responses support explicit confirmation under FR-13; Event-link joins follow FR-18.
+- Agent deletion follows FR-11; moves and updates follow FR-12; Concert-identity outcomes follow FR-13 (attach, refuse, or the same attach-or-create choice as the UI); Event-link joins follow FR-18.
 - A joiner's agent cannot edit the Bill.
 - An unauthenticated caller cannot write.
 - v1 ships a machine interface after the first UI CRUD path works; both are in MVP. The intended interface is MCP — see addendum.
