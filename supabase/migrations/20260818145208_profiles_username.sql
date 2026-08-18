@@ -8,6 +8,24 @@ set username = display_name
 where username is null
   and display_name ~ '^[A-Za-z0-9_-]+$';
 
+-- Keep one row when two valid display_names collide case-insensitively.
+update public.profiles as later
+set username = null
+where later.username is not null
+  and exists (
+    select 1
+    from public.profiles as earlier
+    where earlier.id < later.id
+      and earlier.username is not null
+      and lower(earlier.username) = lower(later.username)
+  );
+
+-- Legacy factory names (email local-parts with `.` / `+`, leftover collisions)
+-- get a deterministic unique handle from the row id.
+update public.profiles
+set username = 'u' || replace(id::text, '-', '')
+where username is null;
+
 alter table public.profiles
   drop column display_name;
 
@@ -46,6 +64,26 @@ end;
 $$;
 
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
+
+-- Boolean-only lookup so register can tell a unique collision from other
+-- trigger failures. SECURITY DEFINER is required because own-row RLS would
+-- hide other usernames from anon.
+create or replace function public.username_is_taken(candidate text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where lower(username) = lower(candidate)
+  );
+$$;
+
+revoke all on function public.username_is_taken(text) from public;
+grant execute on function public.username_is_taken(text) to anon, authenticated;
 
 create or replace function public.prevent_username_update()
 returns trigger

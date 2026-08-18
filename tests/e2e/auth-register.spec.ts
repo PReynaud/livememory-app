@@ -23,7 +23,7 @@ test('registers with username and lands on a branded Home', async ({ page }) => 
     await page.locator('input[name="password"]').fill(account.password);
     await page.getByRole('button', { name: 'Sign up', exact: true }).click();
 
-    await expect(page).toHaveURL(/\/home/);
+    await expect(page).toHaveURL(/\/home$/);
     await expect(page.getByText('Nothing upcoming.')).toBeVisible();
 
     await page.getByRole('link', { name: 'Profile' }).click();

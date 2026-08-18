@@ -4,14 +4,17 @@ import { navigateTo, useSupabaseClient, useSupabaseUser } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
 import {
   EMAIL_TAKEN_ERROR,
+  isDatabaseErrorSavingNewUser,
   isDuplicateEmailSignUp,
   mapSignInError,
-  mapSignUpError
+  mapSignUpError,
+  USERNAME_TAKEN_ERROR
 } from '@/utils/auth-errors';
 import { isValidUsername, USERNAME_CHARSET_ERROR } from '@/utils/username';
+import type { Database } from '@/types/database.types';
 
 export const useAuthStore = defineStore('auth', () => {
-  const supabase = useSupabaseClient();
+  const supabase = useSupabaseClient<Database>();
   const supabaseUser = useSupabaseUser();
 
   const user = computed(() => supabaseUser.value);
@@ -37,6 +40,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   };
 
+  const lookupUsernameTaken = async (candidate: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('username_is_taken', { candidate });
+
+    if (error) {
+      return false;
+    }
+
+    return data === true;
+  };
+
   const signUp = async (email: string, password: string, username: string) => {
     if (!isValidUsername(username)) {
       return {
@@ -46,6 +59,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
+      if (await lookupUsernameTaken(username)) {
+        return {
+          data: null,
+          error: USERNAME_TAKEN_ERROR
+        };
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -76,9 +96,22 @@ export const useAuthStore = defineStore('auth', () => {
 
       return { data, error: null };
     } catch (error: unknown) {
+      const mapped = mapSignUpError(error);
+
+      if (
+        mapped !== USERNAME_TAKEN_ERROR
+        && isDatabaseErrorSavingNewUser(error)
+        && await lookupUsernameTaken(username)
+      ) {
+        return {
+          data: null,
+          error: USERNAME_TAKEN_ERROR
+        };
+      }
+
       return {
         data: null,
-        error: mapSignUpError(error)
+        error: mapped
       };
     }
   };

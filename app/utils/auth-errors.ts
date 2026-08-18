@@ -13,6 +13,25 @@ const getErrorCode = (error: unknown): string => {
   return '';
 };
 
+const getErrorHaystack = (error: unknown): string => {
+  const parts = [getErrorMessage(error, ''), getErrorCode(error)];
+
+  if (typeof error === 'object' && error !== null) {
+    for (const key of ['details', 'hint'] as const) {
+      const value = (error as Record<string, unknown>)[key];
+      if (typeof value === 'string' && value.length > 0) {
+        parts.push(value);
+      }
+    }
+  }
+
+  return parts.join(' ');
+};
+
+export const isDatabaseErrorSavingNewUser = (error: unknown): boolean => {
+  return /database error saving new user/i.test(getErrorHaystack(error));
+};
+
 export const mapSignInError = (error: unknown): string => {
   const message = getErrorMessage(error, '');
   const code = getErrorCode(error);
@@ -25,21 +44,18 @@ export const mapSignInError = (error: unknown): string => {
 };
 
 export const mapSignUpError = (error: unknown): string => {
-  const message = getErrorMessage(error, '');
+  const haystack = getErrorHaystack(error);
   const code = getErrorCode(error);
 
-  if (
-    /profiles_username_lower_idx/i.test(message)
-    || /database error saving new user/i.test(message)
-  ) {
+  if (/profiles_username_lower_idx/i.test(haystack)) {
     return USERNAME_TAKEN_ERROR;
   }
 
   if (
     code === 'user_already_exists'
-    || /already registered/i.test(message)
-    || /already been registered/i.test(message)
-    || /already has an account/i.test(message)
+    || /already registered/i.test(haystack)
+    || /already been registered/i.test(haystack)
+    || /already has an account/i.test(haystack)
   ) {
     return EMAIL_TAKEN_ERROR;
   }

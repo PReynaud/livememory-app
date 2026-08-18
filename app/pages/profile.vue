@@ -12,16 +12,14 @@ definePageMeta({
 const supabaseUser = useSupabaseUser();
 const authStore = useAuthStore();
 const profileStore = useProfileStore();
-const { username } = storeToRefs(profileStore);
+const { username, error } = storeToRefs(profileStore);
 
-const shownUsername = computed(() => {
-  if (username.value) {
-    return username.value;
-  }
-
-  const metaUsername = supabaseUser.value?.user_metadata?.username;
-  return typeof metaUsername === 'string' && metaUsername.length > 0 ? metaUsername : '…';
+const metadataUsername = computed(() => {
+  const value = supabaseUser.value?.user_metadata?.username;
+  return typeof value === 'string' && value.length > 0 ? value : '';
 });
+
+const shownUsername = computed(() => username.value || metadataUsername.value);
 
 watch(() => supabaseUser.value?.id, (userId) => {
   if (userId) {
@@ -41,11 +39,27 @@ const signOut = async () => {
       Profile
     </h1>
 
+    <UAlert
+      v-if="error"
+      color="error"
+      variant="subtle"
+      data-testid="profile-error"
+      :title="error"
+    />
+
     <p
+      v-if="shownUsername"
       class="text-lg font-semibold"
       data-testid="profile-username"
     >
       {{ shownUsername }}
+    </p>
+    <p
+      v-else
+      class="text-lg font-semibold text-muted"
+      data-testid="profile-username"
+    >
+      …
     </p>
 
     <UButton

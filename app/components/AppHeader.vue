@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRuntimeConfig } from '#imports';
+import { useRuntimeConfig, useSupabaseUser } from '#imports';
 
 const config = useRuntimeConfig();
 const appName = computed(() => config.public.appName);
+const supabaseUser = useSupabaseUser();
+const isAuthenticated = computed(() => Boolean(supabaseUser.value));
 </script>
 
 <template>
@@ -20,6 +22,14 @@ const appName = computed(() => config.public.appName);
 
     <template #right>
       <UButton
+        v-if="isAuthenticated"
+        to="/home"
+        label="Home"
+        color="neutral"
+        variant="ghost"
+      />
+      <UButton
+        v-else
         to="/login"
         label="Sign in"
         color="neutral"

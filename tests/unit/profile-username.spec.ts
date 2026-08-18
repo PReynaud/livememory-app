@@ -34,6 +34,8 @@ describe('profiles username kernel', () => {
     expect(sql).toContain('username ~ \'^[A-Za-z0-9_-]+$\'');
     expect(sql).toMatch(/username[\s\S]*not null/i);
     expect(sql).toMatch(/drop column display_name/i);
+    expect(sql).toContain('\'u\' || replace(id::text, \'-\', \'\')');
+    expect(sql).toMatch(/username_is_taken/);
   });
 
   it('rewrites handle_new_user to read username metadata without an email fallback', () => {
@@ -77,5 +79,10 @@ describe('profile store', () => {
     for (const source of pages) {
       expect(source).not.toMatch(/from\('profiles'\)/);
     }
+
+    const profilePage = readFileSync(resolve(process.cwd(), 'app/pages/profile.vue'), 'utf8');
+    expect(profilePage).toMatch(/storeToRefs\(profileStore\)/);
+    expect(profilePage).toContain('profile-error');
+    expect(profilePage).toMatch(/v-if="error"/);
   });
 });
