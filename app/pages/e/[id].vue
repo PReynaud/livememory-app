@@ -3,7 +3,14 @@ import { computed, ref, watch } from 'vue';
 import { definePageMeta, useRoute } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEventsStore } from '@/stores/events';
+import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { formatEventDateLabel } from '@/utils/event-dates';
+import {
+  formatConcertClock,
+  formatConcertDayLabel,
+  groupConcertsByDate,
+  shouldShowDayHeaders
+} from '@/utils/concert-groups';
 
 definePageMeta({
   middleware: 'auth'
@@ -11,7 +18,8 @@ definePageMeta({
 
 const route = useRoute();
 const eventsStore = useEventsStore();
-const { currentEvent, error } = storeToRefs(eventsStore);
+const addSheet = useAddConcertSheetStore();
+const { currentEvent, currentConcerts, error } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
 
 const eventId = computed(() => {
@@ -25,6 +33,22 @@ const notFound = computed(() => {
 
 const loadFailed = computed(() => {
   return hasResolved.value && !currentEvent.value && Boolean(error.value);
+});
+
+const billGroups = computed(() => groupConcertsByDate(currentConcerts.value));
+const showDayHeaders = computed(() => {
+  if (!currentEvent.value) {
+    return false;
+  }
+
+  return shouldShowDayHeaders(currentEvent.value, currentConcerts.value);
+});
+const hasConcerts = computed(() => currentConcerts.value.length > 0);
+const billLoadFailed = computed(() => {
+  return Boolean(currentEvent.value && error.value);
+});
+const billCtaLabel = computed(() => {
+  return currentEvent.value?.kind === 'festival' ? 'Add to this festival' : 'Add to this night';
 });
 
 const loadEvent = async (id: string) => {
@@ -48,6 +72,17 @@ watch(eventId, (id) => {
 const retryLoad = () => {
   void loadEvent(eventId.value);
 };
+
+const openAddSheet = () => {
+  if (!currentEvent.value) {
+    return;
+  }
+
+  addSheet.openSheet({
+    eventId: currentEvent.value.id,
+    lockEvent: true
+  });
+};
 </script>
 
 <template>
@@ -62,11 +97,62 @@ const retryLoad = () => {
       <p class="text-[13px] text-muted">
         {{ currentEvent.place }}
       </p>
-      <section class="rounded-2xl bg-[#1A1A1A] p-4">
-        <p class="text-lg font-semibold">
+      <section class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2">
+        <template v-if="billLoadFailed">
+          <p class="text-lg font-semibold">
+            Couldn't load.
+          </p>
+          <UButton
+            label="Retry"
+            color="primary"
+            variant="outline"
+            class="h-11 rounded-full ring-2"
+            @click="retryLoad"
+          />
+        </template>
+        <p
+          v-else-if="!hasConcerts"
+          class="text-lg font-semibold"
+        >
           No concerts on this bill.
         </p>
+        <template v-else>
+          <div
+            v-for="(group, index) in billGroups"
+            :key="group.date"
+            :class="index > 0 ? 'border-t border-white/10 pt-2' : ''"
+          >
+            <p
+              v-if="showDayHeaders"
+              class="text-[13px] font-semibold text-muted"
+            >
+              {{ formatConcertDayLabel(group.date) }}
+            </p>
+            <div
+              v-for="concert in group.concerts"
+              :key="concert.id"
+              class="py-1.5"
+            >
+              <p class="text-base font-semibold">
+                {{ concert.artist }}
+              </p>
+              <p
+                v-if="concert.time"
+                class="text-[13px] text-muted"
+              >
+                {{ formatConcertClock(concert.time) }}
+              </p>
+            </div>
+          </div>
+        </template>
       </section>
+      <UButton
+        :label="billCtaLabel"
+        color="primary"
+        variant="outline"
+        class="h-11 rounded-full ring-2"
+        @click="openAddSheet"
+      />
     </template>
 
     <template v-else-if="!hasResolved">

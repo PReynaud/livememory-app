@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from '#imports';
+import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 
 const route = useRoute();
+const addSheet = useAddConcertSheetStore();
 
 const links = [
   { to: '/home', label: 'Home', icon: 'i-lucide-house' },
@@ -43,6 +45,7 @@ const profileActive = computed(() => isActive('/profile'));
       type="button"
       aria-label="Add concert"
       class="flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white lg:min-w-0"
+      @click="addSheet.openSheet()"
     >
       <span class="flex h-8 w-11 items-center justify-center rounded-full bg-white text-black">
         <UIcon

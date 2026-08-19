@@ -373,6 +373,7 @@ describe('events store and pages use domain helpers only', () => {
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/useEventsStore/);
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/New night/);
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/New festival/);
+    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/openSheet/);
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/useEventsStore/);
     expect(eventPage).toMatch(/middleware:\s*'auth'/);
@@ -381,9 +382,6 @@ describe('events store and pages use domain helpers only', () => {
     expect(eventPage).toMatch(/Event not found/);
     expect(eventPage).toMatch(/loadFailed|eventsStore\.error|error\.value/);
 
-    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(
-      /Add concert[\s\S]*@click="openCreate\('single_night'\)"/
-    );
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/home\|concerts\|profile\|e/);
   });
 });

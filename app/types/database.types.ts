@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      concerts: {
+        Row: {
+          artist: string
+          date: string
+          event_id: string
+          id: string
+          place: string
+          time: string | null
+        }
+        Insert: {
+          artist: string
+          date: string
+          event_id: string
+          id?: string
+          place: string
+          time?: string | null
+        }
+        Update: {
+          artist?: string
+          date?: string
+          event_id?: string
+          id?: string
+          place?: string
+          time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "concerts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           end_date: string
