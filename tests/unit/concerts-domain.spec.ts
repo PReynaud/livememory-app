@@ -7,6 +7,7 @@ import {
   type EventsClient
 } from '../../shared/domain/events';
 import {
+  CONCERT_IDENTITY,
   CONCERT_RULE,
   CONCERT_RULE_MESSAGE,
   createConcert,
@@ -58,16 +59,50 @@ type QueryError = {
   hint?: string;
 };
 
+const otherNightRow: EventRecord = {
+  id: '55555555-5555-4555-8555-555555555555',
+  owner_id: 'owner-1',
+  kind: 'single_night',
+  name: 'Other Night',
+  start_date: '2026-08-18',
+  end_date: '2026-08-18',
+  place: 'Berlin'
+};
+
+const parisNightRow: EventRecord = {
+  id: '66666666-6666-4666-8666-666666666666',
+  owner_id: 'owner-1',
+  kind: 'single_night',
+  name: 'Paris Night',
+  start_date: '2026-08-18',
+  end_date: '2026-08-18',
+  place: 'Paris'
+};
+
+const timedJustice: ConcertRecord = {
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  event_id: nightRow.id,
+  owner_id: nightRow.owner_id,
+  artist: 'Justice',
+  date: '2026-08-18',
+  time: '20:15',
+  place: 'Berlin'
+};
+
 const createMockConcertsClient = (options?: {
   events?: EventRecord[];
   concerts?: ConcertRecord[];
   concertInsertError?: QueryError;
+  concertUpdateError?: QueryError;
+  missFirstIdentityLookup?: boolean;
 }) => {
   const events = [...(options?.events ?? [])];
   const concerts = [...(options?.concerts ?? [])];
   const concertInserts: Record<string, unknown>[] = [];
+  const concertUpdates: Record<string, unknown>[] = [];
   const eventInserts: Record<string, unknown>[] = [];
   const eventDeletes: { column: string; value: string }[] = [];
+  let identityLookups = 0;
 
   const client = {
     from: (table: 'events' | 'concerts') => {
@@ -133,6 +168,11 @@ const createMockConcertsClient = (options?: {
                 const created: ConcertRecord = {
                   id: `44444444-4444-4444-8444-${String(concerts.length).padStart(12, '0')}`,
                   event_id: String(row.event_id),
+                  owner_id: String(
+                    row.owner_id
+                    ?? events.find(event => event.id === row.event_id)?.owner_id
+                    ?? 'owner-1'
+                  ),
                   artist: String(row.artist),
                   date: String(row.date),
                   time: row.time == null || row.time === '' ? null : String(row.time),
@@ -144,19 +184,69 @@ const createMockConcertsClient = (options?: {
             })
           };
         },
-        select: () => ({
-          order: async () => ({ data: concerts, error: null }),
-          eq: (column: string, value: string) => ({
-            maybeSingle: async () => ({
-              data: concerts.find(concert => concert[column as keyof ConcertRecord] === value) ?? null,
-              error: null
-            }),
-            order: async () => ({
-              data: concerts.filter(concert => concert[column as keyof ConcertRecord] === value),
-              error: null
+        select: () => {
+          const concertEq = (filters: { column: string; value: string }[]) => {
+            const matches = (concert: ConcertRecord) => {
+              return filters.every(
+                filter => concert[filter.column as keyof ConcertRecord] === filter.value
+              );
+            };
+
+            return {
+              eq: (column: string, value: string) => concertEq([...filters, { column, value }]),
+              maybeSingle: async () => ({
+                data: concerts.find(matches) ?? null,
+                error: null
+              }),
+              order: async () => {
+                if (filters.some(filter => filter.column === 'date')) {
+                  identityLookups += 1;
+                  if (options?.missFirstIdentityLookup && identityLookups === 1) {
+                    return { data: [], error: null };
+                  }
+                }
+
+                return {
+                  data: concerts.filter(matches),
+                  error: null
+                };
+              }
+            };
+          };
+
+          return {
+            order: async () => ({ data: concerts, error: null }),
+            eq: (column: string, value: string) => concertEq([{ column, value }])
+          };
+        },
+        update: (row: Record<string, unknown>) => {
+          concertUpdates.push(row);
+          return {
+            eq: (column: string, value: string) => ({
+              select: () => ({
+                single: async () => {
+                  if (options?.concertUpdateError) {
+                    return { data: null, error: options.concertUpdateError };
+                  }
+
+                  const index = concerts.findIndex(
+                    concert => concert[column as keyof ConcertRecord] === value
+                  );
+                  if (index < 0) {
+                    return { data: null, error: { message: 'concert not found' } };
+                  }
+
+                  const updated: ConcertRecord = {
+                    ...concerts[index]!,
+                    time: row.time == null || row.time === '' ? null : String(row.time)
+                  };
+                  concerts[index] = updated;
+                  return { data: updated, error: null };
+                }
+              })
             })
-          })
-        })
+          };
+        }
       };
     }
   };
@@ -166,6 +256,7 @@ const createMockConcertsClient = (options?: {
     events,
     concerts,
     concertInserts,
+    concertUpdates,
     eventInserts,
     eventDeletes
   };
@@ -173,7 +264,9 @@ const createMockConcertsClient = (options?: {
 
 describe('concerts migration kernel', () => {
   it('adds concerts with event FK, owner RLS, and insert date/place checks', () => {
-    const concertsMigration = readMigrations().find(file => file.name.includes('concerts'));
+    const concertsMigration = readMigrations().find(file =>
+      file.name.includes('concerts') && !file.name.includes('identity')
+    );
 
     expect(concertsMigration).toBeTruthy();
     const sql = concertsMigration?.sql ?? '';
@@ -193,6 +286,24 @@ describe('concerts migration kernel', () => {
     expect(sql).toMatch(/concerts\.place\s*=\s*events\.place/);
     expect(sql).not.toMatch(/for delete/i);
     expect(sql).not.toMatch(/service_role/);
+  });
+
+  it('copies owner_id, unique-guards timed identity, and allows owner time UPDATE', () => {
+    const identityMigration = readMigrations().find(file => file.name.includes('concert_identity'));
+
+    expect(identityMigration).toBeTruthy();
+    const sql = identityMigration?.sql ?? '';
+
+    expect(sql).toMatch(/owner_id/);
+    expect(sql).toMatch(/create unique index/i);
+    expect(sql).toMatch(/lower\(\s*artist\s*\)/i);
+    expect(sql).toMatch(/where[\s\S]*time[\s\S]*is not null/i);
+    expect(sql).toMatch(/grant update/i);
+    expect(sql).toMatch(/for update/i);
+    expect(sql).toMatch(/\(select auth\.uid\(\)\)/);
+    expect(sql).not.toMatch(/for delete/i);
+    expect(sql).not.toMatch(/service_role/);
+    expect(sql).not.toMatch(/where time is null/i);
   });
 });
 
@@ -344,31 +455,320 @@ describe('createConcert', () => {
     expect(end.error).toBeNull();
     expect(end.data?.time).toBe('23:45');
     expect(end.data?.place).toBe('Paris');
+    expect(start.outcome).toBe(CONCERT_IDENTITY.created);
   });
 
-  // Story 1.4 (AD-10) attaches timed owner identity instead of inserting a second row.
-  it('allows duplicate artist, date, and time rows', async () => {
+  it('attaches a timed same-Event match without inserting', async () => {
+    const { client, concertInserts, concerts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'JUSTICE',
+      date: '2026-08-18',
+      time: '20:15'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.data?.id).toBe(timedJustice.id);
+    expect(result.data?.event_id).toBe(nightRow.id);
+    expect(concertInserts).toHaveLength(0);
+    expect(concerts).toHaveLength(1);
+  });
+
+  it('attaches a timed match on another Event without reparenting', async () => {
     const { client, concertInserts } = createMockConcertsClient({
-      events: [nightRow]
+      events: [nightRow, otherNightRow],
+      concerts: [timedJustice]
     });
 
-    const first = await createConcert(client, {
-      eventId: nightRow.id,
-      artist: 'Justice',
-      date: '2026-08-18',
-      time: '20:15'
-    });
-    const second = await createConcert(client, {
-      eventId: nightRow.id,
+    const result = await createConcert(client, {
+      eventId: otherNightRow.id,
       artist: 'Justice',
       date: '2026-08-18',
       time: '20:15'
     });
 
-    expect(first.error).toBeNull();
-    expect(second.error).toBeNull();
-    expect(first.data?.id).not.toBe(second.data?.id);
-    expect(concertInserts).toHaveLength(2);
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.data?.id).toBe(timedJustice.id);
+    expect(result.data?.event_id).toBe(nightRow.id);
+    expect(concertInserts).toHaveLength(0);
+  });
+
+  it('refuses a timed match at a different Place', async () => {
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [nightRow, parisNightRow],
+      concerts: [timedJustice]
+    });
+
+    const result = await createConcert(client, {
+      eventId: parisNightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15'
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.impossiblePlace);
+    expect(result.error?.ruleId).toBe(CONCERT_RULE.impossiblePlace);
+    expect(result.error?.message).toBe(CONCERT_RULE_MESSAGE.impossiblePlace);
+    expect(concertInserts).toHaveLength(0);
+  });
+
+  it('asks for a choice when time is missing on one or both sides', async () => {
+    const untimed: ConcertRecord = { ...timedJustice, time: null };
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [untimed]
+    });
+
+    const bothNull = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18'
+    });
+    const draftTimed = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '21:00'
+    });
+
+    const timedExisting = await createConcert(
+      createMockConcertsClient({
+        events: [nightRow],
+        concerts: [timedJustice]
+      }).client,
+      {
+        eventId: nightRow.id,
+        artist: 'Justice',
+        date: '2026-08-18'
+      }
+    );
+
+    expect(bothNull.outcome).toBe(CONCERT_IDENTITY.needsChoice);
+    expect(draftTimed.outcome).toBe(CONCERT_IDENTITY.needsChoice);
+    expect(timedExisting.outcome).toBe(CONCERT_IDENTITY.needsChoice);
+    expect(bothNull.data?.id).toBe(untimed.id);
+    expect(concertInserts).toHaveLength(0);
+  });
+
+  it('writes draft time on confirmed attach when existing time is null', async () => {
+    const untimed: ConcertRecord = { ...timedJustice, time: null };
+    const { client, concertInserts, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [untimed]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '21:00',
+      confirm: 'attach'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.data?.id).toBe(untimed.id);
+    expect(result.data?.time).toBe('21:00');
+    expect(concertInserts).toHaveLength(0);
+    expect(concertUpdates).toEqual([{ time: '21:00' }]);
+  });
+
+  it('attaches a timed match when the stored artist has surrounding whitespace', async () => {
+    const padded: ConcertRecord = { ...timedJustice, artist: '  Justice  ' };
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [padded]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.data?.id).toBe(padded.id);
+    expect(concertInserts).toHaveLength(0);
+  });
+
+  it('maps a unique-guard violation on attach time write to attached, not persist_failed', async () => {
+    const untimed: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      time: null
+    };
+    const timed = { ...timedJustice, time: '21:00' };
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [untimed, timed],
+      concertUpdateError: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "concerts_owner_artist_date_time_idx"'
+      }
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '21:00',
+      confirm: 'attach'
+    });
+
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(timed.id);
+    expect(result.error?.ruleId).not.toBe('persist_failed');
+    expect(concertInserts).toHaveLength(0);
+  });
+
+  it('inserts a second row when the user confirms create after needs_choice', async () => {
+    const untimed: ConcertRecord = { ...timedJustice, time: null };
+    const { client, concertInserts, concerts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [untimed]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      confirm: 'create'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.created);
+    expect(result.data?.id).not.toBe(untimed.id);
+    expect(concertInserts).toHaveLength(1);
+    expect(concerts).toHaveLength(2);
+  });
+
+  it('creates when the same artist and date have different clock times', async () => {
+    const { client, concertInserts, concerts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '21:00'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.created);
+    expect(result.data?.id).not.toBe(timedJustice.id);
+    expect(concertInserts).toHaveLength(1);
+    expect(concerts).toHaveLength(2);
+  });
+
+  it('maps a unique-guard violation to attached or impossible_place, not persist_failed', async () => {
+    const attached = await createConcert(
+      createMockConcertsClient({
+        events: [nightRow],
+        concerts: [timedJustice],
+        concertInsertError: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint "concerts_owner_artist_date_time_idx"'
+        },
+        missFirstIdentityLookup: true
+      }).client,
+      {
+        eventId: nightRow.id,
+        artist: 'Justice',
+        date: '2026-08-18',
+        time: '20:15'
+      }
+    );
+
+    expect(attached.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(attached.error).toBeNull();
+    expect(attached.data?.id).toBe(timedJustice.id);
+    expect(attached.error?.ruleId).not.toBe('persist_failed');
+
+    const refused = await createConcert(
+      createMockConcertsClient({
+        events: [nightRow, parisNightRow],
+        concerts: [timedJustice],
+        concertInsertError: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint "concerts_owner_artist_date_time_idx"'
+        },
+        missFirstIdentityLookup: true
+      }).client,
+      {
+        eventId: parisNightRow.id,
+        artist: 'Justice',
+        date: '2026-08-18',
+        time: '20:15'
+      }
+    );
+
+    expect(refused.outcome).toBe(CONCERT_IDENTITY.impossiblePlace);
+    expect(refused.error?.ruleId).toBe(CONCERT_RULE.impossiblePlace);
+    expect(refused.error?.ruleId).not.toBe('persist_failed');
+  });
+
+  it('does not leave a new Event when identity attaches or is refused', async () => {
+    const { client, eventInserts, eventDeletes, concertInserts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice]
+    });
+
+    const attached = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      newEvent: {
+        kind: 'single_night',
+        name: 'Leftover Night',
+        startDate: '2026-08-18',
+        place: 'Berlin'
+      }
+    });
+
+    expect(attached.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(eventInserts).toHaveLength(0);
+    expect(eventDeletes).toHaveLength(0);
+    expect(concertInserts).toHaveLength(0);
+
+    const racedMock = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice],
+      concertInsertError: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "concerts_owner_artist_date_time_idx"'
+      },
+      missFirstIdentityLookup: true
+    });
+    const raced = await createConcert(racedMock.client, {
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      newEvent: {
+        kind: 'single_night',
+        name: 'Race Night',
+        startDate: '2026-08-18',
+        place: 'Berlin'
+      }
+    });
+
+    expect(raced.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(raced.data?.event_id).toBe(nightRow.id);
+    expect(racedMock.eventInserts).toHaveLength(1);
+    expect(racedMock.eventDeletes).toEqual([
+      { column: 'id', value: '33333333-3333-4333-8333-333333333333' }
+    ]);
   });
 
   it('creates a named night Event and Concert in one save', async () => {
@@ -520,6 +920,7 @@ describe('concert date grouping', () => {
     const friday: ConcertRecord = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       event_id: festivalRow.id,
+      owner_id: festivalRow.owner_id,
       artist: 'The Last Dinner Party',
       date: '2026-08-20',
       time: '20:15',
@@ -555,6 +956,7 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const first: ConcertRecord = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       event_id: festivalRow.id,
+      owner_id: festivalRow.owner_id,
       artist: 'The Last Dinner Party',
       date: '2026-08-20',
       time: '20:15',
@@ -563,6 +965,7 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const second: ConcertRecord = {
       id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       event_id: festivalRow.id,
+      owner_id: festivalRow.owner_id,
       artist: 'Justice',
       date: '2026-08-22',
       time: null,
@@ -571,6 +974,7 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const other: ConcertRecord = {
       id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       event_id: nightRow.id,
+      owner_id: nightRow.owner_id,
       artist: 'Local Band',
       date: '2026-08-18',
       time: null,
@@ -605,6 +1009,8 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(store).toMatch(/finally/);
     expect(store).toMatch(/listedConcerts\.error|listed\.error/);
     expect(store).toMatch(/silent/);
+    expect(store).toMatch(/outcome/);
+    expect(store).toMatch(/ruleId/);
 
     const pageFiles = [
       'app/pages/concerts.vue',
@@ -618,7 +1024,9 @@ describe('concerts store and pages use domain helpers only', () => {
       const source = readFileSync(resolve(process.cwd(), file), 'utf8');
       expect(source).not.toMatch(/from\('concerts'\)/);
       expect(source).not.toMatch(/from\('events'\)/);
-      expect(source).not.toMatch(/shared\/domain/);
+      if (!file.includes('AppAddConcertSheet')) {
+        expect(source).not.toMatch(/shared\/domain/);
+      }
     }
 
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
@@ -637,6 +1045,11 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(sheet).toMatch(/side="bottom"/);
     expect(sheet).toMatch(/Add concert/);
     expect(sheet).toMatch(/Add another/);
+    expect(sheet).toMatch(/navigateTo\('\/e\/' \+/);
+    expect(sheet).toMatch(/CONCERT_RULE_MESSAGE/);
+    expect(sheet).toMatch(/needs_choice|pendingChoice/);
+    expect(sheet).toMatch(/:disabled="pendingChoice"/);
+    expect(sheet).toMatch(/label="Cancel"|label='Cancel'/);
 
     const app = readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8');
     expect(app).toMatch(/AppAddConcertSheet/);

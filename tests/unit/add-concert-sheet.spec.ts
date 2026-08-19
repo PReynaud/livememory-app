@@ -52,4 +52,12 @@ describe('add concert sheet open/close state', () => {
     expect(store).toMatch(/openAddConcertSheetState/);
     expect(store).toMatch(/closedAddConcertSheetState/);
   });
+
+  it('keeps the Add draft when choice cancel does not close the sheet', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(sheet).toMatch(/pendingChoice/);
+    expect(sheet).toMatch(/label="Cancel"|label='Cancel'/);
+    expect(sheet).toMatch(/pendingChoice\.value = false/);
+    expect(sheet).not.toMatch(/dismissChoice[\s\S]{0,80}closeSheet/);
+  });
 });

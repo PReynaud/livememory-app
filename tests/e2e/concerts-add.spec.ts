@@ -6,6 +6,10 @@ const expectConcertAddedToast = async (page: Page) => {
   await expect(page.getByText('Concert added.', { exact: true })).toBeVisible();
 };
 
+const expectConcertAddedToastGone = async (page: Page) => {
+  await expect(page.getByText('Concert added.', { exact: true })).toHaveCount(0, { timeout: 15000 });
+};
+
 test('adds a concert to an owned night with locked date and Place', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
@@ -44,11 +48,12 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(sheet.getByRole('textbox', { name: 'Date' })).toHaveValue('2026-08-18');
   await expect(sheet.getByRole('textbox', { name: 'Place' })).toHaveValue('Berlin');
 
-  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByLabel('Artist').fill('Fontaines D.C.');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toHaveCount(0);
-  await expect(authenticatedPage.getByText('Justice')).toHaveCount(2);
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
+  await expect(authenticatedPage.getByText('Fontaines D.C.')).toHaveCount(1);
   await expect(authenticatedPage.getByText('20:15')).toHaveCount(2);
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
@@ -178,4 +183,180 @@ test('nav Add onto an existing Event stores the concert', async ({ authenticated
 
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toHaveCount(0);
+});
+
+const createOwnedNight = async (
+  page: Page,
+  name: string,
+  date: string,
+  place: string
+) => {
+  await page.getByRole('link', { name: 'Concerts' }).click();
+  await page.getByRole('button', { name: 'New night' }).click();
+  await page.getByLabel('Name').fill(name);
+  await page.getByLabel('Date').fill(date);
+  await page.getByLabel('Place').fill(place);
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  return new URL(page.url()).pathname;
+};
+
+test('attaches a timed concert on the same Event without inserting', async ({ authenticatedPage }) => {
+  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByLabel('Time').fill('20:15');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expectConcertAddedToast(authenticatedPage);
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
+  await expectConcertAddedToastGone(authenticatedPage);
+
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const again = authenticatedPage.getByRole('dialog');
+  await again.getByLabel('Artist').fill('Justice');
+  await again.getByLabel('Time').fill('20:15');
+  await again.getByRole('button', { name: 'Save' }).click();
+
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
+  await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toHaveCount(0);
+  await expect(authenticatedPage.getByText('This concert already exists on another Event.')).toHaveCount(0);
+});
+
+test('attaches onto another Event and shows the other-Event copy', async ({ authenticatedPage }) => {
+  const firstPath = await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const firstSheet = authenticatedPage.getByRole('dialog');
+  await firstSheet.getByLabel('Artist').fill('Justice');
+  await firstSheet.getByLabel('Time').fill('20:15');
+  await firstSheet.getByRole('button', { name: 'Save' }).click();
+  await expect(authenticatedPage.getByText('Justice')).toBeVisible();
+
+  await createOwnedNight(authenticatedPage, 'Other Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByLabel('Time').fill('20:15');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+
+  await expect(authenticatedPage.getByText('This concert already exists on another Event.', { exact: true })).toBeVisible();
+  await expect(authenticatedPage).toHaveURL(new RegExp(`${firstPath}$`));
+  await expect(authenticatedPage.getByRole('heading', { name: 'Club Night' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
+});
+
+test('refuses a timed match at a different Place and stays in the sheet', async ({ authenticatedPage }) => {
+  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const firstSheet = authenticatedPage.getByRole('dialog');
+  await firstSheet.getByLabel('Artist').fill('Justice');
+  await firstSheet.getByLabel('Time').fill('20:15');
+  await firstSheet.getByRole('button', { name: 'Save' }).click();
+  await expect(authenticatedPage.getByText('Justice')).toBeVisible();
+
+  const parisPath = await createOwnedNight(authenticatedPage, 'Paris Night', '2026-08-18', 'Paris');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByLabel('Time').fill('20:15');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('This concert already exists at a different Place.')).toBeVisible();
+  await expect(authenticatedPage).toHaveURL(new RegExp(`${parisPath}$`));
+  await expect(sheet.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
+});
+
+test('keeps the Add draft when needs_choice is cancelled', async ({ authenticatedPage }) => {
+  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expectConcertAddedToast(authenticatedPage);
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const again = authenticatedPage.getByRole('dialog');
+  await again.getByLabel('Artist').fill('Justice');
+  await again.getByRole('button', { name: 'Save' }).click();
+
+  await expect(again.getByText('This artist and date already exist. Attach to the existing concert or create another.')).toBeVisible();
+  await again.getByRole('button', { name: 'Cancel' }).click();
+  await expect(again).toBeVisible();
+  await expect(again.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
+  await expect(again.getByRole('button', { name: 'Save' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
+});
+
+test('attaches after needs_choice and writes the draft clock', async ({ authenticatedPage }) => {
+  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expectConcertAddedToast(authenticatedPage);
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expectConcertAddedToastGone(authenticatedPage);
+
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const again = authenticatedPage.getByRole('dialog');
+  await again.getByLabel('Artist').fill('Justice');
+  await again.getByLabel('Time').fill('21:00');
+  await again.getByRole('button', { name: 'Save' }).click();
+
+  await expect(again.getByText('This artist and date already exist. Attach to the existing concert or create another.')).toBeVisible();
+  await again.getByRole('button', { name: 'Attach' }).click();
+
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
+  await expect(authenticatedPage.getByText('21:00')).toBeVisible();
+  await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toHaveCount(0);
+});
+
+test('creates a second row after needs_choice', async ({ authenticatedPage }) => {
+  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expectConcertAddedToast(authenticatedPage);
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expectConcertAddedToastGone(authenticatedPage);
+
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const again = authenticatedPage.getByRole('dialog');
+  await again.getByLabel('Artist').fill('Justice');
+  await again.getByRole('button', { name: 'Save' }).click();
+
+  await expect(again.getByText('This artist and date already exist. Attach to the existing concert or create another.')).toBeVisible();
+  await again.getByRole('button', { name: 'Create' }).click();
+
+  await expectConcertAddedToast(authenticatedPage);
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(2);
+});
+
+test('Escape dismisses needs_choice and keeps the Add draft', async ({ authenticatedPage }) => {
+  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expectConcertAddedToast(authenticatedPage);
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+
+  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
+  const again = authenticatedPage.getByRole('dialog');
+  await again.getByLabel('Artist').fill('Justice');
+  await again.getByRole('button', { name: 'Save' }).click();
+
+  await expect(again.getByText('This artist and date already exist. Attach to the existing concert or create another.')).toBeVisible();
+  await authenticatedPage.keyboard.press('Escape');
+
+  await expect(again).toBeVisible();
+  await expect(again.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
+  await expect(again.getByRole('button', { name: 'Save' })).toBeVisible();
+  await expect(again.getByRole('button', { name: 'Attach' })).toHaveCount(0);
 });
