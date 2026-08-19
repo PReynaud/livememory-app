@@ -2,11 +2,13 @@ export type AddConcertSheetState = {
   open: boolean;
   eventId: string | null;
   lockEvent: boolean;
+  concertId: string | null;
 };
 
 export type OpenAddConcertSheetOptions = {
   eventId?: string;
   lockEvent?: boolean;
+  concertId?: string;
 };
 
 export const openAddConcertSheetState = (
@@ -17,7 +19,8 @@ export const openAddConcertSheetState = (
     return {
       open: true,
       eventId: options.eventId ?? null,
-      lockEvent: options.lockEvent ?? Boolean(options.eventId)
+      lockEvent: options.lockEvent ?? Boolean(options.eventId),
+      concertId: options.concertId ?? null
     };
   }
 
@@ -25,19 +28,22 @@ export const openAddConcertSheetState = (
     return {
       open: true,
       eventId: current.eventId,
-      lockEvent: current.lockEvent
+      lockEvent: current.lockEvent,
+      concertId: current.concertId
     };
   }
 
   return {
     open: true,
     eventId: null,
-    lockEvent: false
+    lockEvent: false,
+    concertId: null
   };
 };
 
 export const closedAddConcertSheetState = (): AddConcertSheetState => ({
   open: false,
   eventId: null,
-  lockEvent: false
+  lockEvent: false,
+  concertId: null
 });
