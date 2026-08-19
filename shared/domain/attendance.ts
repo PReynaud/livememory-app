@@ -9,12 +9,14 @@ export type AttendanceStatus = (typeof ATTENDANCE_STATUS)[keyof typeof ATTENDANC
 
 export const ATTENDANCE_RULE = {
   futureAttended: 'future_attended',
-  attendedToGoing: 'attended_to_going'
+  attendedToGoing: 'attended_to_going',
+  festivalAttendAll: 'festival_attend_all'
 } as const;
 
 export const ATTENDANCE_RULE_MESSAGE = {
   futureAttended: 'Cannot mark a future concert as attended.',
-  attendedToGoing: 'Cannot change attended to going.'
+  attendedToGoing: 'Cannot change attended to going.',
+  festivalAttendAll: 'Attend this night is only for a single-night Event.'
 } as const;
 
 export type AttendanceRecord = {
@@ -76,10 +78,42 @@ type AttendanceEffectiveApi = {
   };
 };
 
+type EventKindRow = {
+  id: string;
+  kind: 'single_night' | 'festival';
+};
+
+type ConcertBillRow = {
+  id: string;
+  date: string;
+  time: string | null;
+};
+
+type EventLookupApi = {
+  select: (columns?: string) => {
+    eq: (column: string, value: string) => {
+      maybeSingle: () => Promise<QueryResult<EventKindRow | null>>;
+    };
+  };
+};
+
+type ConcertBillApi = {
+  select: (columns?: string) => {
+    eq: (column: string, value: string) => {
+      order: (
+        column: string,
+        options?: { ascending?: boolean }
+      ) => Promise<QueryResult<ConcertBillRow[]>>;
+    };
+  };
+};
+
 export type AttendanceClient = {
   from: {
     (relation: 'attendance'): AttendanceTableApi;
     (relation: 'attendance_effective'): AttendanceEffectiveApi;
+    (relation: 'events'): EventLookupApi;
+    (relation: 'concerts'): ConcertBillApi;
   };
 };
 
@@ -278,6 +312,72 @@ export const clearAttendance = async (
   }
 
   return ok(null);
+};
+
+export const attendThisNight = async (
+  client: AttendanceClient,
+  eventId: string,
+  now = new Date()
+): Promise<DomainResult<AttendanceRecord[]>> => {
+  const id = trim(eventId);
+  if (!id) {
+    return fail('persist_failed', 'Event is required');
+  }
+
+  const eventResult = await client.from('events').select('id, kind').eq('id', id).maybeSingle();
+  if (eventResult.error) {
+    return {
+      data: null,
+      error: persistFailed(eventResult.error)
+    };
+  }
+
+  if (!eventResult.data) {
+    return fail('persist_failed', 'Event not found');
+  }
+
+  if (eventResult.data.kind !== 'single_night') {
+    return fail(ATTENDANCE_RULE.festivalAttendAll, ATTENDANCE_RULE_MESSAGE.festivalAttendAll);
+  }
+
+  const concertsResult = await client
+    .from('concerts')
+    .select('id, date, time')
+    .eq('event_id', id)
+    .order('date', { ascending: true });
+
+  if (concertsResult.error) {
+    return {
+      data: null,
+      error: {
+        ruleId: 'list_failed',
+        message: concertsResult.error.message
+      }
+    };
+  }
+
+  const written: AttendanceRecord[] = [];
+  for (const concert of concertsResult.data ?? []) {
+    const result = await setAttendance(client, {
+      concertId: concert.id,
+      status: isConcertPast(concert, now) ? ATTENDANCE_STATUS.attended : ATTENDANCE_STATUS.going
+    });
+
+    if (result.error) {
+      return {
+        data: null,
+        error: result.error
+      };
+    }
+
+    if (!result.data) {
+      return fail('persist_failed', 'Failed to save attendance');
+    }
+
+    written.push(result.data);
+  }
+
+  return ok(written);
 };
 
 export const listMyAttendance = async (

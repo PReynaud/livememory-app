@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTENDANCE_RULE,
   ATTENDANCE_RULE_MESSAGE,
+  attendThisNight,
   clearAttendance,
   isConcertPast,
   listMyAttendance,
@@ -51,16 +52,34 @@ const attendedRow: AttendanceRecord = {
   status: 'attended'
 };
 
+type EventKindRow = {
+  id: string;
+  kind: 'single_night' | 'festival';
+};
+
+type ConcertBillRow = {
+  id: string;
+  event_id: string;
+  date: string;
+  time: string | null;
+};
+
 const createMockAttendanceClient = (options?: {
   rows?: AttendanceRecord[];
   effectiveRows?: AttendanceRecord[];
+  events?: EventKindRow[];
+  concerts?: ConcertBillRow[];
   insertError?: QueryError;
   updateError?: QueryError;
   deleteError?: QueryError;
   listError?: QueryError;
   effectiveGetError?: QueryError;
+  eventGetError?: QueryError;
+  concertListError?: QueryError;
 }) => {
   const rows = [...(options?.rows ?? [])];
+  const events = [...(options?.events ?? [])];
+  const concerts = [...(options?.concerts ?? [])];
   const inserts: Record<string, unknown>[] = [];
   const updates: Record<string, unknown>[] = [];
   const deletes: { column: string; value: string }[] = [];
@@ -72,8 +91,46 @@ const createMockAttendanceClient = (options?: {
   };
 
   const client = {
-    from: (relation: 'attendance' | 'attendance_effective') => {
+    from: (relation: 'attendance' | 'attendance_effective' | 'events' | 'concerts') => {
       relations.push(relation);
+
+      if (relation === 'events') {
+        return {
+          select: () => ({
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => {
+                if (options?.eventGetError) {
+                  return { data: null, error: options.eventGetError };
+                }
+
+                return {
+                  data: events.find(entry => entry.id === value) ?? null,
+                  error: null
+                };
+              }
+            })
+          })
+        };
+      }
+
+      if (relation === 'concerts') {
+        return {
+          select: () => ({
+            eq: (_column: string, value: string) => ({
+              order: async () => {
+                if (options?.concertListError) {
+                  return { data: null, error: options.concertListError };
+                }
+
+                return {
+                  data: concerts.filter(entry => entry.event_id === value),
+                  error: null
+                };
+              }
+            })
+          })
+        };
+      }
 
       if (relation === 'attendance_effective') {
         return {
@@ -369,6 +426,108 @@ describe('setAttendance / clearAttendance / listMyAttendance', () => {
   });
 });
 
+describe('attendThisNight', () => {
+  const nightId = 'event-night';
+  const festivalId = 'event-festival';
+  const futureConcert: ConcertBillRow = {
+    id: 'concert-future',
+    event_id: nightId,
+    date: '2026-12-01',
+    time: null
+  };
+  const pastConcert: ConcertBillRow = {
+    id: 'concert-past',
+    event_id: nightId,
+    date: '2026-08-18',
+    time: null
+  };
+  const otherNightConcert: ConcertBillRow = {
+    id: 'concert-other',
+    event_id: 'event-other',
+    date: '2026-12-01',
+    time: null
+  };
+
+  it('marks current future Concerts going and past Concerts attended', async () => {
+    const { client, inserts, relations } = createMockAttendanceClient({
+      events: [{ id: nightId, kind: 'single_night' }],
+      concerts: [futureConcert, pastConcert, otherNightConcert]
+    });
+
+    const result = await attendThisNight(client, nightId, new Date('2026-08-19T12:00:00.000Z'));
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([
+      expect.objectContaining({ concert_id: 'concert-future', status: 'going' }),
+      expect.objectContaining({ concert_id: 'concert-past', status: 'attended' })
+    ]);
+    expect(inserts).toEqual([
+      { concert_id: 'concert-future', status: 'going' },
+      { concert_id: 'concert-past', status: 'attended' }
+    ]);
+    expect(relations).toContain('events');
+    expect(relations).toContain('concerts');
+    expect(relations).toContain('attendance');
+  });
+
+  it('does not mark Concerts that are not currently on that Bill', async () => {
+    const { client, inserts } = createMockAttendanceClient({
+      events: [{ id: nightId, kind: 'single_night' }],
+      concerts: [futureConcert]
+    });
+
+    const result = await attendThisNight(client, nightId, new Date('2026-08-19T12:00:00.000Z'));
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([
+      expect.objectContaining({ concert_id: 'concert-future', status: 'going' })
+    ]);
+    expect(inserts).toEqual([{ concert_id: 'concert-future', status: 'going' }]);
+    expect(inserts.some(row => row.concert_id === 'concert-later')).toBe(false);
+  });
+
+  it('keeps a cleared Concert unset after attend-all', async () => {
+    const { client, rows } = createMockAttendanceClient({
+      events: [{ id: nightId, kind: 'single_night' }],
+      concerts: [futureConcert, pastConcert]
+    });
+
+    await attendThisNight(client, nightId, new Date('2026-08-19T12:00:00.000Z'));
+    const cleared = await clearAttendance(client, 'concert-future');
+
+    expect(cleared.error).toBeNull();
+    expect(rows.find(row => row.concert_id === 'concert-future')).toBeUndefined();
+    expect(rows.find(row => row.concert_id === 'concert-past')?.status).toBe('attended');
+  });
+
+  it('does not write Attendance when the Event is a festival', async () => {
+    const { client, inserts } = createMockAttendanceClient({
+      events: [{ id: festivalId, kind: 'festival' }],
+      concerts: [{ ...futureConcert, event_id: festivalId }]
+    });
+
+    const result = await attendThisNight(client, festivalId);
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(ATTENDANCE_RULE.festivalAttendAll);
+    expect(result.error?.message).toBe(ATTENDANCE_RULE_MESSAGE.festivalAttendAll);
+    expect(inserts).toEqual([]);
+  });
+
+  it('succeeds with an empty Bill and writes nothing', async () => {
+    const { client, inserts } = createMockAttendanceClient({
+      events: [{ id: nightId, kind: 'single_night' }],
+      concerts: []
+    });
+
+    const result = await attendThisNight(client, nightId);
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([]);
+    expect(inserts).toEqual([]);
+  });
+});
+
 describe('attendance stays off pages and the store query path', () => {
   it('keeps Attendance queries in shared/domain and chips on Event and Concerts rows', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
@@ -376,6 +535,8 @@ describe('attendance stays off pages and the store query path', () => {
     expect(store).toMatch(/listMyAttendance/);
     expect(store).toMatch(/setAttendance/);
     expect(store).toMatch(/clearAttendance/);
+    expect(store).toMatch(/attendThisNight/);
+    expect(store).toMatch(/isAttendThisNightBusy/);
     expect(store).toMatch(/isAttendanceBusy/);
     expect(store).toMatch(/attendanceError/);
     expect(store).not.toMatch(/from\('attendance'\)/);
@@ -383,6 +544,9 @@ describe('attendance stays off pages and the store query path', () => {
     const cycleAttendance = store.slice(store.indexOf('const cycleAttendance'));
     expect(cycleAttendance).not.toMatch(/loading\.value = true/);
     expect(cycleAttendance).not.toMatch(/error\.value =/);
+    const attendThisNightAction = store.slice(store.indexOf('const attendThisNight ='));
+    expect(attendThisNightAction).not.toMatch(/loading\.value = true/);
+    expect(attendThisNightAction).not.toMatch(/error\.value =/);
 
     const pageFiles = [
       'app/pages/concerts.vue',
@@ -401,6 +565,10 @@ describe('attendance stays off pages and the store query path', () => {
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/AppAttendanceChip/);
     expect(eventPage).toMatch(/isAttendanceBusy/);
+    expect(eventPage).toMatch(/isAttendThisNightBusy/);
+    expect(eventPage).toMatch(/Attend this night/);
+    expect(eventPage).toMatch(/kind === 'single_night'/);
+    expect(eventPage).not.toMatch(/Attend this festival|Mark every concert/i);
     expect(eventPage).not.toMatch(/compact card|compactCard/i);
 
     const concertsPage = readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8');
