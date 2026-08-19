@@ -1412,6 +1412,28 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(nav).toMatch(/openSheet|openAddSheet/);
   });
 
+  it('returns loadAttendance failure from refreshConcertLists so concert update is not success', () => {
+    const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
+    const refresh = store.slice(
+      store.indexOf('const refreshConcertLists ='),
+      store.indexOf('const createOwnedConcert =')
+    );
+    expect(refresh).toMatch(/listedAttendanceError/);
+    expect(refresh).toMatch(/if \(listedAttendanceError\)/);
+    expect(refresh).toMatch(/error\.value = listedAttendanceError/);
+    expect(refresh).toMatch(/return mutationResult\(resultData, listedAttendanceError/);
+
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
+    const editBlock = persist.slice(
+      persist.indexOf('updateOwnedConcert'),
+      persist.indexOf('createOwnedConcert')
+    );
+    expect(editBlock).toMatch(/if \(result\.error\)/);
+    expect(editBlock.indexOf('if (result.error)')).toBeLessThan(editBlock.indexOf('Concert saved.'));
+    expect(editBlock).toMatch(/formError\.value = result\.error/);
+  });
+
   it('exports createEvent for New night/New festival Event rules', () => {
     expect(typeof createEvent).toBe('function');
   });

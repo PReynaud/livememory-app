@@ -259,6 +259,10 @@ export const useEventsStore = defineStore('events', () => {
 
     const listedAttendanceError = await loadAttendance();
     attendanceError.value = listedAttendanceError;
+    if (listedAttendanceError) {
+      error.value = listedAttendanceError;
+      return mutationResult(resultData, listedAttendanceError, outcome, null);
+    }
 
     return mutationResult(resultData, null, outcome, null);
   };
