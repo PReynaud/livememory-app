@@ -106,6 +106,7 @@ const createMockConcertsClient = (options?: {
   const concerts = [...(options?.concerts ?? [])];
   const concertInserts: Record<string, unknown>[] = [];
   const concertUpdates: Record<string, unknown>[] = [];
+  const concertDeletes: { column: string; value: string }[] = [];
   const eventInserts: Record<string, unknown>[] = [];
   const eventDeletes: { column: string; value: string }[] = [];
   const attendanceRows: AttendanceRecord[] = [];
@@ -328,7 +329,20 @@ const createMockConcertsClient = (options?: {
               })
             })
           };
-        }
+        },
+        delete: () => ({
+          eq: async (column: string, value: string) => {
+            concertDeletes.push({ column, value });
+            const index = concerts.findIndex(
+              concert => concert[column as keyof ConcertRecord] === value
+            );
+            if (index >= 0) {
+              concerts.splice(index, 1);
+            }
+
+            return { data: null, error: null };
+          }
+        })
       };
     }
   };
@@ -339,6 +353,7 @@ const createMockConcertsClient = (options?: {
     concerts,
     concertInserts,
     concertUpdates,
+    concertDeletes,
     eventInserts,
     eventDeletes,
     attendanceInserts,
@@ -1057,6 +1072,42 @@ describe('createConcert', () => {
       concert_id: result.data?.id,
       status: ATTENDANCE_STATUS.going
     });
+  });
+
+  it('rolls back the new Concert and Event when transparent Attendance insert fails', async () => {
+    const {
+      client,
+      events,
+      concerts,
+      eventInserts,
+      concertInserts,
+      concertDeletes,
+      eventDeletes,
+      attendanceInserts
+    } = createMockConcertsClient({
+      attendanceInsertError: { message: 'attendance insert denied' }
+    });
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-10',
+      place: 'Berlin'
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe('persist_failed');
+    expect(result.error?.message).toBe('attendance insert denied');
+    expect(eventInserts).toHaveLength(1);
+    expect(concertInserts).toHaveLength(1);
+    expect(attendanceInserts).toHaveLength(1);
+    expect(concertDeletes).toEqual([
+      { column: 'id', value: '44444444-4444-4444-8444-000000000000' }
+    ]);
+    expect(eventDeletes).toEqual([
+      { column: 'id', value: '33333333-3333-4333-8333-333333333333' }
+    ]);
+    expect(concerts).toHaveLength(0);
+    expect(events).toHaveLength(0);
   });
 
   it('does not apply owner Attendance default when identity attaches on the transparent path', async () => {

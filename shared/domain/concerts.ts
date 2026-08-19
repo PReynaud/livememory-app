@@ -421,6 +421,14 @@ const rollbackNewEvent = async (client: ConcertsClient, eventId: string | null) 
   await client.from('events').delete().eq('id', eventId);
 };
 
+const rollbackNewConcert = async (client: ConcertsClient, concertId: string | null) => {
+  if (!concertId) {
+    return;
+  }
+
+  await client.from('concerts').delete().eq('id', concertId);
+};
+
 const resolveTarget = async (
   client: ConcertsClient,
   input: CreateConcertInput
@@ -625,6 +633,8 @@ export const createConcert = async (
   if (isTransparent) {
     const attendanceError = await applyOwnerAttendanceDefault(client, data);
     if (attendanceError) {
+      await rollbackNewConcert(client, data.id);
+      await rollbackNewEvent(client, createdEventId);
       return attendanceError;
     }
   }
