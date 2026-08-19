@@ -1,0 +1,95 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { souvenirStats } from '../../shared/domain/home';
+import { selectFeaturedEvents, type EventRecord } from '../../shared/domain/events';
+
+const read = (relative: string) => readFileSync(resolve(process.cwd(), relative), 'utf8');
+
+const eventAt = (id: string, name: string, start: string): EventRecord => ({
+  id,
+  owner_id: 'owner-1',
+  kind: 'single_night',
+  name,
+  start_date: start,
+  end_date: start,
+  place: 'Paris'
+});
+
+describe('souvenirStats', () => {
+  it('counts effective attended, owned Events, and current going, including zeros', () => {
+    expect(souvenirStats({ ownedEventCount: 0, statuses: [] })).toEqual({
+      attended: 0,
+      events: 0,
+      going: 0
+    });
+
+    expect(souvenirStats({
+      ownedEventCount: 4,
+      statuses: ['attended', 'going', 'attended', 'going', 'going']
+    })).toEqual({
+      attended: 2,
+      events: 4,
+      going: 3
+    });
+  });
+});
+
+describe('past Events leave featured without a How was it interstitial', () => {
+  it('drops Events whose start date is past and Home has no interstitial copy', () => {
+    const past = eventAt('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Past Going Night', '2026-08-10');
+    const upcoming = eventAt('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Still Upcoming', '2026-12-01');
+    const now = new Date('2026-08-19T12:00:00Z');
+
+    expect(selectFeaturedEvents([past, upcoming], now).map(event => event.name)).toEqual(['Still Upcoming']);
+
+    const home = read('app/pages/home.vue');
+    expect(home).not.toMatch(/How was it\?/);
+  });
+});
+
+describe('Home featured and stats surfaces', () => {
+  it('fetches through the store, caps featured, and keeps stats non-tappable', () => {
+    const home = read('app/pages/home.vue');
+    expect(home).toMatch(/fetchEvents/);
+    expect(home).toMatch(/featuredEvents/);
+    expect(home).toMatch(/homeStats/);
+    expect(home).toMatch(/AppEventCard/);
+    expect(home).toMatch(/featured/);
+    expect(home).toMatch(/Nothing upcoming\./);
+    expect(home).toMatch(/Add a night or a concert\./);
+    expect(home).toMatch(/openSheet|openAddSheet/);
+    expect(home).toMatch(/data-testid="home-stats"/);
+    expect(home).toMatch(/data-stat="attended"/);
+    expect(home).toMatch(/data-stat="events"/);
+    expect(home).toMatch(/data-stat="going"/);
+    expect(home).not.toMatch(/v-for="event in events"/);
+    expect(home).not.toMatch(/for you|Pour vous|album/i);
+    expect(home).not.toMatch(/<NuxtLink/);
+    expect(home).not.toMatch(/<svg/);
+    const stats = home.slice(home.indexOf('home-stats'));
+    expect(stats).not.toMatch(/NuxtLink|<a |@click|to="/);
+
+    const store = read('app/stores/events.ts');
+    expect(store).toMatch(/selectFeaturedEvents/);
+    expect(store).toMatch(/souvenirStats/);
+    expect(store).toMatch(/featuredEvents/);
+    expect(store).toMatch(/homeStats/);
+    expect(store).not.toMatch(/from\('attendance'\)/);
+    expect(store).not.toMatch(/from\('attendance_effective'\)/);
+  });
+
+  it('uses display-sm on featured compact artist and grouped Event name', () => {
+    const card = read('app/components/AppEventCard.vue');
+    expect(card).toMatch(/isCompactBill/);
+    expect(card).toMatch(/formatConcertMetaLine/);
+    expect(card).toMatch(/groupConcertsByDate/);
+    expect(card).toMatch(/cycleAttendance/);
+    expect(card).toMatch(/data-event-card/);
+    expect(card).toMatch(/data-featured/);
+    expect(card).toMatch(/text-2xl font-bold tracking-tight leading-\[1\.15\]/);
+    expect(card).toMatch(/text-base font-semibold/);
+    expect(card).toMatch(/`\/e\/\$\{event\.id\}`/);
+    expect(card).not.toMatch(/for you|Pour vous|album/i);
+  });
+});

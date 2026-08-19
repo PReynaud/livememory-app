@@ -1240,7 +1240,8 @@ describe('concerts store and pages use domain helpers only', () => {
       'app/pages/e/[id].vue',
       'app/pages/home.vue',
       'app/components/AppAddConcertSheet.vue',
-      'app/components/AppGlassNav.vue'
+      'app/components/AppGlassNav.vue',
+      'app/components/AppEventCard.vue'
     ];
 
     for (const file of pageFiles) {
@@ -1262,10 +1263,13 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(concertsPage).toMatch(/New night/);
     expect(concertsPage).toMatch(/New festival/);
     expect(concertsPage).toMatch(/openSheet|openAddSheet/);
-    expect(concertsPage).toMatch(/data-event-card/);
-    expect(concertsPage).toMatch(/isCompactBill/);
-    expect(concertsPage).toMatch(/formatConcertMetaLine/);
-    expect(concertsPage).toMatch(/cycleAttendance/);
+    expect(concertsPage).toMatch(/AppEventCard/);
+
+    const eventCard = readFileSync(resolve(process.cwd(), 'app/components/AppEventCard.vue'), 'utf8');
+    expect(eventCard).toMatch(/data-event-card/);
+    expect(eventCard).toMatch(/isCompactBill/);
+    expect(eventCard).toMatch(/formatConcertMetaLine/);
+    expect(eventCard).toMatch(/cycleAttendance/);
 
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/USlideover/);

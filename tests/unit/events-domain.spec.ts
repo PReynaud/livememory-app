@@ -5,6 +5,7 @@ import {
   createEvent,
   getOwnedEvent,
   listOwnedEvents,
+  selectFeaturedEvents,
   EVENT_RULE,
   EVENT_RULE_MESSAGE,
   type EventRecord,
@@ -361,7 +362,8 @@ describe('events store and pages use domain helpers only', () => {
     const pageFiles = [
       'app/pages/concerts.vue',
       'app/pages/e/[id].vue',
-      'app/pages/home.vue'
+      'app/pages/home.vue',
+      'app/components/AppEventCard.vue'
     ];
 
     for (const file of pageFiles) {
@@ -383,5 +385,33 @@ describe('events store and pages use domain helpers only', () => {
     expect(eventPage).toMatch(/loadFailed|eventsStore\.error|error\.value/);
 
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/home\|concerts\|profile\|e/);
+  });
+});
+
+describe('selectFeaturedEvents', () => {
+  const eventAt = (id: string, name: string, start: string, end = start): EventRecord => ({
+    ...festivalRow,
+    id,
+    name,
+    start_date: start,
+    end_date: end,
+    place: 'Paris'
+  });
+
+  it('ranks the next 1–3 upcoming owned Events by start date, including empty ones', () => {
+    const past = eventAt('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Past Night', '2026-08-01');
+    const emptySoon = eventAt('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Empty Soon', '2026-08-20');
+    const second = eventAt('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Second', '2026-08-21');
+    const third = eventAt('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'Third', '2026-08-22');
+    const fourth = eventAt('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'Fourth', '2026-08-23');
+    const now = new Date('2026-08-19T12:00:00Z');
+
+    expect(selectFeaturedEvents([fourth, past, third, emptySoon, second], now).map(event => event.name)).toEqual([
+      'Empty Soon',
+      'Second',
+      'Third'
+    ]);
+    expect(selectFeaturedEvents([past], now)).toEqual([]);
+    expect(selectFeaturedEvents([emptySoon], now).map(event => event.name)).toEqual(['Empty Soon']);
   });
 });
