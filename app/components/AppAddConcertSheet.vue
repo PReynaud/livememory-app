@@ -259,8 +259,35 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
         artist: artist.value,
         date: isExistingNight.value ? (selectedEvent.value?.start_date ?? concertDate.value) : concertDate.value,
         time: concertTime.value,
-        notes: notes.value
+        notes: notes.value,
+        confirm
       });
+
+      if (result.outcome === 'needs_choice') {
+        pendingChoice.value = true;
+        return;
+      }
+
+      pendingChoice.value = false;
+
+      if (result.outcome === 'impossible_place') {
+        formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
+        return;
+      }
+
+      if (result.outcome === 'attached' && result.data) {
+        const attachedToIntended
+          = picker.value === result.data.event_id
+            && picker.value !== NEW_NIGHT
+            && picker.value !== NEW_FESTIVAL;
+        if (!attachedToIntended) {
+          toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
+        }
+
+        sheet.closeSheet();
+        await navigateTo('/e/' + result.data.event_id);
+        return;
+      }
 
       if (result.error) {
         formError.value = result.error;

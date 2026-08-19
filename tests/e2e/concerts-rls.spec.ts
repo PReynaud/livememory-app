@@ -211,3 +211,68 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     await deleteE2EAccountForTest(other.userId);
   }
 });
+
+test('owner UPDATE RLS rejects a blank artist name', async ({ page: _page }, testInfo) => {
+  const account = await createE2EAccountForTest(`${testInfo.project.name}-${testInfo.title}-${testInfo.retry}`);
+
+  try {
+    const session = await signIn(account.email, account.password);
+
+    const eventResponse = await fetch(`${session.supabaseUrl}/rest/v1/events`, {
+      method: 'POST',
+      headers: session.headers,
+      body: JSON.stringify({
+        kind: 'single_night',
+        name: 'Club Night',
+        start_date: '2026-08-18',
+        end_date: '2026-08-18',
+        place: 'Berlin'
+      })
+    });
+    expect(eventResponse.ok).toBe(true);
+    const events = await eventResponse.json() as { id: string }[];
+    const eventId = events[0]?.id;
+    expect(eventId).toBeTruthy();
+
+    const concertResponse = await fetch(`${session.supabaseUrl}/rest/v1/concerts`, {
+      method: 'POST',
+      headers: session.headers,
+      body: JSON.stringify({
+        event_id: eventId,
+        artist: 'Justice',
+        date: '2026-08-18',
+        place: 'Berlin'
+      })
+    });
+    expect(concertResponse.ok).toBe(true);
+    const concerts = await concertResponse.json() as { id: string }[];
+    const concertId = concerts[0]?.id;
+    expect(concertId).toBeTruthy();
+
+    const blankArtist = await fetch(`${session.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+      method: 'PATCH',
+      headers: session.headers,
+      body: JSON.stringify({ artist: '   ' })
+    });
+    expect(blankArtist.ok).toBe(false);
+
+    const stillNamed = await fetch(
+      `${session.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=artist`,
+      { headers: session.headers }
+    );
+    expect(stillNamed.ok).toBe(true);
+    const stillNamedRows = await stillNamed.json() as { artist: string }[];
+    expect(stillNamedRows[0]?.artist).toBe('Justice');
+
+    const renamed = await fetch(`${session.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+      method: 'PATCH',
+      headers: session.headers,
+      body: JSON.stringify({ artist: 'The Last Dinner Party' })
+    });
+    expect(renamed.ok).toBe(true);
+    const renamedRows = await renamed.json() as { artist: string }[];
+    expect(renamedRows[0]?.artist).toBe('The Last Dinner Party');
+  } finally {
+    await deleteE2EAccountForTest(account.userId);
+  }
+});

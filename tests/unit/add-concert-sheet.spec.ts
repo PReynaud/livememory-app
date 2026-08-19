@@ -99,4 +99,20 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/Delete this concert\?/);
     expect(sheet).not.toMatch(/joiner/i);
   });
+
+  it('runs Concert identity on edit and keeps the draft for needs_choice', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
+    const editBlock = persist.slice(
+      persist.indexOf('updateOwnedConcert'),
+      persist.indexOf('createOwnedConcert')
+    );
+
+    expect(editBlock).toMatch(/confirm/);
+    expect(editBlock).toMatch(/needs_choice/);
+    expect(editBlock).toMatch(/pendingChoice\.value = true/);
+    expect(editBlock).toMatch(/impossible_place/);
+    expect(editBlock).toMatch(/attached/);
+    expect(persist).not.toMatch(/dismissChoice[\s\S]{0,80}closeSheet/);
+  });
 });

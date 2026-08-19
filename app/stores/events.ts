@@ -34,6 +34,12 @@ import {
   type AttendanceClient,
   type AttendanceStatus
 } from '#shared/domain/attendance';
+import {
+  currentConcertsForEvent,
+  omitAttendanceForConcert,
+  omitConcert,
+  upsertConcert
+} from '@/utils/concert-mutation-state';
 
 export type { ConcertCreateOutcome, ConcertRecord, CreateConcertInput, CreateEventInput, EventKind, EventRecord, UpdateConcertInput };
 export type { AttendanceStatus };
@@ -225,16 +231,11 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
-  const refreshConcertLists = async (resultData: ConcertRecord | null, outcome: ConcertCreateOutcome | null) => {
+  const reloadOwnedConcertState = async () => {
     const listedEvents = await listOwnedEvents(eventsClient());
     if (listedEvents.error) {
       error.value = listedEvents.error.message;
-      return mutationResult(
-        resultData,
-        listedEvents.error.message,
-        outcome,
-        listedEvents.error.ruleId
-      );
+      return listedEvents.error.message;
     }
 
     events.value = listedEvents.data ?? [];
@@ -242,29 +243,49 @@ export const useEventsStore = defineStore('events', () => {
     const listedConcerts = await listOwnedConcerts(concertsClient());
     if (listedConcerts.error) {
       error.value = listedConcerts.error.message;
-      return mutationResult(
-        resultData,
-        listedConcerts.error.message,
-        outcome,
-        listedConcerts.error.ruleId
-      );
+      return listedConcerts.error.message;
     }
 
     concerts.value = listedConcerts.data ?? [];
-    if (currentEvent.value) {
-      currentConcerts.value = concerts.value.filter(
-        concert => concert.event_id === currentEvent.value?.id
-      );
+    const listedCurrent = currentConcertsForEvent(concerts.value, currentEvent.value?.id);
+    if (listedCurrent) {
+      currentConcerts.value = listedCurrent;
     }
 
     const listedAttendanceError = await loadAttendance();
     attendanceError.value = listedAttendanceError;
     if (listedAttendanceError) {
       error.value = listedAttendanceError;
-      return mutationResult(resultData, listedAttendanceError, outcome, null);
+      return listedAttendanceError;
+    }
+
+    return null;
+  };
+
+  const refreshConcertLists = async (resultData: ConcertRecord | null, outcome: ConcertCreateOutcome | null) => {
+    const refreshError = await reloadOwnedConcertState();
+    if (refreshError) {
+      return mutationResult(resultData, refreshError, outcome, null);
     }
 
     return mutationResult(resultData, null, outcome, null);
+  };
+
+  const applyOwnedConcert = (concert: ConcertRecord) => {
+    concerts.value = upsertConcert(concerts.value, concert);
+    const listedCurrent = currentConcertsForEvent(concerts.value, currentEvent.value?.id);
+    if (listedCurrent) {
+      currentConcerts.value = listedCurrent;
+    }
+  };
+
+  const dropOwnedConcert = (concertId: string) => {
+    concerts.value = omitConcert(concerts.value, concertId);
+    attendanceByConcertId.value = omitAttendanceForConcert(attendanceByConcertId.value, concertId);
+    const listedCurrent = currentConcertsForEvent(concerts.value, currentEvent.value?.id);
+    if (listedCurrent) {
+      currentConcerts.value = listedCurrent;
+    }
   };
 
   const createOwnedConcert = async (input: CreateConcertInput) => {
@@ -305,12 +326,26 @@ export const useEventsStore = defineStore('events', () => {
     try {
       const result = await updateConcert(concertsClient(), input);
 
-      if (result.error) {
-        error.value = result.error.message;
-        return mutationResult(null, result.error.message, null, result.error.ruleId);
+      if (result.outcome === 'needs_choice' || result.outcome === 'impossible_place') {
+        return mutationResult(
+          result.data,
+          result.error?.message ?? null,
+          result.outcome,
+          result.error?.ruleId ?? result.outcome
+        );
       }
 
-      return await refreshConcertLists(result.data, null);
+      if (result.error) {
+        error.value = result.error.message;
+        return mutationResult(null, result.error.message, result.outcome, result.error.ruleId);
+      }
+
+      if (result.data) {
+        applyOwnedConcert(result.data);
+      }
+
+      await reloadOwnedConcertState();
+      return mutationResult(result.data, null, result.outcome, null);
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update concert');
       error.value = errorMessage;
@@ -332,38 +367,8 @@ export const useEventsStore = defineStore('events', () => {
         return { data: null, error: result.error.message };
       }
 
-      const listedEvents = await listOwnedEvents(eventsClient());
-      if (listedEvents.error) {
-        error.value = listedEvents.error.message;
-        return { data: null, error: listedEvents.error.message };
-      }
-
-      events.value = listedEvents.data ?? [];
-
-      const listedConcerts = await listOwnedConcerts(concertsClient());
-      if (listedConcerts.error) {
-        error.value = listedConcerts.error.message;
-        return { data: null, error: listedConcerts.error.message };
-      }
-
-      concerts.value = listedConcerts.data ?? [];
-      if (currentEvent.value) {
-        currentConcerts.value = concerts.value.filter(
-          concert => concert.event_id === currentEvent.value?.id
-        );
-      }
-
-      attendanceByConcertId.value = Object.fromEntries(
-        Object.entries(attendanceByConcertId.value).filter(([id]) => id !== concertId)
-      );
-
-      const listedAttendanceError = await loadAttendance();
-      attendanceError.value = listedAttendanceError;
-      if (listedAttendanceError) {
-        error.value = listedAttendanceError;
-        return { data: result.data, error: listedAttendanceError };
-      }
-
+      dropOwnedConcert(concertId);
+      await reloadOwnedConcertState();
       return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to delete concert');

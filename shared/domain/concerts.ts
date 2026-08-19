@@ -77,6 +77,7 @@ export type UpdateConcertInput = {
   date: string;
   time?: string | null;
   notes?: string | null;
+  confirm?: ConcertIdentityConfirm;
 };
 
 type QueryError = {
@@ -373,6 +374,42 @@ const pickAttachTarget = (
   return overlap[0] ?? null;
 };
 
+type IdentityDecision
+  = { kind: 'return'; result: CreateConcertResult }
+    | { kind: 'attach'; target: ConcertRecord }
+    | { kind: 'proceed' };
+
+const decideIdentity = (
+  candidates: ConcertRecord[],
+  draftTime: string | null,
+  targetPlace: string,
+  confirm?: ConcertIdentityConfirm
+): IdentityDecision => {
+  const exactTimed = timedMatch(candidates, draftTime);
+  if (exactTimed) {
+    return { kind: 'return', result: concludeTimedMatch(exactTimed, targetPlace) };
+  }
+
+  const overlap = untimedOverlap(candidates, draftTime);
+  if (overlap.length > 0 && confirm !== 'create') {
+    const existing = pickAttachTarget(overlap, draftTime);
+    if (existing && confirm === 'attach') {
+      return { kind: 'attach', target: existing };
+    }
+
+    return {
+      kind: 'return',
+      result: {
+        data: existing ?? null,
+        error: null,
+        outcome: CONCERT_IDENTITY.needsChoice
+      }
+    };
+  }
+
+  return { kind: 'proceed' };
+};
+
 const writeAttachTime = async (
   client: ConcertsClient,
   existing: ConcertRecord,
@@ -550,23 +587,13 @@ export const createConcert = async (
   }
 
   const candidates = candidatesResult.data ?? [];
-  const exactTimed = timedMatch(candidates, draftTime);
-  if (exactTimed) {
-    return concludeTimedMatch(exactTimed, target.data.place);
+  const decision = decideIdentity(candidates, draftTime, target.data.place, request.confirm);
+  if (decision.kind === 'return') {
+    return decision.result;
   }
 
-  const overlap = untimedOverlap(candidates, draftTime);
-  if (overlap.length > 0 && request.confirm !== 'create') {
-    const existing = pickAttachTarget(overlap, draftTime);
-    if (existing && request.confirm === 'attach') {
-      return writeAttachTime(client, existing, draftTime, target.data.place);
-    }
-
-    return {
-      data: existing,
-      error: null,
-      outcome: CONCERT_IDENTITY.needsChoice
-    };
+  if (decision.kind === 'attach') {
+    return writeAttachTime(client, decision.target, draftTime, target.data.place);
   }
 
   let event = target.data.event;
@@ -685,42 +712,88 @@ const loadConcert = async (
 export const updateConcert = async (
   client: ConcertsClient,
   input: UpdateConcertInput
-): Promise<DomainResult<ConcertRecord>> => {
+): Promise<CreateConcertResult> => {
   const artist = trim(input.artist);
   if (!artist) {
-    return fail(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
+    return failCreate(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
   }
 
   const date = trim(input.date);
   if (!date || !CIVIL_DATE.test(date)) {
-    return fail(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
+    return failCreate(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
   }
 
   const existing = await loadConcert(client, input.concertId);
   if (existing.error || !existing.data) {
-    return existing;
+    return {
+      data: null,
+      error: existing.error,
+      outcome: null
+    };
   }
+
+  const current = existing.data;
 
   const eventResult = await resolveEvent(client, {
     artist,
     date,
-    eventId: existing.data.event_id
+    eventId: current.event_id
   });
   if (eventResult.error || !eventResult.data) {
     return {
       data: null,
-      error: eventResult.error
+      error: eventResult.error,
+      outcome: null
     };
   }
 
   if (!isDateInsideEvent(date, eventResult.data)) {
-    return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
+    return failCreate(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
+  }
+
+  const draftTime = normalizeClock(input.time);
+  const identityUnchanged
+    = sameArtist(current.artist, artist)
+      && current.date === date
+      && normalizeClock(current.time) === draftTime;
+
+  if (!identityUnchanged) {
+    const candidatesResult = await listIdentityCandidates(
+      client,
+      artist,
+      date,
+      current.owner_id
+    );
+    if (candidatesResult.error) {
+      return {
+        data: null,
+        error: candidatesResult.error,
+        outcome: null
+      };
+    }
+
+    const candidates = (candidatesResult.data ?? []).filter(
+      concert => concert.id !== current.id
+    );
+    const decision = decideIdentity(
+      candidates,
+      draftTime,
+      eventResult.data.place,
+      input.confirm
+    );
+    if (decision.kind === 'return') {
+      return decision.result;
+    }
+
+    if (decision.kind === 'attach') {
+      return writeAttachTime(client, decision.target, draftTime, eventResult.data.place);
+    }
   }
 
   const payload = {
     artist,
     date,
-    time: normalizeClock(input.time),
+    time: draftTime,
     place: eventResult.data.place,
     notes: optionalNotes(input.notes)
   };
@@ -728,18 +801,49 @@ export const updateConcert = async (
   const { data, error } = await client
     .from('concerts')
     .update(payload)
-    .eq('id', existing.data.id)
+    .eq('id', current.id)
     .select()
     .single();
 
   if (error || !data) {
-    return {
-      data: null,
-      error: persistFailed(error ?? { message: 'Failed to update concert' })
-    };
+    if (error && isUniqueViolation(error)) {
+      const retry = await listIdentityCandidates(
+        client,
+        artist,
+        date,
+        current.owner_id
+      );
+      if (retry.error) {
+        return {
+          data: null,
+          error: retry.error,
+          outcome: null
+        };
+      }
+
+      const raced = timedMatch(
+        (retry.data ?? []).filter(concert => concert.id !== current.id),
+        draftTime
+      );
+      if (raced) {
+        return concludeTimedMatch(raced, eventResult.data.place);
+      }
+
+      return failCreate(
+        CONCERT_RULE.impossiblePlace,
+        CONCERT_RULE_MESSAGE.impossiblePlace,
+        CONCERT_IDENTITY.impossiblePlace
+      );
+    }
+
+    return failCreate('persist_failed', error?.message ?? 'Failed to update concert');
   }
 
-  return ok(data);
+  return {
+    data,
+    error: null,
+    outcome: null
+  };
 };
 
 export const deleteConcert = async (
