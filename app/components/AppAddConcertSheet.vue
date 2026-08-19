@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { navigateTo, useSupabaseUser, useToast } from '#imports';
+import { navigateTo, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
@@ -16,8 +16,7 @@ const sheet = useAddConcertSheetStore();
 const editEventSheet = useEditEventSheetStore();
 const eventsStore = useEventsStore();
 const toast = useToast();
-const user = useSupabaseUser();
-const { events } = storeToRefs(eventsStore);
+const { events, sessionUserId } = storeToRefs(eventsStore);
 const { lockEvent } = storeToRefs(sheet);
 
 const picker = ref('');
@@ -89,7 +88,7 @@ const showStageSelect = computed(() => eventStages.value.length > 0);
 
 const eventItems = computed(() => {
   const owned = events.value
-    .filter(event => event.owner_id === user.value?.id)
+    .filter(event => Boolean(sessionUserId.value) && event.owner_id === sessionUserId.value)
     .map(event => ({
       label: event.name,
       value: event.id

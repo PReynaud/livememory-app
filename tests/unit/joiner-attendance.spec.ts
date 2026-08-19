@@ -151,8 +151,9 @@ describe('joiner Event attendance surface', () => {
 
   it('offers only owned Events in the Add Concert picker', () => {
     const sheet = read('app/components/AppAddConcertSheet.vue');
-    expect(sheet).toMatch(/owner_id === user\.value\?\.id/);
-    expect(sheet).toMatch(/useSupabaseUser/);
+    expect(sheet).toMatch(/sessionUserId/);
+    expect(sheet).toMatch(/event\.owner_id === sessionUserId\.value/);
+    expect(sheet).not.toMatch(/useSupabaseUser/);
     expect(sheet).not.toMatch(/joiner/i);
   });
 

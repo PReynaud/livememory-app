@@ -225,6 +225,7 @@ test('joiner domain and REST Bill writes are blocked', async ({ page }, testInfo
 
     await page.goto('/login');
     await signInOnPage(page, joiner);
+    await expect(page).toHaveURL(/\/home/);
     await page.goto(`/e/${eventId}`);
     await waitForNuxtHydration(page);
     await expect(page.getByRole('heading', { name: 'Joiner Fest' })).toBeVisible();

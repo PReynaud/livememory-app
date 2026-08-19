@@ -87,6 +87,7 @@ export const useEventsStore = defineStore('events', () => {
   const events = ref<EventRecord[]>([]);
   const concerts = ref<ConcertRecord[]>([]);
   const currentEvent = ref<EventRecord | null>(null);
+  const sessionUserId = ref<string | null>(null);
   const isOwner = ref(false);
   const currentConcerts = ref<ConcertRecord[]>([]);
   const currentStages = ref<EventStageRecord[]>([]);
@@ -110,14 +111,15 @@ export const useEventsStore = defineStore('events', () => {
     return OFFLINE_TOAST_TITLE;
   };
 
-  const syncOwner = async (event: EventRecord | null) => {
-    if (!event) {
-      isOwner.value = false;
-      return;
-    }
-
+  const syncSessionUser = async () => {
     const { data } = await supabase.auth.getUser();
-    isOwner.value = Boolean(data.user?.id && data.user.id === event.owner_id);
+    sessionUserId.value = data.user?.id ?? null;
+    return sessionUserId.value;
+  };
+
+  const syncOwner = async (event: EventRecord | null) => {
+    const userId = await syncSessionUser();
+    isOwner.value = Boolean(event && userId && userId === event.owner_id);
   };
 
   const mergeConcertsForEvents = (eventIds: string[], incoming: ConcertRecord[]) => {
@@ -204,6 +206,7 @@ export const useEventsStore = defineStore('events', () => {
     error.value = null;
 
     try {
+      await syncSessionUser();
       const result = await listOwnedEvents(eventsClient());
 
       if (result.error) {
@@ -777,6 +780,7 @@ export const useEventsStore = defineStore('events', () => {
     events,
     concerts,
     currentEvent,
+    sessionUserId,
     isOwner,
     currentConcerts,
     currentStages,
