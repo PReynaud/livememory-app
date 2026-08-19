@@ -1953,6 +1953,7 @@ describe('concerts store and pages use domain helpers only', () => {
     const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
     expect(persist).toMatch(/moveOwnedConcert/);
     expect(persist).toMatch(/originalEventId/);
+    expect(persist).toMatch(/editLoaded/);
     const editBlock = persist.slice(
       persist.indexOf('isEdit.value && sheet.concertId'),
       persist.indexOf('createOwnedConcert')
