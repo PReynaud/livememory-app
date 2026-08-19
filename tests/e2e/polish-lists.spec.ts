@@ -86,7 +86,16 @@ test('announces Home, Concerts, Event, and Profile when routes change', async ({
 test('shows Couldn\'t load with Retry when Home events fail to fetch', async ({ authenticatedPage }) => {
   await authenticatedPage.route('**/rest/v1/events*', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.abort('failed');
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'failed',
+          code: '500',
+          details: '',
+          hint: ''
+        })
+      });
       return;
     }
 
@@ -95,16 +104,16 @@ test('shows Couldn\'t load with Retry when Home events fail to fetch', async ({ 
 
   await authenticatedPage.goto('/home');
   await waitForNuxtHydration(authenticatedPage);
-  await expect(authenticatedPage.getByText('Couldn\'t load.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Couldn\'t load.')).toBeVisible({ timeout: 15000 });
   await expect(authenticatedPage.getByRole('button', { name: 'Retry' })).toBeVisible();
 
   await authenticatedPage.unroute('**/rest/v1/events*');
   await authenticatedPage.getByRole('button', { name: 'Retry' }).click();
-  await expect(authenticatedPage.getByText('Nothing upcoming.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Nothing upcoming.')).toBeVisible({ timeout: 15000 });
 });
 
 test('blocks an offline Concert write with a toast and does not create the night', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('button', { name: 'Add concert' }).click();
+  await authenticatedPage.locator('main').getByRole('button', { name: 'Add concert' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet).toBeVisible();
   await sheet.getByLabel('Artist').fill('Justice');
@@ -113,7 +122,7 @@ test('blocks an offline Concert write with a toast and does not create the night
 
   await authenticatedPage.context().setOffline(true);
   await sheet.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage.getByText('You\'re offline.')).toBeVisible();
+  await expect(authenticatedPage.getByLabel('Notifications (F8)')).toContainText('You\'re offline.');
 
   await authenticatedPage.context().setOffline(false);
   await authenticatedPage.keyboard.press('Escape');

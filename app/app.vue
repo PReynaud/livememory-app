@@ -70,7 +70,9 @@ useSeoMeta({
     >
       <AppGlassNav />
       <UMain class="pb-24 lg:pb-8 lg:pl-24">
-        <AppRouteAnnouncer />
+        <ClientOnly>
+          <AppRouteAnnouncer />
+        </ClientOnly>
         <NuxtPage />
       </UMain>
       <AppAddConcertSheet />

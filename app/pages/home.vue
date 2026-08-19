@@ -19,7 +19,11 @@ const retryLoad = () => {
   void eventsStore.fetchEvents();
 };
 
-void eventsStore.fetchEvents({ silent: eventsStore.events.length > 0 });
+if (import.meta.server) {
+  await eventsStore.fetchEvents({ silent: eventsStore.events.length > 0 });
+} else {
+  void eventsStore.fetchEvents({ silent: eventsStore.events.length > 0 });
+}
 </script>
 
 <template>

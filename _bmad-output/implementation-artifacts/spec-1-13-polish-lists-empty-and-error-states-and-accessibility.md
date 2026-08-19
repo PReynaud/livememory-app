@@ -2,7 +2,7 @@
 title: 'Story 1.13: Polish lists, empty and error states, and accessibility'
 type: 'feature'
 created: '2026-08-19'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '201a83ef0bf9653e9365e2224cb4a714cc52a3e2'
 review_loop_iteration: 0
 context:

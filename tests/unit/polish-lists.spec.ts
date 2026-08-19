@@ -39,10 +39,10 @@ describe('list polish source guards', () => {
     expect(home).toMatch(/AppListSkeleton/);
     expect(home).toMatch(/variant="home"/);
     expect(home).toMatch(/loading/);
-    expect(home).not.toMatch(/await eventsStore\.fetchEvents/);
+    expect(home).toMatch(/import\.meta\.server/);
     expect(concerts).toMatch(/AppListSkeleton/);
     expect(concerts).toMatch(/variant="groups"/);
-    expect(concerts).not.toMatch(/await eventsStore\.fetchEvents/);
+    expect(concerts).toMatch(/import\.meta\.server/);
     expect(concerts).not.toMatch(/Loading events/);
     expect(eventPage).toMatch(/AppListSkeleton/);
     expect(eventPage).not.toMatch(/Loading event/);
