@@ -192,6 +192,7 @@ await eventsStore.fetchEvents();
         color="primary"
         variant="outline"
         class="h-11 rounded-full ring-2"
+        @click="openCreate('single_night')"
       />
     </section>
 
