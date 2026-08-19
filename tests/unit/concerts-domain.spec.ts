@@ -172,7 +172,7 @@ const createMockConcertsClient = (options?: {
 };
 
 describe('concerts migration kernel', () => {
-  it('adds concerts with event FK and owner RLS select/insert only', () => {
+  it('adds concerts with event FK, owner RLS, and insert date/place checks', () => {
     const concertsMigration = readMigrations().find(file => file.name.includes('concerts'));
 
     expect(concertsMigration).toBeTruthy();
@@ -188,6 +188,9 @@ describe('concerts migration kernel', () => {
     expect(sql).toMatch(/enable row level security/);
     expect(sql).toMatch(/\(select auth\.uid\(\)\)/);
     expect(sql).toMatch(/grant select,\s*insert/i);
+    expect(sql).toMatch(/concerts\.date\s*>=\s*events\.start_date/);
+    expect(sql).toMatch(/concerts\.date\s*<=\s*events\.end_date/);
+    expect(sql).toMatch(/concerts\.place\s*=\s*events\.place/);
     expect(sql).not.toMatch(/for delete/i);
     expect(sql).not.toMatch(/service_role/);
   });
@@ -343,6 +346,7 @@ describe('createConcert', () => {
     expect(end.data?.place).toBe('Paris');
   });
 
+  // Story 1.4 (AD-10) attaches timed owner identity instead of inserting a second row.
   it('allows duplicate artist, date, and time rows', async () => {
     const { client, concertInserts } = createMockConcertsClient({
       events: [nightRow]
@@ -396,6 +400,54 @@ describe('createConcert', () => {
       date: '2026-08-10',
       place: 'Berlin'
     });
+  });
+
+  it('rejects a newEvent Concert date outside the Event range without persisting the Event', async () => {
+    const { client, events, eventInserts, concertInserts, eventDeletes } = createMockConcertsClient();
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-19',
+      newEvent: {
+        kind: 'festival',
+        name: 'Rock Week',
+        startDate: '2026-08-20',
+        endDate: '2026-08-22',
+        place: 'Paris'
+      }
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(CONCERT_RULE.dateOutsideEvent);
+    expect(result.error?.message).toContain(CONCERT_RULE_MESSAGE.dateOutsideEvent);
+    expect(result.error?.message).toContain('20/08/2026');
+    expect(result.error?.message).toContain('22/08/2026');
+    expect(eventInserts).toHaveLength(0);
+    expect(concertInserts).toHaveLength(0);
+    expect(eventDeletes).toHaveLength(0);
+    expect(events).toHaveLength(0);
+  });
+
+  it('rejects a newEvent single_night Concert date that does not match the Event date without persisting', async () => {
+    const { client, events, eventInserts, concertInserts, eventDeletes } = createMockConcertsClient();
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-23',
+      newEvent: {
+        kind: 'single_night',
+        name: 'Club Night',
+        startDate: '2026-08-10',
+        place: 'Berlin'
+      }
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(CONCERT_RULE.dateOutsideEvent);
+    expect(concertInserts).toHaveLength(0);
+    expect(eventInserts).toHaveLength(0);
+    expect(eventDeletes).toHaveLength(0);
+    expect(events).toHaveLength(0);
   });
 
   it('still applies Event rules when creating a night from the sheet', async () => {

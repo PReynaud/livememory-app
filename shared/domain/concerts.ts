@@ -146,6 +146,49 @@ const persistFailed = (error: QueryError): DomainError => ({
   message: error.message
 });
 
+const eventRangeFromCreateInput = (
+  input: CreateEventInput
+): Pick<EventRecord, 'start_date' | 'end_date'> | null => {
+  const startDate = trim(input.startDate);
+  if (!startDate || !CIVIL_DATE.test(startDate)) {
+    return null;
+  }
+
+  if (input.kind === 'single_night') {
+    return { start_date: startDate, end_date: startDate };
+  }
+
+  if (input.kind !== 'festival') {
+    return null;
+  }
+
+  const endDate = trim(input.endDate);
+  if (!endDate || !CIVIL_DATE.test(endDate)) {
+    return null;
+  }
+
+  return { start_date: startDate, end_date: endDate };
+};
+
+const isDateInsideEvent = (
+  date: string,
+  event: Pick<EventRecord, 'start_date' | 'end_date'>
+) => {
+  return date >= event.start_date && date <= event.end_date;
+};
+
+const rollbackCreatedEvent = async (
+  client: ConcertsClient,
+  eventId: string,
+  createdNewEvent: boolean
+) => {
+  if (!createdNewEvent) {
+    return;
+  }
+
+  await client.from('events').delete().eq('id', eventId);
+};
+
 const resolveEvent = async (
   client: ConcertsClient,
   input: CreateConcertInput
@@ -189,6 +232,13 @@ export const createConcert = async (
     return fail(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
   }
 
+  if (input.newEvent) {
+    const plannedRange = eventRangeFromCreateInput(input.newEvent);
+    if (plannedRange && !isDateInsideEvent(date, plannedRange)) {
+      return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(plannedRange));
+    }
+  }
+
   const eventResult = await resolveEvent(client, input);
   if (eventResult.error || !eventResult.data) {
     return {
@@ -198,7 +248,9 @@ export const createConcert = async (
   }
 
   const event = eventResult.data;
-  if (date < event.start_date || date > event.end_date) {
+  const createdNewEvent = Boolean(input.newEvent);
+  if (!isDateInsideEvent(date, event)) {
+    await rollbackCreatedEvent(client, event.id, createdNewEvent);
     return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(event));
   }
 
@@ -213,9 +265,7 @@ export const createConcert = async (
   const { data, error } = await client.from('concerts').insert(payload).select().single();
 
   if (error || !data) {
-    if (input.newEvent) {
-      await client.from('events').delete().eq('id', event.id);
-    }
+    await rollbackCreatedEvent(client, event.id, createdNewEvent);
 
     if (error) {
       return {
