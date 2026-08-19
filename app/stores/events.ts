@@ -63,6 +63,8 @@ export const useEventsStore = defineStore('events', () => {
   const currentEvent = ref<EventRecord | null>(null);
   const currentConcerts = ref<ConcertRecord[]>([]);
   const attendanceByConcertId = ref<Record<string, AttendanceStatus>>({});
+  const attendanceBusyByConcertId = ref<Record<string, true>>({});
+  const attendanceError = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -86,6 +88,10 @@ export const useEventsStore = defineStore('events', () => {
 
   const attendanceStatus = (concertId: string): AttendanceStatus | null => {
     return attendanceByConcertId.value[concertId] ?? null;
+  };
+
+  const isAttendanceBusy = (concertId: string) => {
+    return Boolean(attendanceBusyByConcertId.value[concertId]);
   };
 
   const concertIsPast = (concert: Pick<ConcertRecord, 'date' | 'time'>, now?: Date) => {
@@ -120,11 +126,8 @@ export const useEventsStore = defineStore('events', () => {
 
       concerts.value = listedConcerts.data ?? [];
 
-      const attendanceError = await loadAttendance();
-      if (attendanceError) {
-        error.value = attendanceError;
-        return { data: events.value, error: attendanceError };
-      }
+      const listedAttendanceError = await loadAttendance();
+      attendanceError.value = listedAttendanceError;
 
       return { data: events.value, error: null };
     } catch (err: unknown) {
@@ -164,11 +167,8 @@ export const useEventsStore = defineStore('events', () => {
         currentConcerts.value = listed.data ?? [];
       }
 
-      const attendanceError = await loadAttendance();
-      if (attendanceError) {
-        error.value = attendanceError;
-        return { data: result.data, error: attendanceError };
-      }
+      const listedAttendanceError = await loadAttendance();
+      attendanceError.value = listedAttendanceError;
 
       return { data: result.data, error: null };
     } catch (err: unknown) {
@@ -261,11 +261,8 @@ export const useEventsStore = defineStore('events', () => {
         );
       }
 
-      const attendanceError = await loadAttendance();
-      if (attendanceError) {
-        error.value = attendanceError;
-        return mutationResult(result.data, attendanceError, result.outcome, null);
-      }
+      const listedAttendanceError = await loadAttendance();
+      attendanceError.value = listedAttendanceError;
 
       return mutationResult(result.data, null, result.outcome, null);
     } catch (err: unknown) {
@@ -278,8 +275,15 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const cycleAttendance = async (concert: ConcertRecord) => {
-    loading.value = true;
-    error.value = null;
+    if (attendanceBusyByConcertId.value[concert.id]) {
+      return { data: null, error: null };
+    }
+
+    attendanceBusyByConcertId.value = {
+      ...attendanceBusyByConcertId.value,
+      [concert.id]: true
+    };
+    attendanceError.value = null;
 
     try {
       const current = attendanceStatus(concert.id);
@@ -291,7 +295,7 @@ export const useEventsStore = defineStore('events', () => {
           });
 
       if (result.error) {
-        error.value = result.error.message;
+        attendanceError.value = result.error.message;
         return { data: null, error: result.error.message };
       }
 
@@ -309,10 +313,12 @@ export const useEventsStore = defineStore('events', () => {
       return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update attendance');
-      error.value = errorMessage;
+      attendanceError.value = errorMessage;
       return { data: null, error: errorMessage };
     } finally {
-      loading.value = false;
+      attendanceBusyByConcertId.value = Object.fromEntries(
+        Object.entries(attendanceBusyByConcertId.value).filter(([concertId]) => concertId !== concert.id)
+      ) as Record<string, true>;
     }
   };
 
@@ -322,10 +328,12 @@ export const useEventsStore = defineStore('events', () => {
     currentEvent,
     currentConcerts,
     attendanceByConcertId,
+    attendanceError,
     loading,
     error,
     concertsForEvent,
     attendanceStatus,
+    isAttendanceBusy,
     concertIsPast,
     fetchEvents,
     fetchEvent,

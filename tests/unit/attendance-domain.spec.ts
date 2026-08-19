@@ -58,6 +58,7 @@ const createMockAttendanceClient = (options?: {
   updateError?: QueryError;
   deleteError?: QueryError;
   listError?: QueryError;
+  effectiveGetError?: QueryError;
 }) => {
   const rows = [...(options?.rows ?? [])];
   const inserts: Record<string, unknown>[] = [];
@@ -86,6 +87,10 @@ const createMockAttendanceClient = (options?: {
             },
             eq: (_column: string, value: string) => ({
               maybeSingle: async () => {
+                if (options?.effectiveGetError) {
+                  return { data: null, error: options.effectiveGetError };
+                }
+
                 const row = rows.find(entry => entry.concert_id === value);
                 return { data: row ? effectiveFor(row) : null, error: null };
               }
@@ -202,6 +207,7 @@ describe('attendance migration kernel', () => {
     expect(sql).toMatch(/security_invoker\s*=\s*true/);
     expect(sql).toMatch(/attendance_effective/);
     expect(sql).toMatch(/Europe\/Paris/);
+    expect(sql).toMatch(/function public\.attendance_enforce_status\(\)[\s\S]*?set search_path = ''/);
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/pg_cron|cron\.schedule/i);
 
@@ -346,6 +352,21 @@ describe('setAttendance / clearAttendance / listMyAttendance', () => {
     expect(result.error?.message).toBe(ATTENDANCE_RULE_MESSAGE.attendedToGoing);
     expect(updates[0]).toMatchObject({ status: 'going' });
   });
+
+  it('returns the written row when the effective read fails after a successful insert', async () => {
+    const { client } = createMockAttendanceClient({
+      effectiveGetError: { message: 'view unavailable' }
+    });
+
+    const result = await setAttendance(client, {
+      concertId: 'concert-future',
+      status: 'going'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.concert_id).toBe('concert-future');
+    expect(result.data?.status).toBe('going');
+  });
 });
 
 describe('attendance stays off createConcert, pages, and the store query path', () => {
@@ -360,8 +381,13 @@ describe('attendance stays off createConcert, pages, and the store query path', 
     expect(store).toMatch(/listMyAttendance/);
     expect(store).toMatch(/setAttendance/);
     expect(store).toMatch(/clearAttendance/);
+    expect(store).toMatch(/isAttendanceBusy/);
+    expect(store).toMatch(/attendanceError/);
     expect(store).not.toMatch(/from\('attendance'\)/);
     expect(store).not.toMatch(/from\('attendance_effective'\)/);
+    const cycleAttendance = store.slice(store.indexOf('const cycleAttendance'));
+    expect(cycleAttendance).not.toMatch(/loading\.value = true/);
+    expect(cycleAttendance).not.toMatch(/error\.value =/);
 
     const pageFiles = [
       'app/pages/concerts.vue',
@@ -378,10 +404,12 @@ describe('attendance stays off createConcert, pages, and the store query path', 
 
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/AppAttendanceChip/);
+    expect(eventPage).toMatch(/isAttendanceBusy/);
     expect(eventPage).not.toMatch(/compact card|compactCard/i);
 
     const concertsPage = readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8');
     expect(concertsPage).toMatch(/AppAttendanceChip/);
+    expect(concertsPage).toMatch(/isAttendanceBusy/);
     expect(concertsPage).not.toMatch(/compact card|compactCard/i);
 
     const chip = readFileSync(resolve(process.cwd(), 'app/components/AppAttendanceChip.vue'), 'utf8');
@@ -392,6 +420,7 @@ describe('attendance stays off createConcert, pages, and the store query path', 
     expect(chip).toMatch(/#FF4D8A/);
     expect(chip).toMatch(/#A3A3A3/);
     expect(chip).toMatch(/border-dashed/);
+    expect(chip).toMatch(/focus-visible/);
     expect(chip).toMatch(/motion-reduce|prefers-reduced-motion/);
     expect(chip).not.toMatch(/bg-\[#A3A3A3\]/);
     expect(chip).not.toMatch(/Set|On the bill|Skipped/);

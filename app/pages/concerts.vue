@@ -184,14 +184,14 @@ await eventsStore.fetchEvents();
     </p>
 
     <p
-      v-else-if="loading && !hasEvents"
+      v-if="!error && loading && !hasEvents"
       class="text-sm text-muted"
     >
       Loading events…
     </p>
 
     <section
-      v-else-if="!hasEvents"
+      v-else-if="!error && !hasEvents"
       class="rounded-2xl bg-[#1A1A1A] p-4 space-y-3"
     >
       <p class="text-lg font-semibold">
@@ -207,7 +207,7 @@ await eventsStore.fetchEvents();
     </section>
 
     <div
-      v-else-if="hasEvents"
+      v-if="hasEvents"
       class="space-y-2.5"
     >
       <section
@@ -260,6 +260,7 @@ await eventsStore.fetchEvents();
               <AppAttendanceChip
                 :status="eventsStore.attendanceStatus(concert.id)"
                 :is-past="eventsStore.concertIsPast(concert)"
+                :disabled="eventsStore.isAttendanceBusy(concert.id)"
                 @click="void eventsStore.cycleAttendance(concert)"
               />
             </div>

@@ -1,5 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { test, expect } from './fixtures/auth.fixture';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
+import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 
 const restHeaders = (accessToken: string, anonKey: string) => ({
@@ -78,6 +80,43 @@ const createOwnedConcert = async (
   return { eventId, concertId };
 };
 
+const isUuid = (value: string) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+};
+
+const patchConcertDate = (
+  headers: ReturnType<typeof restHeaders>,
+  supabaseUrl: string,
+  concertId: string,
+  date: string
+) => {
+  if (!isUuid(concertId) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error('Invalid concert date patch');
+  }
+
+  return fetch(`${supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ date })
+  }).then(async (response) => {
+    if (response.ok) {
+      return;
+    }
+
+    // Concert UPDATE only allows time, so move the date in SQL without touching attendance.
+    const sql = [
+      'alter table public.concerts disable trigger concerts_attach_time_only',
+      `update public.concerts set date = '${date}' where id = '${concertId}'::uuid`,
+      'alter table public.concerts enable trigger concerts_attach_time_only'
+    ].join('; ');
+
+    execFileSync('pnpm', ['exec', 'supabase', 'db', 'query', '--local', sql], {
+      cwd: process.cwd(),
+      encoding: 'utf8'
+    });
+  });
+};
+
 test('marks a future concert Going and a past concert Attended, then clear stays unset', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
@@ -86,6 +125,7 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   await authenticatedPage.getByLabel('Place').fill('Lyon');
   await authenticatedPage.getByRole('button', { name: 'Save' }).click();
   await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  const futureEventPath = new URL(authenticatedPage.url()).pathname;
 
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
   const futureSheet = authenticatedPage.getByRole('dialog');
@@ -98,10 +138,19 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   await expect(goingChip).toHaveAttribute('aria-pressed', 'true');
   await expect(goingChip).toHaveText('Going');
 
+  await authenticatedPage.reload();
+  await waitForNuxtHydration(authenticatedPage);
+  await expect(authenticatedPage).toHaveURL(new RegExp(`${futureEventPath}$`));
+  const reloadedGoing = authenticatedPage.getByRole('button', { name: 'Mark as going' });
+  await expect(reloadedGoing).toHaveAttribute('aria-pressed', 'true');
+  await expect(reloadedGoing).toHaveText('Going');
+
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const concertsGoing = authenticatedPage.getByRole('button', { name: 'Mark as going' });
   await expect(concertsGoing).toHaveAttribute('aria-pressed', 'true');
   await expect(concertsGoing).toHaveText('Going');
+  await concertsGoing.click();
+  await expect(concertsGoing).toHaveAttribute('aria-pressed', 'false');
 
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
   await authenticatedPage.getByLabel('Name').fill('Past Night');
@@ -121,9 +170,19 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   await expect(attendedChip).toHaveAttribute('aria-pressed', 'true');
   await expect(attendedChip).toHaveText('Attended');
 
-  await attendedChip.click();
-  await expect(attendedChip).toHaveAttribute('aria-pressed', 'false');
-  await expect(attendedChip).toHaveText('Attended');
+  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  const pastGroup = authenticatedPage.locator('section').filter({ hasText: 'Past Night' });
+  const concertsAttended = pastGroup.getByRole('button', { name: 'Mark as attended' });
+  await expect(concertsAttended).toHaveAttribute('aria-pressed', 'true');
+  await expect(concertsAttended).toHaveText('Attended');
+
+  await pastGroup.getByRole('link', { name: /Past Night/ }).click();
+  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  const eventAttended = authenticatedPage.getByRole('button', { name: 'Mark as attended' });
+  await expect(eventAttended).toHaveAttribute('aria-pressed', 'true');
+  await eventAttended.click();
+  await expect(eventAttended).toHaveAttribute('aria-pressed', 'false');
+  await expect(eventAttended).toHaveText('Attended');
 });
 
 test('hides another user attendance over REST and coerces past going to attended', async ({ page: _page }, testInfo) => {
@@ -168,6 +227,24 @@ test('hides another user attendance over REST and coerces past going to attended
     expect(futureGoing.ok).toBe(true);
     const futureRows = await futureGoing.json() as { status: string; concert_id: string }[];
     expect(futureRows[0]?.status).toBe('going');
+
+    await patchConcertDate(ownerSession.headers, ownerSession.supabaseUrl, future.concertId, '2026-08-18');
+
+    const storedAfterMove = await fetch(
+      `${ownerSession.supabaseUrl}/rest/v1/attendance?concert_id=eq.${future.concertId}&select=status`,
+      { headers: ownerSession.headers }
+    );
+    expect(storedAfterMove.ok).toBe(true);
+    const storedRows = await storedAfterMove.json() as { status: string }[];
+    expect(storedRows[0]?.status).toBe('going');
+
+    const effectiveAfterMove = await fetch(
+      `${ownerSession.supabaseUrl}/rest/v1/attendance_effective?concert_id=eq.${future.concertId}&select=status`,
+      { headers: ownerSession.headers }
+    );
+    expect(effectiveAfterMove.ok).toBe(true);
+    const effectiveRows = await effectiveAfterMove.json() as { status: string }[];
+    expect(effectiveRows[0]?.status).toBe('attended');
 
     const pastGoing = await fetch(`${ownerSession.supabaseUrl}/rest/v1/attendance`, {
       method: 'POST',

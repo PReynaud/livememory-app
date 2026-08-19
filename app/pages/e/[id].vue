@@ -45,7 +45,7 @@ const showDayHeaders = computed(() => {
 });
 const hasConcerts = computed(() => currentConcerts.value.length > 0);
 const billLoadFailed = computed(() => {
-  return Boolean(currentEvent.value && error.value);
+  return Boolean(currentEvent.value && error.value && !hasConcerts.value);
 });
 const billCtaLabel = computed(() => {
   return currentEvent.value?.kind === 'festival' ? 'Add to this festival' : 'Add to this night';
@@ -147,6 +147,7 @@ const openAddSheet = () => {
               <AppAttendanceChip
                 :status="eventsStore.attendanceStatus(concert.id)"
                 :is-past="eventsStore.concertIsPast(concert)"
+                :disabled="eventsStore.isAttendanceBusy(concert.id)"
                 @click="void eventsStore.cycleAttendance(concert)"
               />
             </div>

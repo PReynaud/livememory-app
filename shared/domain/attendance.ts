@@ -209,7 +209,7 @@ export const setAttendance = async (
   }
 
   if (existing.data) {
-    const { error } = await client
+    const { data, error } = await client
       .from('attendance')
       .update({ status })
       .eq('concert_id', concertId)
@@ -222,22 +222,42 @@ export const setAttendance = async (
         error: mapWriteError(error)
       };
     }
-  } else {
-    const { error } = await client
-      .from('attendance')
-      .insert({ concert_id: concertId, status })
-      .select()
-      .single();
 
-    if (error) {
-      return {
-        data: null,
-        error: mapWriteError(error)
-      };
+    if (!data) {
+      return fail('persist_failed', 'Failed to save attendance');
     }
+
+    const effective = await readEffective(client, concertId);
+    if (effective.error || !effective.data) {
+      return ok(data);
+    }
+
+    return ok(effective.data);
   }
 
-  return readEffective(client, concertId);
+  const { data, error } = await client
+    .from('attendance')
+    .insert({ concert_id: concertId, status })
+    .select()
+    .single();
+
+  if (error) {
+    return {
+      data: null,
+      error: mapWriteError(error)
+    };
+  }
+
+  if (!data) {
+    return fail('persist_failed', 'Failed to save attendance');
+  }
+
+  const effective = await readEffective(client, concertId);
+  if (effective.error || !effective.data) {
+    return ok(data);
+  }
+
+  return ok(effective.data);
 };
 
 export const clearAttendance = async (

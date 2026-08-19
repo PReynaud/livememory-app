@@ -97,7 +97,7 @@ create policy "Authenticated users can delete own attendance"
 create or replace function public.attendance_enforce_status()
 returns trigger
 language plpgsql
-set search_path = public
+set search_path = ''
 as $$
 declare
   concert_date date;
