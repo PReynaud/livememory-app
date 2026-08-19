@@ -12,6 +12,7 @@ import {
   EVENT_RULE_MESSAGE,
   dateOutsideEventMessage,
   type EventBillConcert,
+  type EventMemberRecord,
   type EventRecord,
   type EventStageRecord,
   type EventsClient
@@ -53,10 +54,12 @@ const createMockEventsClient = (options?: {
   updateError?: { message: string; code?: string; details?: string; hint?: string };
   rpcError?: { message: string; code?: string; details?: string; hint?: string };
   deleteError?: { message: string; code?: string; details?: string; hint?: string };
+  members?: EventMemberRecord[];
 }) => {
   const rows = [...(options?.rows ?? [])];
   const concerts = [...(options?.concerts ?? [])];
   const stages = [...(options?.stages ?? [])];
+  const members = [...(options?.members ?? [])];
   const insertCalls = options?.insertCalls ?? [];
   const updateCalls = options?.updateCalls ?? [];
   const rpcCalls = options?.rpcCalls ?? [];
@@ -72,9 +75,12 @@ const createMockEventsClient = (options?: {
             })
           }),
           select: () => ({
-            order: async () => ({ data: [], error: null }),
-            eq: () => ({
-              maybeSingle: async () => ({ data: null, error: null }),
+            order: async () => ({ data: members, error: null }),
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => ({
+                data: members.find(member => member.event_id === value || member.id === value) ?? null,
+                error: null
+              }),
               order: async () => ({ data: [], error: null }),
               eq: () => ({
                 maybeSingle: async () => ({ data: null, error: null }),
@@ -705,6 +711,37 @@ describe('deleteEvent', () => {
     const blank = await deleteEvent(client, '  ');
     expect(blank.error?.ruleId).toBe(EVENT_RULE.ownership);
     expect(eventDeletes).toHaveLength(0);
+  });
+
+  it('blocks Event update and delete when the acting User is a member', async () => {
+    const membership: EventMemberRecord = {
+      id: 'mmmmmmmm-mmmm-4mmm-8mmm-mmmmmmmmmmmm',
+      event_id: festivalRow.id,
+      user_id: 'joiner-1'
+    };
+    const { client, updateCalls, eventDeletes, rows } = createMockEventsClient({
+      rows: [festivalRow],
+      members: [membership]
+    });
+
+    const updated = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: 'Stolen Week',
+      startDate: '2026-08-20',
+      endDate: '2026-08-22',
+      place: 'Paris'
+    });
+    expect(updated.data).toBeNull();
+    expect(updated.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(updated.error?.message).toBe(EVENT_RULE_MESSAGE.ownership);
+    expect(updateCalls).toHaveLength(0);
+    expect(rows[0]?.name).toBe(festivalRow.name);
+
+    const deleted = await deleteEvent(client, festivalRow.id);
+    expect(deleted.data).toBeNull();
+    expect(deleted.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(eventDeletes).toHaveLength(0);
+    expect(rows).toHaveLength(1);
   });
 
   it('surfaces persist failures from Event delete', async () => {
