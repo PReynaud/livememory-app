@@ -92,6 +92,7 @@ export type UpdateConcertInput = {
   confirm?: ConcertIdentityConfirm;
   place?: string;
   stageId?: string | null;
+  eventId?: string;
 };
 
 export type MoveConcertInput = {
@@ -854,11 +855,13 @@ export const updateConcert = async (
   }
 
   const current = existing.data;
+  const requestedEventId = trim(input.eventId);
+  const targetEventId = requestedEventId || current.event_id;
 
   const eventResult = await resolveEvent(client, {
     artist,
     date,
-    eventId: current.event_id
+    eventId: targetEventId
   });
   if (eventResult.error || !eventResult.data) {
     return {
@@ -866,6 +869,10 @@ export const updateConcert = async (
       error: eventResult.error,
       outcome: null
     };
+  }
+
+  if (eventResult.data.id !== current.event_id && eventResult.data.owner_id !== current.owner_id) {
+    return failCreate(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
   }
 
   if (!isDateInsideEvent(date, eventResult.data)) {
@@ -930,7 +937,8 @@ export const updateConcert = async (
     time: draftTime,
     place: placement.data.place,
     stage_id: placement.data.stageId,
-    notes: optionalNotes(input.notes)
+    notes: optionalNotes(input.notes),
+    ...(eventResult.data.id !== current.event_id ? { event_id: eventResult.data.id } : {})
   };
 
   const { data, error } = await client

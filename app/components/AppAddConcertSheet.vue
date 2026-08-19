@@ -33,14 +33,6 @@ const notes = ref('');
 const confirmDelete = ref(false);
 const originalEventId = ref('');
 const editLoaded = ref(false);
-const loadedEdit = ref<{
-  artist: string;
-  date: string;
-  time: string;
-  notes: string;
-  place: string;
-  stageId: string;
-} | null>(null);
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -158,7 +150,6 @@ const resetForOpen = async () => {
   stageId.value = '';
   originalEventId.value = '';
   editLoaded.value = !sheet.concertId;
-  loadedEdit.value = null;
 
   if (!sheet.eventId) {
     picker.value = '';
@@ -190,14 +181,6 @@ const resetForOpen = async () => {
       notes.value = concert.notes ?? '';
       stageId.value = concert.stage_id ?? '';
       place.value = concert.place;
-      loadedEdit.value = {
-        artist: concert.artist,
-        date: concert.date,
-        time: concert.time ? concert.time.slice(0, 5) : '',
-        notes: concert.notes ?? '',
-        place: concert.place,
-        stageId: concert.stage_id ?? ''
-      };
     }
     editLoaded.value = true;
   }
@@ -313,74 +296,51 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
 
       const targetEventId = picker.value;
       const moved = Boolean(targetEventId && targetEventId !== originalEventId.value);
-      if (moved && targetEventId) {
-        const movedResult = await eventsStore.moveOwnedConcert({
-          concertId: sheet.concertId,
-          targetEventId,
-          place: place.value,
-          stageId: stageId.value || null
-        });
-
-        if (movedResult.error) {
-          formError.value = movedResult.error;
-          return;
-        }
-      }
-
       const nextDate = isExistingNight.value
         ? (selectedEvent.value?.start_date ?? concertDate.value)
         : concertDate.value;
-      const loaded = loadedEdit.value;
-      const fieldsChanged = !loaded
-        || artist.value !== loaded.artist
-        || nextDate !== loaded.date
-        || (concertTime.value || '') !== loaded.time
-        || notes.value !== loaded.notes
-        || place.value !== loaded.place
-        || (stageId.value || '') !== loaded.stageId;
 
-      if (!moved || fieldsChanged) {
-        const result = await eventsStore.updateOwnedConcert({
-          concertId: sheet.concertId,
-          artist: artist.value,
-          date: nextDate,
-          time: concertTime.value,
-          notes: notes.value,
-          confirm,
-          place: place.value,
-          stageId: stageId.value || null
-        });
+      const result = await eventsStore.updateOwnedConcert({
+        concertId: sheet.concertId,
+        artist: artist.value,
+        date: nextDate,
+        time: concertTime.value,
+        notes: notes.value,
+        confirm,
+        place: place.value,
+        stageId: stageId.value || null,
+        ...(moved && targetEventId ? { eventId: targetEventId } : {})
+      });
 
-        if (result.outcome === 'needs_choice') {
-          pendingChoice.value = true;
-          return;
+      if (result.outcome === 'needs_choice') {
+        pendingChoice.value = true;
+        return;
+      }
+
+      pendingChoice.value = false;
+
+      if (result.outcome === 'impossible_place') {
+        formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
+        return;
+      }
+
+      if (result.outcome === 'attached' && result.data) {
+        const attachedToIntended
+          = picker.value === result.data.event_id
+            && picker.value !== NEW_NIGHT
+            && picker.value !== NEW_FESTIVAL;
+        if (!attachedToIntended) {
+          toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
         }
 
-        pendingChoice.value = false;
+        sheet.closeSheet();
+        await navigateTo('/e/' + result.data.event_id);
+        return;
+      }
 
-        if (result.outcome === 'impossible_place') {
-          formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
-          return;
-        }
-
-        if (result.outcome === 'attached' && result.data) {
-          const attachedToIntended
-            = picker.value === result.data.event_id
-              && picker.value !== NEW_NIGHT
-              && picker.value !== NEW_FESTIVAL;
-          if (!attachedToIntended) {
-            toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
-          }
-
-          sheet.closeSheet();
-          await navigateTo('/e/' + result.data.event_id);
-          return;
-        }
-
-        if (result.error) {
-          formError.value = result.error;
-          return;
-        }
+      if (result.error) {
+        formError.value = result.error;
+        return;
       }
 
       toast.add({ title: 'Concert saved.' });

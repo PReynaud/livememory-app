@@ -120,7 +120,8 @@ describe('add concert sheet open/close state', () => {
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/eventLocked/);
     expect(sheet).toMatch(/!isEdit\.value/);
-    expect(sheet).toMatch(/moveOwnedConcert/);
+    expect(sheet).toMatch(/eventId: targetEventId/);
+    expect(sheet).not.toMatch(/moveOwnedConcert/);
     expect(sheet).toMatch(/originalEventId/);
     expect(sheet).toMatch(/editLoaded/);
     expect(sheet).toMatch(/if \(isEdit\.value\) \{[\s\S]*return owned/);

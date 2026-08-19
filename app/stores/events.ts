@@ -461,7 +461,12 @@ export const useEventsStore = defineStore('events', () => {
         return mutationResult(null, result.error.message, null, result.error.ruleId);
       }
 
-      return await refreshConcertLists(result.data, null);
+      if (result.data) {
+        applyOwnedConcert(result.data);
+      }
+
+      await reloadOwnedConcertState();
+      return mutationResult(result.data, null, null, null);
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to move concert');
       error.value = errorMessage;
