@@ -1,19 +1,43 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useHead, useRoute, useSeoMeta, useRuntimeConfig } from '#imports';
 import { useAuthStore } from '@/stores/auth';
+import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
+import { shouldOpenAddSheetOnKeydown } from '@/utils/add-concert-shortcut';
 
 const config = useRuntimeConfig();
 const route = useRoute();
 const title = config.public.appName;
 const description = 'A private concert log.';
 const authStore = useAuthStore();
+const addSheet = useAddConcertSheetStore();
 const showAppChrome = computed(() => {
   if (!authStore.isAuthenticated) {
     return false;
   }
 
   return /^\/(home|concerts|profile|e)(\/|$)/.test(route.path);
+});
+
+const onKeydown = (event: KeyboardEvent) => {
+  if (!showAppChrome.value) {
+    return;
+  }
+
+  if (!shouldOpenAddSheetOnKeydown(event)) {
+    return;
+  }
+
+  event.preventDefault();
+  addSheet.openSheet();
+};
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown);
 });
 
 useHead({
@@ -48,6 +72,7 @@ useSeoMeta({
       <UMain class="pb-24 lg:pb-8 lg:pl-24">
         <NuxtPage />
       </UMain>
+      <AppAddConcertSheet />
     </div>
     <template v-else>
       <AppHeader />

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { definePageMeta } from '#imports';
+import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 
 definePageMeta({
   middleware: 'auth'
 });
+
+const addSheet = useAddConcertSheetStore();
 </script>
 
 <template>
@@ -24,6 +27,7 @@ definePageMeta({
         color="primary"
         variant="outline"
         class="h-11 rounded-full ring-2"
+        @click="addSheet.openSheet()"
       />
     </section>
 

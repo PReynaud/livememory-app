@@ -3,13 +3,21 @@ import { computed, ref } from 'vue';
 import { definePageMeta, navigateTo } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEventsStore, type EventKind } from '@/stores/events';
+import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { formatEventDateLabel } from '@/utils/event-dates';
+import {
+  formatConcertClock,
+  formatConcertDayLabel,
+  groupConcertsByDate,
+  shouldShowDayHeaders
+} from '@/utils/concert-groups';
 
 definePageMeta({
   middleware: 'auth'
 });
 
 const eventsStore = useEventsStore();
+const addSheet = useAddConcertSheetStore();
 const { events, loading, error } = storeToRefs(eventsStore);
 
 const createKind = ref<EventKind | null>(null);
@@ -22,6 +30,8 @@ const saving = ref(false);
 
 const hasEvents = computed(() => events.value.length > 0);
 const isFestival = computed(() => createKind.value === 'festival');
+
+const concertsFor = (eventId: string) => eventsStore.concertsForEvent(eventId);
 
 const openCreate = (kind: EventKind) => {
   createKind.value = kind;
@@ -192,7 +202,7 @@ await eventsStore.fetchEvents();
         color="primary"
         variant="outline"
         class="h-11 rounded-full ring-2"
-        @click="openCreate('single_night')"
+        @click="addSheet.openSheet()"
       />
     </section>
 
@@ -200,22 +210,55 @@ await eventsStore.fetchEvents();
       v-else-if="hasEvents"
       class="space-y-2.5"
     >
-      <NuxtLink
+      <section
         v-for="event in events"
         :key="event.id"
-        :to="`/e/${event.id}`"
-        class="block rounded-2xl bg-[#1A1A1A] p-4 space-y-1"
+        class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2"
       >
-        <p class="text-base font-semibold">
-          {{ event.name }}
-        </p>
-        <p class="text-[13px] text-muted">
-          {{ formatEventDateLabel(event) }}
-        </p>
-        <p class="text-[13px] text-muted">
-          {{ event.place }}
-        </p>
-      </NuxtLink>
+        <NuxtLink
+          :to="`/e/${event.id}`"
+          class="block space-y-1"
+        >
+          <p class="text-base font-semibold">
+            {{ event.name }}
+          </p>
+          <p class="text-[13px] text-muted">
+            {{ formatEventDateLabel(event) }}
+          </p>
+          <p class="text-[13px] text-muted">
+            {{ event.place }}
+          </p>
+        </NuxtLink>
+        <template v-if="concertsFor(event.id).length">
+          <div
+            v-for="(group, index) in groupConcertsByDate(concertsFor(event.id))"
+            :key="group.date"
+            :class="index > 0 ? 'border-t border-white/10 pt-2' : ''"
+          >
+            <p
+              v-if="shouldShowDayHeaders(event, concertsFor(event.id))"
+              class="text-[13px] font-semibold text-muted"
+            >
+              {{ formatConcertDayLabel(group.date) }}
+            </p>
+            <div
+              v-for="concert in group.concerts"
+              :key="concert.id"
+              class="py-1.5"
+            >
+              <p class="text-base font-semibold">
+                {{ concert.artist }}
+              </p>
+              <p
+                v-if="concert.time"
+                class="text-[13px] text-muted"
+              >
+                {{ formatConcertClock(concert.time) }}
+              </p>
+            </div>
+          </div>
+        </template>
+      </section>
     </div>
   </UContainer>
 </template>
