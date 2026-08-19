@@ -19,6 +19,7 @@ import {
   dateOutsideEventMessage,
   deleteConcert,
   EVENTS_LIST_WINDOW,
+  nextEventsListWindowEnd,
   listConcertsForEvent,
   listConcertsForEventIds,
   listOwnedConcerts,
@@ -1968,6 +1969,14 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const owned = await listOwnedConcerts(client);
     expect(owned.error).toBeNull();
     expect(owned.data).toHaveLength(3);
+  });
+
+  it('keeps at least one Concerts page visible when the Event list grows', () => {
+    expect(nextEventsListWindowEnd(2, 1)).toBe(2);
+    expect(nextEventsListWindowEnd(10, 0)).toBe(10);
+    expect(nextEventsListWindowEnd(25, 0)).toBe(EVENTS_LIST_WINDOW);
+    expect(nextEventsListWindowEnd(45, 40)).toBe(40);
+    expect(nextEventsListWindowEnd(5, 20)).toBe(5);
   });
 
   it('lists concerts for a window of Event ids without loading the rest', async () => {

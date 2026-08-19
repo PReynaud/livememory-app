@@ -1128,6 +1128,15 @@ export const listConcertsForEvent = async (
 
 export const EVENTS_LIST_WINDOW = 20;
 
+export const nextEventsListWindowEnd = (
+  listLength: number,
+  currentEnd: number,
+  pageSize = EVENTS_LIST_WINDOW
+) => {
+  const onePage = Math.min(pageSize, listLength);
+  return Math.max(onePage, Math.min(Math.max(currentEnd, 0), listLength));
+};
+
 export const listConcertsForEventIds = async (
   client: ConcertsClient,
   eventIds: string[]

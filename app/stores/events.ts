@@ -25,6 +25,7 @@ import {
   createConcert,
   deleteConcert,
   EVENTS_LIST_WINDOW,
+  nextEventsListWindowEnd,
   listConcertsForEvent,
   listConcertsForEventIds,
   listOwnedConcerts,
@@ -200,9 +201,10 @@ export const useEventsStore = defineStore('events', () => {
 
       events.value = result.data ?? [];
 
-      const nextWindowEnd = options?.silent && eventWindowEnd.value > 0
-        ? Math.min(eventWindowEnd.value, events.value.length)
-        : Math.min(EVENTS_LIST_WINDOW, events.value.length);
+      const nextWindowEnd = nextEventsListWindowEnd(
+        events.value.length,
+        eventWindowEnd.value
+      );
       allConcertsLoaded.value = false;
       const listedConcertsError = await loadConcertsForEventSlice(0, nextWindowEnd);
       if (listedConcertsError) {
@@ -341,6 +343,10 @@ export const useEventsStore = defineStore('events', () => {
         const listed = await listOwnedEvents(eventsClient());
         if (!listed.error && listed.data) {
           events.value = listed.data;
+          eventWindowEnd.value = nextEventsListWindowEnd(
+            events.value.length,
+            eventWindowEnd.value
+          );
         }
       }
 
@@ -420,11 +426,10 @@ export const useEventsStore = defineStore('events', () => {
 
     concerts.value = listedConcerts.data ?? [];
     allConcertsLoaded.value = true;
-    if (eventWindowEnd.value === 0) {
-      eventWindowEnd.value = Math.min(EVENTS_LIST_WINDOW, events.value.length);
-    } else {
-      eventWindowEnd.value = Math.min(eventWindowEnd.value, events.value.length);
-    }
+    eventWindowEnd.value = nextEventsListWindowEnd(
+      events.value.length,
+      eventWindowEnd.value
+    );
     const listedCurrent = currentConcertsForEvent(concerts.value, currentEvent.value?.id);
     if (listedCurrent) {
       currentConcerts.value = listedCurrent;

@@ -57,8 +57,13 @@ describe('list polish source guards', () => {
     expect(error).toMatch(/Couldn't load\./);
     expect(error).toMatch(/label="Retry"/);
     expect(home).toMatch(/AppLoadError/);
+    expect(home).toMatch(/void eventsStore\.fetchEvents\(\)/);
     expect(concerts).toMatch(/AppLoadError/);
+    expect(concerts).toMatch(/const retryLoad = \(\) => \{\s*void eventsStore\.fetchEvents\(\);/);
+    expect(concerts).not.toMatch(/loadMoreEvents\(\);\s*return;/);
     expect(concerts).not.toMatch(/\{\{\s*error\s*\}\}/);
+    expect(concerts).toMatch(/v-else-if="error && !formError"/);
+    expect(concerts).toMatch(/v-else$/m);
     expect(eventPage).toMatch(/AppLoadError/);
   });
 
@@ -68,6 +73,7 @@ describe('list polish source guards', () => {
 
     expect(EVENTS_LIST_WINDOW).toBe(20);
     expect(store).toMatch(/EVENTS_LIST_WINDOW/);
+    expect(store).toMatch(/nextEventsListWindowEnd/);
     expect(store).toMatch(/listConcertsForEventIds/);
     expect(store).toMatch(/loadMoreEvents/);
     expect(store).toMatch(/loadingMore/);

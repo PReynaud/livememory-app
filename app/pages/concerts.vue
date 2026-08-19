@@ -68,11 +68,6 @@ const submitCreate = async () => {
 };
 
 const retryLoad = () => {
-  if (hasEvents.value) {
-    void eventsStore.loadMoreEvents();
-    return;
-  }
-
   void eventsStore.fetchEvents();
 };
 
@@ -216,7 +211,7 @@ if (import.meta.server) {
     </section>
 
     <div
-      v-if="hasEvents && !showSkeleton"
+      v-else
       class="space-y-2.5"
     >
       <AppEventCard
