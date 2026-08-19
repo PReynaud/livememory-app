@@ -157,11 +157,17 @@ type TableApi<T> = {
   };
 };
 
+export type ConcertNoteRecord = {
+  concert_id: string;
+  notes: string | null;
+};
+
 export type ConcertsClient = {
   from: {
     (relation: 'events'): TableApi<EventRecord>;
     (relation: 'concerts'): TableApi<ConcertRecord>;
     (relation: 'event_stages'): TableApi<EventStageRecord>;
+    (relation: 'concert_notes'): TableApi<ConcertNoteRecord>;
   };
 };
 
@@ -233,6 +239,40 @@ const persistFailed = (error: QueryError): DomainError => ({
   ruleId: 'persist_failed',
   message: error.message
 });
+
+const attachOwnerNotes = async (
+  client: ConcertsClient,
+  concerts: ConcertRecord[]
+): Promise<DomainResult<ConcertRecord[]>> => {
+  if (concerts.length === 0) {
+    return ok([]);
+  }
+
+  const ids = concerts.map(concert => concert.id);
+  const { data, error } = await client
+    .from('concert_notes')
+    .select('concert_id, notes')
+    .in('concert_id', ids)
+    .order('concert_id', { ascending: true });
+
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  const notesById = new Map(
+    (data ?? []).map(row => [row.concert_id, row.notes ?? null] as const)
+  );
+
+  return ok(
+    concerts.map(concert => ({
+      ...concert,
+      notes: notesById.get(concert.id) ?? null
+    }))
+  );
+};
 
 const eventRangeFromCreateInput = (
   input: CreateEventInput
@@ -837,7 +877,15 @@ const loadConcert = async (
     return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
   }
 
-  return ok(data);
+  const withNotes = await attachOwnerNotes(client, [data]);
+  if (withNotes.error || !withNotes.data?.[0]) {
+    return {
+      data: null,
+      error: withNotes.error
+    };
+  }
+
+  return ok(withNotes.data[0]);
 };
 
 export const updateConcert = async (
@@ -996,7 +1044,10 @@ export const updateConcert = async (
   }
 
   return {
-    data,
+    data: {
+      ...data,
+      notes: optionalNotes(input.notes)
+    },
     error: null,
     outcome: null
   };
@@ -1123,7 +1174,15 @@ export const listConcertsForEvent = async (
     };
   }
 
-  return ok(sortConcerts(data ?? []));
+  const withNotes = await attachOwnerNotes(client, data ?? []);
+  if (withNotes.error || !withNotes.data) {
+    return {
+      data: null,
+      error: withNotes.error
+    };
+  }
+
+  return ok(sortConcerts(withNotes.data));
 };
 
 export const EVENTS_LIST_WINDOW = 20;
@@ -1162,7 +1221,15 @@ export const listConcertsForEventIds = async (
     };
   }
 
-  return ok(sortConcerts(data ?? []));
+  const withNotes = await attachOwnerNotes(client, data ?? []);
+  if (withNotes.error || !withNotes.data) {
+    return {
+      data: null,
+      error: withNotes.error
+    };
+  }
+
+  return ok(sortConcerts(withNotes.data));
 };
 
 export const listOwnedConcerts = async (
@@ -1180,5 +1247,13 @@ export const listOwnedConcerts = async (
     };
   }
 
-  return ok(sortConcerts(data ?? []));
+  const withNotes = await attachOwnerNotes(client, data ?? []);
+  if (withNotes.error || !withNotes.data) {
+    return {
+      data: null,
+      error: withNotes.error
+    };
+  }
+
+  return ok(sortConcerts(withNotes.data));
 };

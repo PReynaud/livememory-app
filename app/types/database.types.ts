@@ -33,6 +33,13 @@ export type Database = {
             foreignKeyName: "attendance_concert_id_fkey"
             columns: ["concert_id"]
             isOneToOne: false
+            referencedRelation: "concert_notes"
+            referencedColumns: ["concert_id"]
+          },
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
             referencedRelation: "concerts"
             referencedColumns: ["id"]
           },
@@ -85,6 +92,32 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "event_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_members: {
+        Row: {
+          event_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          user_id?: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_members_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]
@@ -180,10 +213,32 @@ export type Database = {
             foreignKeyName: "attendance_concert_id_fkey"
             columns: ["concert_id"]
             isOneToOne: false
+            referencedRelation: "concert_notes"
+            referencedColumns: ["concert_id"]
+          },
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
             referencedRelation: "concerts"
             referencedColumns: ["id"]
           },
         ]
+      }
+      concert_notes: {
+        Row: {
+          concert_id: string | null
+          notes: string | null
+        }
+        Insert: {
+          concert_id?: string | null
+          notes?: string | null
+        }
+        Update: {
+          concert_id?: string | null
+          notes?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {

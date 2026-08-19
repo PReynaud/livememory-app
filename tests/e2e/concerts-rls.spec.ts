@@ -159,24 +159,35 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
       body: JSON.stringify({ notes: 'Back of the room.' })
     });
     expect(notesResponse.ok).toBe(true);
-    const updated = await notesResponse.json() as { notes: string | null }[];
-    expect(updated[0]?.notes).toBe('Back of the room.');
 
     const ownerRead = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      `${ownerSession.supabaseUrl}/rest/v1/concert_notes?concert_id=eq.${concertId}&select=notes`,
       { headers: ownerSession.headers }
     );
     expect(ownerRead.ok).toBe(true);
     const ownerRows = await ownerRead.json() as { notes: string | null }[];
     expect(ownerRows).toEqual([{ notes: 'Back of the room.' }]);
 
+    const ownerColumn = await fetch(
+      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      { headers: ownerSession.headers }
+    );
+    expect(ownerColumn.ok).toBe(false);
+
     const otherRead = await fetch(
-      `${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      `${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id`,
       { headers: otherSession.headers }
     );
     expect(otherRead.ok).toBe(true);
     const otherRows = await otherRead.json() as unknown[];
     expect(otherRows).toEqual([]);
+
+    const otherNotesView = await fetch(
+      `${otherSession.supabaseUrl}/rest/v1/concert_notes?concert_id=eq.${concertId}`,
+      { headers: otherSession.headers }
+    );
+    expect(otherNotesView.ok).toBe(true);
+    expect(await otherNotesView.json()).toEqual([]);
 
     const otherPatch = await fetch(`${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
       method: 'PATCH',
@@ -188,7 +199,7 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     expect(otherPatched).toEqual([]);
 
     const afterTheft = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      `${ownerSession.supabaseUrl}/rest/v1/concert_notes?concert_id=eq.${concertId}&select=notes`,
       { headers: ownerSession.headers }
     );
     const afterTheftRows = await afterTheft.json() as { notes: string | null }[];
@@ -201,7 +212,7 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     expect(otherDelete.ok).toBe(true);
 
     const stillThere = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,notes`,
+      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id`,
       { headers: ownerSession.headers }
     );
     const stillThereRows = await stillThere.json() as { id: string }[];

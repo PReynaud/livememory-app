@@ -59,6 +59,12 @@ export type EventBillConcert = {
   stage_id: string | null;
 };
 
+export type EventMemberRecord = {
+  id: string;
+  event_id: string;
+  user_id: string;
+};
+
 export type EventConflict = {
   concertId: string;
   artist: string;
@@ -156,6 +162,7 @@ export type EventsClient = {
     (relation: 'events'): TableApi<EventRecord>;
     (relation: 'event_stages'): TableApi<EventStageRecord>;
     (relation: 'concerts'): TableApi<EventBillConcert>;
+    (relation: 'event_members'): TableApi<EventMemberRecord>;
   };
   rpc: (
     fn: 'save_event_and_concert_dates',

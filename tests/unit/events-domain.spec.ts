@@ -63,7 +63,29 @@ const createMockEventsClient = (options?: {
   const eventDeletes = options?.eventDeletes ?? [];
 
   const client = {
-    from: (table: 'events' | 'concerts' | 'event_stages') => {
+    from: (table: 'events' | 'concerts' | 'event_stages' | 'event_members') => {
+      if (table === 'event_members') {
+        return {
+          insert: () => ({
+            select: () => ({
+              single: async () => ({ data: null, error: { message: 'Event not found' } })
+            })
+          }),
+          select: () => ({
+            order: async () => ({ data: [], error: null }),
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+              order: async () => ({ data: [], error: null }),
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: null }),
+                order: async () => ({ data: [], error: null })
+              }),
+              in: async () => ({ data: [], error: null })
+            })
+          })
+        };
+      }
+
       if (table === 'concerts') {
         return {
           select: () => ({

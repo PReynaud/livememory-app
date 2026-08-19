@@ -190,7 +190,7 @@ test('Event delete is owner-only and cascades Concerts, Attendance, and notes', 
     expect(await eventsAfter.json()).toEqual([]);
 
     const concertsAfter = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,event_id,notes`,
+      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,event_id`,
       { headers: ownerSession.headers }
     );
     expect(await concertsAfter.json()).toEqual([]);

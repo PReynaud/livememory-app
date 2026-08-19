@@ -20,6 +20,7 @@ import {
   type EventsClient,
   type UpdateEventInput
 } from '#shared/domain/events';
+import { joinEvent } from '#shared/domain/membership';
 import { souvenirStats } from '#shared/domain/home';
 import {
   createConcert,
@@ -181,7 +182,7 @@ export const useEventsStore = defineStore('events', () => {
   const hasMoreEvents = computed(() => eventWindowEnd.value < events.value.length);
 
   const homeStats = computed(() => souvenirStats({
-    ownedEventCount: events.value.length,
+    eventCount: events.value.length,
     statuses: Object.values(attendanceByConcertId.value)
   }));
 
@@ -278,11 +279,27 @@ export const useEventsStore = defineStore('events', () => {
     currentStages.value = [];
 
     try {
-      const result = await getOwnedEvent(eventsClient(), id);
+      let result = await getOwnedEvent(eventsClient(), id);
 
       if (result.error) {
         error.value = result.error.message;
         return { data: null, error: result.error.message };
+      }
+
+      if (!result.data) {
+        const joined = await joinEvent(eventsClient(), id);
+        if (joined.error) {
+          error.value = joined.error.message;
+          return { data: null, error: joined.error.message };
+        }
+
+        if (joined.data) {
+          result = await getOwnedEvent(eventsClient(), id);
+          if (result.error) {
+            error.value = result.error.message;
+            return { data: null, error: result.error.message };
+          }
+        }
       }
 
       currentEvent.value = result.data;

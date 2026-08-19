@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { definePageMeta, useRoute } from '#imports';
+import { definePageMeta, useRoute, useSupabaseUser, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEventsStore, type ConcertRecord } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
+import { COPY_LINK_FAILED, copyTextToClipboard } from '@/utils/copy-link';
 import { formatEventDateLabel } from '@/utils/event-dates';
 import {
   formatConcertClock,
@@ -18,15 +19,22 @@ definePageMeta({
 });
 
 const route = useRoute();
+const toast = useToast();
+const user = useSupabaseUser();
 const eventsStore = useEventsStore();
 const addSheet = useAddConcertSheetStore();
 const editEventSheet = useEditEventSheetStore();
 const { currentEvent, currentConcerts, error } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
+const copyBusy = ref(false);
 
 const eventId = computed(() => {
   const id = route.params.id;
   return typeof id === 'string' ? id : '';
+});
+
+const isOwner = computed(() => {
+  return Boolean(currentEvent.value && user.value?.id === currentEvent.value.owner_id);
 });
 
 const notFound = computed(() => {
@@ -110,7 +118,7 @@ const attendThisNight = async () => {
 };
 
 const openEditSheet = (concert: ConcertRecord) => {
-  if (!currentEvent.value) {
+  if (!currentEvent.value || !isOwner.value) {
     return;
   }
 
@@ -119,6 +127,22 @@ const openEditSheet = (concert: ConcertRecord) => {
     lockEvent: true,
     concertId: concert.id
   });
+};
+
+const copyEventLink = async () => {
+  if (copyBusy.value) {
+    return;
+  }
+
+  copyBusy.value = true;
+  try {
+    const result = await copyTextToClipboard(window.location.href);
+    if (result.error) {
+      toast.add({ title: COPY_LINK_FAILED });
+    }
+  } finally {
+    copyBusy.value = false;
+  }
 };
 </script>
 
@@ -135,11 +159,21 @@ const openEditSheet = (concert: ConcertRecord) => {
         {{ currentEvent.place }}
       </p>
       <UButton
+        v-if="isOwner"
         label="Edit event"
         color="neutral"
         variant="link"
         class="px-0 font-semibold text-white"
         @click="openEditEvent"
+      />
+      <UButton
+        v-if="isOwner"
+        label="Copy link"
+        color="neutral"
+        variant="link"
+        class="px-0 text-[13px] font-medium text-muted"
+        :loading="copyBusy"
+        @click="void copyEventLink()"
       />
       <section class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2">
         <template v-if="billLoadFailed">
@@ -169,6 +203,7 @@ const openEditSheet = (concert: ConcertRecord) => {
               class="flex items-start justify-between gap-3 py-1.5"
             >
               <button
+                v-if="isOwner"
                 type="button"
                 class="min-w-0 flex-1 text-left"
                 :aria-label="`Edit ${concert.artist}`"
@@ -190,7 +225,28 @@ const openEditSheet = (concert: ConcertRecord) => {
                   {{ stageName(concert) }}
                 </p>
               </button>
+              <div
+                v-else
+                class="min-w-0 flex-1"
+              >
+                <p class="text-base font-semibold">
+                  {{ concert.artist }}
+                </p>
+                <p
+                  v-if="concert.time"
+                  class="text-[13px] text-muted"
+                >
+                  {{ formatConcertClock(concert.time) }}
+                </p>
+                <p
+                  v-if="stageName(concert)"
+                  class="text-[13px] text-muted"
+                >
+                  {{ stageName(concert) }}
+                </p>
+              </div>
               <AppAttendanceChip
+                v-if="isOwner"
                 :status="eventsStore.attendanceStatus(concert.id)"
                 :is-past="eventsStore.concertIsPast(concert)"
                 :disabled="eventsStore.isAttendanceBusy(concert.id)"
@@ -201,7 +257,7 @@ const openEditSheet = (concert: ConcertRecord) => {
         </template>
       </section>
       <UButton
-        v-if="showAttendThisNight"
+        v-if="isOwner && showAttendThisNight"
         label="Attend this night"
         color="primary"
         variant="outline"
@@ -211,6 +267,7 @@ const openEditSheet = (concert: ConcertRecord) => {
         @click="void attendThisNight()"
       />
       <UButton
+        v-if="isOwner"
         :label="billCtaLabel"
         color="primary"
         variant="outline"
