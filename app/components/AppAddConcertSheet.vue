@@ -31,6 +31,7 @@ const saving = ref(false);
 const pendingChoice = ref(false);
 const notes = ref('');
 const confirmDelete = ref(false);
+const originalEventId = ref('');
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -61,10 +62,10 @@ const isNewNight = computed(() => picker.value === NEW_NIGHT);
 const isNewFestival = computed(() => picker.value === NEW_FESTIVAL);
 const isExistingNight = computed(() => selectedEvent.value?.kind === 'single_night');
 const isTransparent = computed(() => !picker.value);
-const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.value));
+const isEdit = computed(() => Boolean(sheet.concertId));
+const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.value) && !isEdit.value);
 const placeLocked = computed(() => Boolean(selectedEvent.value) && !eventAllowsPlaceOverride(selectedEvent.value));
 const dateLocked = computed(() => isExistingNight.value || isNewNight.value);
-const isEdit = computed(() => Boolean(sheet.concertId));
 const sheetTitle = computed(() => (isEdit.value ? 'Edit concert' : 'Add concert'));
 const eventStages = computed(() => {
   if (!selectedEvent.value) {
@@ -80,6 +81,10 @@ const eventItems = computed(() => {
     label: event.name,
     value: event.id
   }));
+
+  if (isEdit.value) {
+    return owned;
+  }
 
   return [
     owned,
@@ -142,6 +147,7 @@ const resetForOpen = async () => {
   artist.value = '';
   concertTime.value = '';
   stageId.value = '';
+  originalEventId.value = '';
 
   if (!sheet.eventId) {
     picker.value = '';
@@ -162,6 +168,7 @@ const resetForOpen = async () => {
     const concert = findConcert(sheet.concertId);
     if (concert) {
       picker.value = concert.event_id;
+      originalEventId.value = concert.event_id;
       const event = events.value.find(item => item.id === concert.event_id);
       if (event) {
         applyEvent(event);
@@ -171,6 +178,7 @@ const resetForOpen = async () => {
       concertTime.value = concert.time ? concert.time.slice(0, 5) : '';
       notes.value = concert.notes ?? '';
       stageId.value = concert.stage_id ?? '';
+      place.value = concert.place;
     }
   }
 
@@ -184,6 +192,17 @@ watch(() => sheet.open, (isOpen) => {
 });
 
 watch(picker, (value) => {
+  if (isEdit.value) {
+    const event = events.value.find(item => item.id === value);
+    if (event) {
+      const targetStages = eventsStore.stagesForEvent(event.id);
+      if (!targetStages.some(stage => stage.id === stageId.value)) {
+        stageId.value = '';
+      }
+    }
+    return;
+  }
+
   if (value === NEW_NIGHT || value === NEW_FESTIVAL) {
     resetNewEventFields();
     return;
@@ -196,7 +215,7 @@ watch(picker, (value) => {
 });
 
 watch(festivalDays, (days) => {
-  if (!days.length) {
+  if (!days.length || isEdit.value) {
     return;
   }
 
@@ -268,6 +287,21 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
 
   try {
     if (isEdit.value && sheet.concertId) {
+      const targetEventId = picker.value;
+      if (targetEventId && targetEventId !== originalEventId.value) {
+        const moved = await eventsStore.moveOwnedConcert({
+          concertId: sheet.concertId,
+          targetEventId,
+          place: place.value,
+          stageId: stageId.value || null
+        });
+
+        if (moved.error) {
+          formError.value = moved.error;
+          return;
+        }
+      }
+
       const result = await eventsStore.updateOwnedConcert({
         concertId: sheet.concertId,
         artist: artist.value,
@@ -285,6 +319,9 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
 
       toast.add({ title: 'Concert saved.' });
       sheet.closeSheet();
+      if (targetEventId && targetEventId !== originalEventId.value) {
+        await navigateTo('/e/' + targetEventId);
+      }
       return;
     }
 
