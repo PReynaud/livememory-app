@@ -68,9 +68,12 @@ test('owner moves a Concert between two owned Events without duplicating', async
 
   await authenticatedPage.getByRole('button', { name: 'Edit Justice' }).click();
   const notesSheet = authenticatedPage.getByRole('dialog');
+  await expect(notesSheet.getByRole('heading', { name: 'Edit concert' })).toBeVisible();
+  await expect(notesSheet.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
   await notesSheet.getByPlaceholder('Private. Never on your public profile.').fill('Back of the room.');
   await notesSheet.getByRole('button', { name: 'Save' }).click();
   await expect(notesSheet).toHaveCount(0);
+  await expect(authenticatedPage.getByText('Concert saved.', { exact: true })).toBeVisible();
   await authenticatedPage.getByRole('button', { name: 'Mark as attended' }).click();
   await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -86,9 +89,11 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await authenticatedPage.goto(sourcePath);
   await waitForNuxtHydration(authenticatedPage);
   await expect(authenticatedPage.getByRole('heading', { name: 'Club Night' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Justice')).toBeVisible();
   await authenticatedPage.getByRole('button', { name: 'Edit Justice' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Edit concert' })).toBeVisible();
+  await expect(sheet.getByPlaceholder('Private. Never on your public profile.')).toHaveValue('Back of the room.');
   await sheet.getByLabel('Event').click();
   await authenticatedPage.getByRole('option', { name: 'Other Night' }).click();
   await expect(sheet.getByText(/joiner/i)).toHaveCount(0);

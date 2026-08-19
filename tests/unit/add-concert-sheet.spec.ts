@@ -106,6 +106,7 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/!isEdit\.value/);
     expect(sheet).toMatch(/moveOwnedConcert/);
     expect(sheet).toMatch(/originalEventId/);
+    expect(sheet).toMatch(/editLoaded/);
     expect(sheet).toMatch(/if \(isEdit\.value\) \{[\s\S]*return owned/);
     expect(sheet).not.toMatch(/joiner/i);
   });
