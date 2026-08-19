@@ -79,6 +79,42 @@ describe('Home featured and stats surfaces', () => {
     expect(store).not.toMatch(/from\('attendance_effective'\)/);
   });
 
+  it('shows Couldn\'t load with Retry on fetch failure instead of empty featured copy', () => {
+    const home = read('app/pages/home.vue');
+    expect(home).toMatch(/Couldn't load\./);
+    expect(home).toMatch(/label="Retry"/);
+    expect(home).toMatch(/retryLoad/);
+    expect(home).toMatch(/data-testid="home-load-error"/);
+
+    const errorIndex = home.indexOf('home-load-error');
+    const emptyIndex = home.indexOf('home-featured-empty');
+    const statsIndex = home.indexOf('home-stats');
+    expect(errorIndex).toBeGreaterThan(-1);
+    expect(emptyIndex).toBeGreaterThan(errorIndex);
+    expect(statsIndex).toBeGreaterThan(emptyIndex);
+
+    const beforeEmpty = home.slice(0, emptyIndex);
+    expect(beforeEmpty).toMatch(/v-if="error"/);
+    expect(beforeEmpty).toMatch(/v-else/);
+    expect(beforeEmpty).not.toMatch(/Add concert/);
+  });
+
+  it('propagates attendance list failure through fetchEvents so Home does not show zero stats', () => {
+    const store = read('app/stores/events.ts');
+    const fetchEvents = store.slice(store.indexOf('const fetchEvents ='), store.indexOf('const fetchEvent ='));
+    expect(fetchEvents).toMatch(/listedAttendanceError/);
+    expect(fetchEvents).toMatch(/if \(listedAttendanceError\)/);
+    expect(fetchEvents).toMatch(/error\.value = listedAttendanceError/);
+    expect(fetchEvents).toMatch(/return \{ data: events\.value, error: listedAttendanceError \}/);
+
+    const home = read('app/pages/home.vue');
+    const statsIndex = home.indexOf('home-stats');
+    const beforeStats = home.slice(0, statsIndex);
+    expect(beforeStats).toMatch(/v-if="error"/);
+    expect(beforeStats).toMatch(/v-else/);
+    expect(beforeStats).toMatch(/Couldn't load\./);
+  });
+
   it('uses display-sm on featured compact artist and grouped Event name', () => {
     const card = read('app/components/AppEventCard.vue');
     expect(card).toMatch(/isCompactBill/);

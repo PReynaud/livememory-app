@@ -14,6 +14,10 @@ const eventsStore = useEventsStore();
 const { featuredEvents, homeStats, error } = storeToRefs(eventsStore);
 const hasFeatured = computed(() => featuredEvents.value.length > 0);
 
+const retryLoad = () => {
+  void eventsStore.fetchEvents();
+};
+
 await eventsStore.fetchEvents();
 </script>
 
@@ -23,85 +27,96 @@ await eventsStore.fetchEvents();
       Home
     </h1>
 
-    <p
-      v-if="error"
-      class="text-sm text-muted"
-    >
-      {{ error }}
-    </p>
-
-    <section
-      v-if="!hasFeatured"
-      data-testid="home-featured-empty"
-      class="rounded-2xl bg-[#1A1A1A] p-4 space-y-3"
-    >
-      <p class="text-2xl font-bold tracking-tight leading-[1.15]">
-        Nothing upcoming.
-      </p>
-      <p class="text-muted">
-        Add a night or a concert.
+    <template v-if="error">
+      <p
+        data-testid="home-load-error"
+        class="text-lg font-semibold"
+      >
+        Couldn't load.
       </p>
       <UButton
-        label="Add concert"
+        label="Retry"
         color="primary"
         variant="outline"
         class="h-11 rounded-full ring-2"
-        @click="addSheet.openSheet()"
+        @click="retryLoad"
       />
-    </section>
+    </template>
 
-    <div
-      v-else
-      data-testid="home-featured"
-      class="space-y-2.5"
-    >
-      <AppEventCard
-        v-for="event in featuredEvents"
-        :key="event.id"
-        :event="event"
-        :concerts="eventsStore.concertsForEvent(event.id)"
-        featured
-      />
-    </div>
+    <template v-else>
+      <section
+        v-if="!hasFeatured"
+        data-testid="home-featured-empty"
+        class="rounded-2xl bg-[#1A1A1A] p-4 space-y-3"
+      >
+        <p class="text-2xl font-bold tracking-tight leading-[1.15]">
+          Nothing upcoming.
+        </p>
+        <p class="text-muted">
+          Add a night or a concert.
+        </p>
+        <UButton
+          label="Add concert"
+          color="primary"
+          variant="outline"
+          class="h-11 rounded-full ring-2"
+          @click="addSheet.openSheet()"
+        />
+      </section>
 
-    <section
-      data-testid="home-stats"
-      aria-label="Souvenir stats"
-      class="rounded-2xl bg-[#1A1A1A] p-4 flex"
-    >
       <div
-        class="flex-1"
-        data-stat="attended"
+        v-else
+        data-testid="home-featured"
+        class="space-y-2.5"
       >
-        <p class="text-2xl font-bold tracking-tight leading-[1.15]">
-          {{ homeStats.attended }}
-        </p>
-        <p class="mt-1 text-sm text-muted">
-          Attended
-        </p>
+        <AppEventCard
+          v-for="event in featuredEvents"
+          :key="event.id"
+          :event="event"
+          :concerts="eventsStore.concertsForEvent(event.id)"
+          featured
+        />
       </div>
-      <div
-        class="flex-1"
-        data-stat="events"
+
+      <section
+        data-testid="home-stats"
+        aria-label="Souvenir stats"
+        class="rounded-2xl bg-[#1A1A1A] p-4 flex"
       >
-        <p class="text-2xl font-bold tracking-tight leading-[1.15]">
-          {{ homeStats.events }}
-        </p>
-        <p class="mt-1 text-sm text-muted">
-          Events
-        </p>
-      </div>
-      <div
-        class="flex-1"
-        data-stat="going"
-      >
-        <p class="text-2xl font-bold tracking-tight leading-[1.15]">
-          {{ homeStats.going }}
-        </p>
-        <p class="mt-1 text-sm text-muted">
-          Going
-        </p>
-      </div>
-    </section>
+        <div
+          class="flex-1"
+          data-stat="attended"
+        >
+          <p class="text-2xl font-bold tracking-tight leading-[1.15]">
+            {{ homeStats.attended }}
+          </p>
+          <p class="mt-1 text-sm text-muted">
+            Attended
+          </p>
+        </div>
+        <div
+          class="flex-1"
+          data-stat="events"
+        >
+          <p class="text-2xl font-bold tracking-tight leading-[1.15]">
+            {{ homeStats.events }}
+          </p>
+          <p class="mt-1 text-sm text-muted">
+            Events
+          </p>
+        </div>
+        <div
+          class="flex-1"
+          data-stat="going"
+        >
+          <p class="text-2xl font-bold tracking-tight leading-[1.15]">
+            {{ homeStats.going }}
+          </p>
+          <p class="mt-1 text-sm text-muted">
+            Going
+          </p>
+        </div>
+      </section>
+    </template>
   </UContainer>
 </template>

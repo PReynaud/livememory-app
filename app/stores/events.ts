@@ -137,6 +137,10 @@ export const useEventsStore = defineStore('events', () => {
 
       const listedAttendanceError = await loadAttendance();
       attendanceError.value = listedAttendanceError;
+      if (listedAttendanceError) {
+        error.value = listedAttendanceError;
+        return { data: events.value, error: listedAttendanceError };
+      }
 
       return { data: events.value, error: null };
     } catch (err: unknown) {
