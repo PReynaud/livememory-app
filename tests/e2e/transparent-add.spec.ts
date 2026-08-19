@@ -13,7 +13,7 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
   await sheet.getByRole('button', { name: 'Save' }).click();
 
   await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toBeVisible();
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
 
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
@@ -45,7 +45,7 @@ test('defaults future transparent Attendance to Going and groups after a second 
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toBeVisible();
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
   await expect(compact.getByRole('button', { name: 'Mark as going' })).toHaveAttribute('aria-pressed', 'true');
@@ -65,7 +65,7 @@ test('defaults future transparent Attendance to Going and groups after a second 
   await expect(authenticatedPage.getByRole('button', { name: 'Mark as going' }).nth(0)).toHaveAttribute('aria-pressed', 'true');
   await expect(authenticatedPage.getByRole('button', { name: 'Mark as going' }).nth(1)).toHaveAttribute('aria-pressed', 'false');
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   const group = authenticatedPage.locator('[data-event-card="group"]');
   await expect(group).toBeVisible();
   await expect(authenticatedPage.locator('[data-event-card="compact"]')).toHaveCount(0);

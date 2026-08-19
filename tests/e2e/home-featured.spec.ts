@@ -173,7 +173,7 @@ test('features the next 1–3 upcoming Events and keeps the rest of the log on C
   await expect(authenticatedPage).toHaveURL(new RegExp(`/e/${emptyId}$`));
   await expect(authenticatedPage.getByRole('heading', { name: 'Empty Soon' })).toBeVisible();
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
   await expect(authenticatedPage.getByText('Empty Soon')).toBeVisible();
   await expect(authenticatedPage.getByText('Second Night')).toBeVisible();
@@ -284,7 +284,7 @@ test('counts effective attended, owned Events, and going; past nights leave feat
   await expect(stats.locator('[data-stat="events"]')).toHaveText(/3/);
   await expect(stats.locator('[data-stat="going"]')).toHaveText(/1/);
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   await expect(authenticatedPage.getByText('Past Night')).toBeVisible();
   await expect(authenticatedPage.getByText('Future Night')).toBeVisible();
   await expect(authenticatedPage.getByText('Empty Future')).toBeVisible();
