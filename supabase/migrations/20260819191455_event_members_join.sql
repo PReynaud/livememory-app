@@ -116,8 +116,8 @@ grant select on table public.concert_notes to authenticated;
 grant update (notes) on table public.concert_notes to authenticated;
 revoke all on table public.concert_notes from public, anon;
 
--- Invoker functions cannot SELECT * after notes were revoked. Keep the rowtype
--- aligned with table column order and fill notes with null.
+-- Invoker functions cannot SELECT concerts.notes. Assign granted columns into
+-- the rowtype instead of SELECT * / SELECT into concerts%rowtype.
 create or replace function public.assert_event_bill_valid(p_event_id uuid)
 returns void
 language plpgsql
@@ -127,9 +127,10 @@ set search_path = public
 as $$
 declare
   concert public.concerts%rowtype;
+  rec record;
   violation text;
 begin
-  for concert in
+  for rec in
     select
       id,
       event_id,
@@ -138,11 +139,20 @@ begin
       "time",
       place,
       owner_id,
-      null::text,
       stage_id
     from public.concerts
     where event_id = p_event_id
   loop
+    concert.id := rec.id;
+    concert.event_id := rec.event_id;
+    concert.artist := rec.artist;
+    concert.date := rec.date;
+    concert."time" := rec."time";
+    concert.place := rec.place;
+    concert.owner_id := rec.owner_id;
+    concert.notes := null;
+    concert.stage_id := rec.stage_id;
+
     violation := public.concert_event_rule_violation(concert);
     if violation is not null then
       raise exception '%', violation;

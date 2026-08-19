@@ -416,7 +416,7 @@ const listBillConcerts = async (
 ): Promise<DomainResult<EventBillConcert[]>> => {
   const { data, error } = await client
     .from('concerts')
-    .select('*')
+    .select('id,event_id,owner_id,artist,date,time,place,stage_id')
     .eq('event_id', eventId)
     .order('date', { ascending: true });
 

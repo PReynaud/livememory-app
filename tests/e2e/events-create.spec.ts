@@ -98,7 +98,7 @@ authTest('stays on the festival form for inverted dates and missing required fie
   await authExpect(authenticatedPage.getByText('Name is required.')).toBeVisible();
 });
 
-authTest('unknown and non-owned Event URLs are the same quiet not-found', async ({ authenticatedPage }, testInfo) => {
+authTest('unknown Event URLs are quiet not-found and a stranger joins via the URL', async ({ authenticatedPage }, testInfo) => {
   await authExpect(authenticatedPage.getByRole('heading', { name: 'Home' })).toBeVisible();
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts' }).click();
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
@@ -130,8 +130,10 @@ authTest('unknown and non-owned Event URLs are the same quiet not-found', async 
     await authExpect(authenticatedPage).not.toHaveURL(/\/login/);
 
     await authenticatedPage.goto(ownedPath);
-    await authExpect(authenticatedPage.getByRole('heading', { name: 'Event not found.' })).toBeVisible();
-    await authExpect(authenticatedPage.getByText('Private Night')).toHaveCount(0);
+    await waitForNuxtHydration(authenticatedPage);
+    await authExpect(authenticatedPage.getByRole('heading', { name: 'Private Night' })).toBeVisible();
+    await authExpect(authenticatedPage.getByRole('button', { name: 'Edit event' })).toHaveCount(0);
+    await authExpect(authenticatedPage.getByRole('button', { name: 'Add to this night' })).toHaveCount(0);
   } finally {
     await deleteE2EAccountForTest(other.userId);
   }
