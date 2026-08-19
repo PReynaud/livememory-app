@@ -193,6 +193,19 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     );
     const afterTheftRows = await afterTheft.json() as { notes: string | null }[];
     expect(afterTheftRows[0]?.notes).toBe('Back of the room.');
+
+    const otherDelete = await fetch(`${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+      method: 'DELETE',
+      headers: otherSession.headers
+    });
+    expect(otherDelete.ok).toBe(true);
+
+    const stillThere = await fetch(
+      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,notes`,
+      { headers: ownerSession.headers }
+    );
+    const stillThereRows = await stillThere.json() as { id: string }[];
+    expect(stillThereRows).toHaveLength(1);
   } finally {
     await deleteE2EAccountForTest(owner.userId);
     await deleteE2EAccountForTest(other.userId);
