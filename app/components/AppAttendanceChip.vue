@@ -26,19 +26,15 @@ const accessibleName = computed(() => {
 const chipClass = computed(() => {
   const base = 'inline-flex h-6 shrink-0 items-center rounded-full px-2 text-[10px] font-semibold leading-none';
 
-  if (!confirmed.value && displayStatus.value === 'going') {
-    return `${base} border border-dashed border-[#FF4D8A] bg-transparent text-[#FF4D8A]`;
-  }
-
   if (!confirmed.value) {
     return `${base} border border-dashed border-[#A3A3A3] bg-transparent text-[#A3A3A3]`;
   }
 
   if (displayStatus.value === 'going') {
-    return `${base} border border-[#FF4D8A] bg-transparent text-[#FF4D8A] shadow-[0_0_8px_#FF4D8A] motion-reduce:shadow-none motion-reduce:outline motion-reduce:outline-1 motion-reduce:outline-[#FF4D8A]`;
+    return `${base} border border-[#FF4D8A] bg-transparent text-[#FF4D8A] shadow-[0_0_8px_#FF4D8A66] motion-reduce:shadow-none motion-reduce:outline motion-reduce:outline-1 motion-reduce:outline-[#FF4D8A]`;
   }
 
-  return `${base} border border-[#A3A3A3] bg-[#A3A3A3] text-black`;
+  return `${base} border border-[#A3A3A3] bg-transparent text-[#A3A3A3]`;
 });
 </script>
 
