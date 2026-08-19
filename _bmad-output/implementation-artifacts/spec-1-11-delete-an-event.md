@@ -2,7 +2,7 @@
 title: 'Story 1.11: Delete an Event'
 type: 'feature'
 created: '2026-08-19'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 context:
   - docs/project-context.md
@@ -77,6 +77,8 @@ context:
 - Given a non-owner, when they attempt delete via domain or RLS, then it is blocked.
 
 ## Spec Change Log
+
+- Tightened `tests/unit/concerts-domain.spec.ts` update/delete source-guard slices so `moveOwnedConcert`'s `refreshConcertLists` return is not treated as an `updateOwnedConcert` regression, and `deleteOwnedEvent` is checked separately.
 
 ## Design Notes
 
