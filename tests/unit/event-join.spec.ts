@@ -143,6 +143,14 @@ describe('joinEvent', () => {
       '11111111-1111-4111-8111-111111111111'
     );
     expect(owner).toEqual({ data: null, error: null });
+
+    const malformed = await joinEvent(
+      createJoinClient({
+        insertError: { code: '22P02', message: 'invalid input syntax for type uuid' }
+      }).client,
+      'not-a-uuid'
+    );
+    expect(malformed).toEqual({ data: null, error: null });
   });
 });
 

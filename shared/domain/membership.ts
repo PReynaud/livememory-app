@@ -20,7 +20,11 @@ const isUniqueViolation = (error: QueryError) => {
 };
 
 const isQuietNotFound = (error: QueryError) => {
-  return /event not found/i.test(constraintText(error));
+  return (
+    error.code === '22P02'
+    || /event not found/i.test(constraintText(error))
+    || /invalid input syntax/i.test(constraintText(error))
+  );
 };
 
 export const joinEvent = async (
