@@ -37,10 +37,10 @@ test('owner edits Event name and Place from the glass sheet', async ({ authentic
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole('heading', { name: 'Edit event' })).toBeVisible();
   await expect(sheet.getByLabel('Name')).toHaveValue('Rock Week');
-  await expect(sheet.getByLabel('Place')).toHaveValue('Paris');
+  await expect(sheet.getByRole('textbox', { name: 'Place' })).toHaveValue('Paris');
 
   await sheet.getByLabel('Name').fill('Rock Week Paris');
-  await sheet.getByLabel('Place').fill('La Villette');
+  await sheet.getByRole('textbox', { name: 'Place' }).fill('La Villette');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(authenticatedPage.getByRole('heading', { name: 'Rock Week Paris' })).toBeVisible();
@@ -64,6 +64,6 @@ test('invalid Concert date shows the named Event range copy', async ({ authentic
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet.getByText('This date is outside the Event.')).toBeVisible();
   await expect(sheet.getByText(/20\/08\/2026/)).toBeVisible();
-  await expect(sheet.getByText(/Justice/)).toBeVisible();
+  await expect(sheet.getByText(/These concerts would break the Event rules/)).toBeVisible();
   await expect(sheet).toBeVisible();
 });
