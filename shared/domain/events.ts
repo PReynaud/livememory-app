@@ -538,6 +538,7 @@ const applyEventUpdate = async (
     endDate: string;
     place: string;
     allowPlaceOverride: boolean;
+    previousAllowPlaceOverride: boolean;
     stages?: Array<{ id?: string; name: string }>;
     concertDates?: Array<{ concertId: string; date: string; stageId?: string | null }>;
   }
@@ -576,7 +577,8 @@ const applyEventUpdate = async (
     const nextStage = stageByConcert.has(concert.id)
       ? (stageByConcert.get(concert.id) ?? null)
       : concert.stage_id;
-    const nextPlace = input.allowPlaceOverride ? concert.place : input.place;
+    const inheritPlace = !input.allowPlaceOverride && !input.previousAllowPlaceOverride;
+    const nextPlace = inheritPlace ? input.place : concert.place;
     return {
       ...concert,
       date: nextDate,
@@ -711,6 +713,7 @@ export const updateEvent = async (
     allowPlaceOverride: input.allowPlaceOverride === undefined
       ? eventAllowsPlaceOverride(existing.data)
       : input.allowPlaceOverride === true,
+    previousAllowPlaceOverride: eventAllowsPlaceOverride(existing.data),
     stages: input.stages,
     concertDates: input.concertDates
   });
