@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { souvenirStats } from '../../shared/domain/home';
 import { joinEvent, type EventMemberRecord } from '../../shared/domain/membership';
+import { CONCERT_VISIBLE_COLUMNS } from '../../shared/domain/concerts';
 import type { EventsClient } from '../../shared/domain/events';
 import { COPY_LINK_FAILED } from '../../app/utils/copy-link';
 
@@ -77,8 +78,28 @@ describe('event_members kernel', () => {
     expect(sql).not.toMatch(/grant select \([^;]*notes[^;]*\) on table public\.concerts/s);
     expect(sql).toMatch(/create or replace view public\.concert_notes/);
     expect(sql).toMatch(/concerts\.owner_id = \(select auth\.uid\(\)\)/);
+    expect(sql).toMatch(/grant select on table public\.concert_notes to authenticated/);
+    expect(sql).toMatch(/grant update \(notes\) on table public\.concert_notes to authenticated/);
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/for delete/);
+  });
+
+  it('loads Concerts without selecting revoked notes', () => {
+    const domain = read('shared/domain/concerts.ts');
+    expect(domain).toContain('export const CONCERT_VISIBLE_COLUMNS');
+    expect(domain).not.toMatch(/from\('concerts'\)\.select\('\*'\)/);
+    expect(domain).not.toMatch(/from\('concerts'\)[\s\S]{0,160}\.select\(\)/);
+    expect(CONCERT_VISIBLE_COLUMNS.split(',')).toEqual([
+      'id',
+      'event_id',
+      'owner_id',
+      'artist',
+      'date',
+      'time',
+      'place',
+      'stage_id'
+    ]);
+    expect(CONCERT_VISIBLE_COLUMNS).not.toMatch(/notes/);
   });
 });
 

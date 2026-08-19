@@ -113,6 +113,7 @@ from public.concerts
 where concerts.owner_id = (select auth.uid());
 
 grant select on table public.concert_notes to authenticated;
+grant update (notes) on table public.concert_notes to authenticated;
 revoke all on table public.concert_notes from public, anon;
 
 drop policy if exists "Authenticated users can select stages on owned events" on public.event_stages;

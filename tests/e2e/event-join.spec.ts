@@ -6,6 +6,7 @@ import {
   deleteE2EAccountForTest,
   generateE2EAccountData
 } from './helpers/e2e-account';
+import { concertNotesRest, concertsRest } from './helpers/concert-rest';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 import type { E2EAccount } from './helpers/e2e-account';
@@ -90,7 +91,7 @@ test('signed-in joiner opens an Event URL once, sees the Bill, and lists it on C
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const concerts = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts`, ownerSession.headers, {
+    const concerts = await postJson<{ id: string }[]>(concertsRest(ownerSession.supabaseUrl), ownerSession.headers, {
       event_id: eventId,
       artist: 'Justice',
       date: start,
@@ -99,7 +100,7 @@ test('signed-in joiner opens an Event URL once, sees the Bill, and lists it on C
     const concertId = concerts[0]?.id;
     expect(concertId).toBeTruthy();
 
-    const notesPatch = await fetch(`${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    const notesPatch = await fetch(concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${concertId}`), {
       method: 'PATCH',
       headers: ownerSession.headers,
       body: JSON.stringify({ notes: 'Back of the room.' })
@@ -146,7 +147,7 @@ test('signed-in joiner opens an Event URL once, sees the Bill, and lists it on C
     expect(memberRowsAgain).toHaveLength(1);
 
     const joinerNotes = await fetch(
-      `${joinerSession.supabaseUrl}/rest/v1/concert_notes?concert_id=eq.${concertId}`,
+      concertNotesRest(joinerSession.supabaseUrl, `concert_id=eq.${concertId}`),
       { headers: joinerSession.headers }
     );
     expect(joinerNotes.ok).toBe(true);

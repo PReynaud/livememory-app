@@ -68,6 +68,10 @@ export type ConcertRecord = {
   stage_id?: string | null;
 };
 
+/** Columns `authenticated` may SELECT on `concerts` after notes moved to `concert_notes`. */
+export const CONCERT_VISIBLE_COLUMNS
+  = 'id,event_id,owner_id,artist,date,time,place,stage_id' as const;
+
 export type CreateConcertResult = DomainResult<ConcertRecord> & {
   outcome: ConcertCreateOutcome | null;
 };
@@ -125,7 +129,7 @@ type EqFilter<T> = {
 
 type TableApi<T> = {
   insert: (values: Record<string, unknown>) => {
-    select: () => {
+    select: (columns?: string) => {
       single: () => Promise<QueryResult<T>>;
     };
   };
@@ -147,7 +151,7 @@ type TableApi<T> = {
   };
   update: (values: Record<string, unknown>) => {
     eq: (column: string, value: string) => {
-      select: () => {
+      select: (columns?: string) => {
         single: () => Promise<QueryResult<T>>;
       };
     };
@@ -467,7 +471,7 @@ const listIdentityCandidates = async (
   date: string,
   ownerId?: string | null
 ): Promise<DomainResult<ConcertRecord[]>> => {
-  const byDate = client.from('concerts').select('*').eq('date', date);
+  const byDate = client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('date', date);
   const scoped = ownerId ? byDate.eq('owner_id', ownerId) : byDate;
   const { data, error } = await scoped.order('date', { ascending: true });
 
@@ -572,7 +576,7 @@ const writeAttachTime = async (
     .from('concerts')
     .update({ time: draftTime })
     .eq('id', existing.id)
-    .select()
+    .select(CONCERT_VISIBLE_COLUMNS)
     .single();
 
   if (error && isUniqueViolation(error)) {
@@ -801,7 +805,7 @@ export const createConcert = async (
     stage_id: placement.data.stageId
   };
 
-  const { data, error } = await client.from('concerts').insert(payload).select().single();
+  const { data, error } = await client.from('concerts').insert(payload).select(CONCERT_VISIBLE_COLUMNS).single();
 
   if (error || !data) {
     await rollbackNewEvent(client, createdEventId);
@@ -865,7 +869,7 @@ const loadConcert = async (
     return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
   }
 
-  const { data, error } = await client.from('concerts').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('id', id).maybeSingle();
   if (error) {
     return {
       data: null,
@@ -1002,7 +1006,7 @@ export const updateConcert = async (
     .from('concerts')
     .update(payload)
     .eq('id', current.id)
-    .select()
+    .select(CONCERT_VISIBLE_COLUMNS)
     .single();
 
   if (error || !data) {
@@ -1114,7 +1118,7 @@ export const moveConcert = async (
     .from('concerts')
     .update(payload)
     .eq('id', existing.data.id)
-    .select()
+    .select(CONCERT_VISIBLE_COLUMNS)
     .single();
 
   if (error || !data) {
@@ -1162,7 +1166,7 @@ export const listConcertsForEvent = async (
     return ok([]);
   }
 
-  const { data, error } = await client.from('concerts').select('*').eq('event_id', id).order('date', { ascending: true });
+  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('event_id', id).order('date', { ascending: true });
 
   if (error) {
     return {
@@ -1207,7 +1211,7 @@ export const listConcertsForEventIds = async (
 
   const { data, error } = await client
     .from('concerts')
-    .select('*')
+    .select(CONCERT_VISIBLE_COLUMNS)
     .in('event_id', ids)
     .order('date', { ascending: true });
 
@@ -1235,7 +1239,7 @@ export const listConcertsForEventIds = async (
 export const listOwnedConcerts = async (
   client: ConcertsClient
 ): Promise<DomainResult<ConcertRecord[]>> => {
-  const { data, error } = await client.from('concerts').select('*').order('date', { ascending: true });
+  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).order('date', { ascending: true });
 
   if (error) {
     return {

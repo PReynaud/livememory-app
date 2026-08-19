@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures/auth.fixture';
+import { concertsRest } from './helpers/concert-rest';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 import type { E2EAccount } from './helpers/e2e-account';
@@ -92,7 +93,7 @@ const createConcert = async (
     payload.time = input.time;
   }
 
-  const rows = await postJson<{ id: string }[]>(`${session.supabaseUrl}/rest/v1/concerts`, session.headers, payload);
+  const rows = await postJson<{ id: string }[]>(concertsRest(session.supabaseUrl), session.headers, payload);
   const id = rows[0]?.id;
   if (!id) {
     throw new Error('Failed to create concert');
