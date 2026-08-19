@@ -35,6 +35,7 @@ import {
   type UpdateConcertInput
 } from '#shared/domain/concerts';
 import {
+  attendThisNight as markNightAttendance,
   clearAttendance,
   isConcertPast,
   listMyAttendance,
@@ -85,6 +86,7 @@ export const useEventsStore = defineStore('events', () => {
   const stagesByEventId = ref<Record<string, EventStageRecord[]>>({});
   const attendanceByConcertId = ref<Record<string, AttendanceStatus>>({});
   const attendanceBusyByConcertId = ref<Record<string, true>>({});
+  const attendThisNightBusy = ref(false);
   const attendanceError = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -114,6 +116,8 @@ export const useEventsStore = defineStore('events', () => {
   const isAttendanceBusy = (concertId: string) => {
     return Boolean(attendanceBusyByConcertId.value[concertId]);
   };
+
+  const isAttendThisNightBusy = () => attendThisNightBusy.value;
 
   const concertIsPast = (concert: Pick<ConcertRecord, 'date' | 'time'>, now?: Date) => {
     return isConcertPast(concert, now);
@@ -578,6 +582,38 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const attendThisNight = async (eventId: string) => {
+    if (attendThisNightBusy.value) {
+      return { data: null, error: null };
+    }
+
+    attendThisNightBusy.value = true;
+    attendanceError.value = null;
+
+    try {
+      const result = await markNightAttendance(attendanceClient(), eventId);
+
+      if (result.error) {
+        attendanceError.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      const next = { ...attendanceByConcertId.value };
+      for (const row of result.data ?? []) {
+        next[row.concert_id] = row.status;
+      }
+      attendanceByConcertId.value = next;
+
+      return { data: result.data, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update attendance');
+      attendanceError.value = errorMessage;
+      return { data: null, error: errorMessage };
+    } finally {
+      attendThisNightBusy.value = false;
+    }
+  };
+
   return {
     events,
     concerts,
@@ -595,6 +631,7 @@ export const useEventsStore = defineStore('events', () => {
     homeStats,
     attendanceStatus,
     isAttendanceBusy,
+    isAttendThisNightBusy,
     concertIsPast,
     fetchEvents,
     fetchEvent,
@@ -605,6 +642,7 @@ export const useEventsStore = defineStore('events', () => {
     updateOwnedConcert,
     moveOwnedConcert,
     deleteOwnedConcert,
-    cycleAttendance
+    cycleAttendance,
+    attendThisNight
   };
 });

@@ -52,6 +52,9 @@ const billLoadFailed = computed(() => {
 const billCtaLabel = computed(() => {
   return currentEvent.value?.kind === 'festival' ? 'Add to this festival' : 'Add to this night';
 });
+const showAttendThisNight = computed(() => {
+  return currentEvent.value?.kind === 'single_night' && hasConcerts.value;
+});
 
 const stageName = (concert: ConcertRecord) => {
   return eventsStore.currentStages.find(stage => stage.id === concert.stage_id)?.name ?? '';
@@ -96,6 +99,14 @@ const openAddSheet = () => {
     eventId: currentEvent.value.id,
     lockEvent: true
   });
+};
+
+const attendThisNight = async () => {
+  if (!currentEvent.value) {
+    return;
+  }
+
+  await eventsStore.attendThisNight(currentEvent.value.id);
 };
 
 const openEditSheet = (concert: ConcertRecord) => {
@@ -198,6 +209,16 @@ const openEditSheet = (concert: ConcertRecord) => {
           </div>
         </template>
       </section>
+      <UButton
+        v-if="showAttendThisNight"
+        label="Attend this night"
+        color="primary"
+        variant="outline"
+        class="h-11 rounded-full ring-2"
+        :loading="eventsStore.isAttendThisNightBusy()"
+        :disabled="eventsStore.isAttendThisNightBusy()"
+        @click="void attendThisNight()"
+      />
       <UButton
         :label="billCtaLabel"
         color="primary"
