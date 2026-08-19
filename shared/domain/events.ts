@@ -52,6 +52,8 @@ export type CreateEventInput = {
 type QueryError = {
   message: string;
   code?: string;
+  details?: string;
+  hint?: string;
 };
 
 type QueryResult<T> = {
@@ -176,8 +178,12 @@ const validateCreateInput = (input: CreateEventInput): DomainResult<{
   });
 };
 
+const constraintText = (error: QueryError): string => {
+  return [error.message, error.details, error.hint].filter(Boolean).join(' ');
+};
+
 const mapInsertError = (error: QueryError): DomainError => {
-  if (error.code === '23514' || /end_date|events_dates/i.test(error.message)) {
+  if (/events_dates_check/i.test(constraintText(error))) {
     return {
       ruleId: EVENT_RULE.dateOrder,
       message: EVENT_RULE_MESSAGE.dateOrder

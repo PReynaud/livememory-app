@@ -11,7 +11,7 @@ definePageMeta({
 
 const route = useRoute();
 const eventsStore = useEventsStore();
-const { currentEvent } = storeToRefs(eventsStore);
+const { currentEvent, error } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
 
 const eventId = computed(() => {
@@ -20,10 +20,14 @@ const eventId = computed(() => {
 });
 
 const notFound = computed(() => {
-  return hasResolved.value && !currentEvent.value;
+  return hasResolved.value && !currentEvent.value && !error.value;
 });
 
-watch(eventId, async (id) => {
+const loadFailed = computed(() => {
+  return hasResolved.value && !currentEvent.value && Boolean(error.value);
+});
+
+const loadEvent = async (id: string) => {
   hasResolved.value = false;
   if (!id) {
     hasResolved.value = true;
@@ -35,7 +39,15 @@ watch(eventId, async (id) => {
   if (eventId.value === requested) {
     hasResolved.value = true;
   }
+};
+
+watch(eventId, (id) => {
+  void loadEvent(id);
 }, { immediate: true });
+
+const retryLoad = () => {
+  void loadEvent(eventId.value);
+};
 </script>
 
 <template>
@@ -55,6 +67,25 @@ watch(eventId, async (id) => {
           No concerts on this bill.
         </p>
       </section>
+    </template>
+
+    <template v-else-if="!hasResolved">
+      <p class="text-sm text-muted">
+        Loading event…
+      </p>
+    </template>
+
+    <template v-else-if="loadFailed">
+      <p class="text-lg font-semibold">
+        Couldn't load.
+      </p>
+      <UButton
+        label="Retry"
+        color="primary"
+        variant="outline"
+        class="h-11 rounded-full ring-2"
+        @click="retryLoad"
+      />
     </template>
 
     <template v-else-if="notFound">

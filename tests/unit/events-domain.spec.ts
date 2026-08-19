@@ -38,6 +38,7 @@ const createMockEventsClient = (options?: {
   rows?: EventRecord[];
   insertCalls?: Record<string, unknown>[];
   getError?: { message: string; code?: string };
+  insertError?: { message: string; code?: string; details?: string; hint?: string };
 }) => {
   const rows = [...(options?.rows ?? [])];
   const insertCalls = options?.insertCalls ?? [];
@@ -52,6 +53,10 @@ const createMockEventsClient = (options?: {
           return {
             select: () => ({
               single: async () => {
+                if (options?.insertError) {
+                  return { data: null, error: options.insertError };
+                }
+
                 const created: EventRecord = {
                   id: '22222222-2222-4222-8222-222222222222',
                   owner_id: 'owner-1',
@@ -232,6 +237,57 @@ describe('createEvent', () => {
     expect(missingFestivalEnd.error?.message).toBe(EVENT_RULE_MESSAGE.requiredEndDate);
     expect(insertCalls).toHaveLength(0);
   });
+
+  it('maps only events_dates_check violations to the date-order rule', async () => {
+    const datesCheck = createMockEventsClient({
+      insertError: {
+        code: '23514',
+        message: 'new row for relation "events" violates check constraint "events_dates_check"'
+      }
+    });
+    const datesResult = await createEvent(datesCheck.client, {
+      kind: 'festival',
+      name: 'Rock Week',
+      startDate: '2026-08-20',
+      endDate: '2026-08-22',
+      place: 'Paris'
+    });
+    expect(datesResult.data).toBeNull();
+    expect(datesResult.error?.ruleId).toBe(EVENT_RULE.dateOrder);
+    expect(datesResult.error?.message).toBe(EVENT_RULE_MESSAGE.dateOrder);
+
+    const kindCheck = createMockEventsClient({
+      insertError: {
+        code: '23514',
+        message: 'new row for relation "events" violates check constraint "events_kind_check"'
+      }
+    });
+    const kindResult = await createEvent(kindCheck.client, {
+      kind: 'festival',
+      name: 'Rock Week',
+      startDate: '2026-08-20',
+      endDate: '2026-08-22',
+      place: 'Paris'
+    });
+    expect(kindResult.data).toBeNull();
+    expect(kindResult.error?.ruleId).toBe('persist_failed');
+    expect(kindResult.error?.message).toMatch(/events_kind_check/);
+
+    const looseMessage = createMockEventsClient({
+      insertError: {
+        code: '23514',
+        message: 'end_date is invalid'
+      }
+    });
+    const looseResult = await createEvent(looseMessage.client, {
+      kind: 'festival',
+      name: 'Rock Week',
+      startDate: '2026-08-20',
+      endDate: '2026-08-22',
+      place: 'Paris'
+    });
+    expect(looseResult.error?.ruleId).toBe('persist_failed');
+  });
 });
 
 describe('listOwnedEvents and getOwnedEvent', () => {
@@ -317,8 +373,17 @@ describe('events store and pages use domain helpers only', () => {
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/useEventsStore/);
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/New night/);
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/New festival/);
-    expect(readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8')).toMatch(/useEventsStore/);
-    expect(readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8')).toMatch(/middleware:\s*'auth'/);
+    const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
+    expect(eventPage).toMatch(/useEventsStore/);
+    expect(eventPage).toMatch(/middleware:\s*'auth'/);
+    expect(eventPage).toMatch(/Loading event/);
+    expect(eventPage).toMatch(/Couldn't load/);
+    expect(eventPage).toMatch(/Event not found/);
+    expect(eventPage).toMatch(/loadFailed|eventsStore\.error|error\.value/);
+
+    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(
+      /Add concert[\s\S]*@click="openCreate\('single_night'\)"/
+    );
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/home\|concerts\|profile\|e/);
   });
 });
