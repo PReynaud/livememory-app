@@ -4,7 +4,7 @@ import { useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
 import { useEventsStore } from '@/stores/events';
-import { eventAllowsPlaceOverride } from '#shared/domain/events';
+import { eventAllowsPlaceOverride, newStageId } from '#shared/domain/events';
 
 type StageDraft = { id?: string; name: string };
 
@@ -20,6 +20,7 @@ const place = ref('');
 const allowPlaceOverride = ref(false);
 const stages = ref<StageDraft[]>([]);
 const concertDates = ref<Record<string, string>>({});
+const concertStages = ref<Record<string, string>>({});
 const formError = ref('');
 const saving = ref(false);
 
@@ -34,6 +35,12 @@ const sheetOpen = computed({
 
 const isFestival = computed(() => currentEvent.value?.kind === 'festival');
 const hasConcerts = computed(() => currentConcerts.value.length > 0);
+const namedStages = computed(() => stages.value.filter(stage => stage.name.trim() && stage.id));
+const showConcertStages = computed(() => hasConcerts.value && namedStages.value.length > 0);
+const stageItems = computed(() => namedStages.value.map(stage => ({
+  label: stage.name.trim(),
+  value: stage.id as string
+})));
 
 const fillFromEvent = () => {
   const event = currentEvent.value;
@@ -49,6 +56,9 @@ const fillFromEvent = () => {
   stages.value = currentStages.value.map(stage => ({ id: stage.id, name: stage.name }));
   concertDates.value = Object.fromEntries(
     currentConcerts.value.map(concert => [concert.id, concert.date])
+  );
+  concertStages.value = Object.fromEntries(
+    currentConcerts.value.map(concert => [concert.id, concert.stage_id ?? ''])
   );
   formError.value = '';
 };
@@ -66,7 +76,7 @@ watch(() => sheet.open, async (isOpen) => {
 });
 
 const addStage = () => {
-  stages.value = [...stages.value, { name: '' }];
+  stages.value = [...stages.value, { id: newStageId(), name: '' }];
 };
 
 const removeStage = (index: number) => {
@@ -84,17 +94,34 @@ const persist = async () => {
   try {
     const event = currentEvent.value;
     const movedNight = event?.kind === 'single_night' && startDate.value !== event.start_date;
+    const namedStageIds = new Set(
+      namedStages.value.flatMap(stage => (stage.id ? [stage.id] : []))
+    );
     const datePatches = currentConcerts.value
       .map((concert) => {
         const nextDate = movedNight
           ? startDate.value
           : (concertDates.value[concert.id] ?? concert.date);
+        const selectedStage = concertStages.value[concert.id] ?? '';
+        const nextStage = namedStageIds.size > 0
+          ? (namedStageIds.has(selectedStage) ? selectedStage : null)
+          : undefined;
         return {
           concertId: concert.id,
-          date: nextDate
+          date: nextDate,
+          stageId: nextStage
         };
       })
-      .filter(patch => patch.date !== currentConcerts.value.find(concert => concert.id === patch.concertId)?.date);
+      .filter((patch) => {
+        const original = currentConcerts.value.find(concert => concert.id === patch.concertId);
+        if (!original) {
+          return false;
+        }
+
+        const dateChanged = patch.date !== original.date;
+        const stageChanged = patch.stageId !== undefined && patch.stageId !== original.stage_id;
+        return dateChanged || stageChanged;
+      });
 
     const result = await eventsStore.updateOwnedEvent({
       eventId: sheet.eventId,
@@ -258,6 +285,28 @@ const slideoverUi = {
             <UInput
               v-model="concertDates[concert.id]"
               type="date"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
+        <div
+          v-if="showConcertStages"
+          class="space-y-2"
+        >
+          <p class="text-[13px] text-muted">
+            Concert stages
+          </p>
+          <UFormField
+            v-for="concert in currentConcerts"
+            :key="`stage-${concert.id}`"
+            :label="concert.artist"
+            :name="`concert-stage-${concert.id}`"
+          >
+            <USelect
+              v-model="concertStages[concert.id]"
+              :items="stageItems"
+              placeholder="Select a Stage or Scene"
               class="w-full"
             />
           </UFormField>

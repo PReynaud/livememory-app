@@ -612,6 +612,8 @@ describe('events store and pages use domain helpers only', () => {
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/AppEditEventSheet/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/updateOwnedEvent/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertDates/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertStages/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).not.toMatch(/firstStage/);
   });
 });
 
@@ -764,6 +766,86 @@ describe('updateEvent', () => {
       p_end_date: '2026-08-12'
     });
     expect(concerts.map(concert => concert.date)).toEqual(['2026-08-10', '2026-08-11']);
+  });
+
+  it('blocks adding Stages when existing Concerts have no stage_id and does not assign the first Stage', async () => {
+    const { client, rpcCalls, updateCalls, concerts } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [justice, phoenix]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      stages: [{ name: 'Main' }, { name: 'Valley' }]
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(EVENT_RULE.concertConflict);
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.concertConflict);
+    expect(result.error?.message).toContain('Justice (20/08/2026)');
+    expect(result.error?.message).toContain('Phoenix (21/08/2026)');
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.requiredStage);
+    expect(result.error?.conflicts).toEqual([
+      expect.objectContaining({
+        concertId: justice.id,
+        artist: 'Justice',
+        date: justice.date,
+        ruleId: EVENT_RULE.requiredStage,
+        message: EVENT_RULE_MESSAGE.requiredStage
+      }),
+      expect.objectContaining({
+        concertId: phoenix.id,
+        artist: 'Phoenix',
+        date: phoenix.date,
+        ruleId: EVENT_RULE.requiredStage,
+        message: EVENT_RULE_MESSAGE.requiredStage
+      })
+    ]);
+    expect(concerts.map(concert => concert.stage_id)).toEqual([null, null]);
+    expect(updateCalls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it('saves new Stages with explicit per-Concert Stage choices in one domain operation', async () => {
+    const mainId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const valleyId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const { client, rpcCalls, concerts, stages } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [justice, phoenix]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      stages: [
+        { id: mainId, name: 'Main' },
+        { id: valleyId, name: 'Valley' }
+      ],
+      concertDates: [
+        { concertId: justice.id, date: justice.date, stageId: mainId },
+        { concertId: phoenix.id, date: phoenix.date, stageId: valleyId }
+      ]
+    });
+
+    expect(result.error).toBeNull();
+    expect(stages.map(stage => stage.name)).toEqual(['Main', 'Valley']);
+    expect(concerts.map(concert => concert.stage_id)).toEqual([mainId, valleyId]);
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toMatchObject({
+      fn: 'save_event_and_concert_dates',
+      p_event_id: festivalRow.id,
+      p_stages: [
+        { id: mainId, name: 'Main' },
+        { id: valleyId, name: 'Valley' }
+      ]
+    });
   });
 
   it('renames a Stage without detaching Concerts', async () => {

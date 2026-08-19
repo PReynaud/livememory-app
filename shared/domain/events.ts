@@ -587,14 +587,7 @@ const applyEventUpdate = async (
     };
   });
 
-  if (proposedStages.length > 0 && input.stages) {
-    const firstStageId = proposedStages[0]?.id;
-    for (const concert of proposedConcerts) {
-      if (!concert.stage_id && firstStageId) {
-        concert.stage_id = firstStageId;
-      }
-    }
-  } else if (input.stages) {
+  if (input.stages && proposedStages.length === 0) {
     for (const concert of proposedConcerts) {
       concert.stage_id = null;
     }
