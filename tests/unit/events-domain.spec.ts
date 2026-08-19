@@ -793,4 +793,27 @@ describe('updateEvent', () => {
     expect(stages[0]?.id).toBe(stage.id);
     expect(concerts[0]?.stage_id).toBe(stage.id);
   });
+
+  it('blocks turning Place-override off when Concert Places differ', async () => {
+    const { client, updateCalls, rpcCalls } = createMockEventsClient({
+      rows: [{ ...festivalRow, allow_place_override: true }],
+      concerts: [{ ...justice, place: 'Lyon' }]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      allowPlaceOverride: false
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(EVENT_RULE.concertConflict);
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.placeConflict);
+    expect(result.error?.message).toContain('Justice');
+    expect(updateCalls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
+  });
 });
