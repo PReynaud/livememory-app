@@ -295,6 +295,7 @@ describe('concerts migration kernel', () => {
     const sql = identityMigration?.sql ?? '';
 
     expect(sql).toMatch(/owner_id/);
+    expect(sql).toMatch(/row_number\(\) over/i);
     expect(sql).toMatch(/create unique index/i);
     expect(sql).toMatch(/lower\(\s*artist\s*\)/i);
     expect(sql).toMatch(/where[\s\S]*time[\s\S]*is not null/i);

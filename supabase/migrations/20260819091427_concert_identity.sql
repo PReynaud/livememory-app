@@ -41,6 +41,23 @@ create trigger concerts_set_owner_id
 
 revoke execute on function public.set_concert_owner_id() from public, anon, authenticated;
 
+-- Story 1.3 allowed timed duplicates. Keep the earliest row per identity.
+delete from public.concerts
+where id in (
+  select ranked.id
+  from (
+    select
+      id,
+      row_number() over (
+        partition by owner_id, lower(artist), date, "time"
+        order by id
+      ) as row_number
+    from public.concerts
+    where "time" is not null
+  ) as ranked
+  where ranked.row_number > 1
+);
+
 create unique index concerts_owner_artist_date_time_idx
   on public.concerts (owner_id, (lower(artist)), date, "time")
   where "time" is not null;
