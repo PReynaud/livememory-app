@@ -236,7 +236,9 @@ test('register from an Event redirect lands on that Event and joins', async ({ p
 
     await page.goto(`/e/${eventId}`);
     await expect(page).toHaveURL(/\/login\?redirect=/);
+    await waitForNuxtHydration(page);
     await page.getByRole('button', { name: 'Need an account? Sign up' }).click();
+    await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible();
     await page.getByLabel('Email').fill(joiner.email);
     await page.getByLabel('Username').fill(joiner.username);
     await page.locator('input[name="password"]').fill(joiner.password);
