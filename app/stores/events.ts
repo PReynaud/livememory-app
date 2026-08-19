@@ -21,8 +21,17 @@ import {
   type ConcertsClient,
   type CreateConcertInput
 } from '#shared/domain/concerts';
+import {
+  clearAttendance,
+  isConcertPast,
+  listMyAttendance,
+  setAttendance,
+  type AttendanceClient,
+  type AttendanceStatus
+} from '#shared/domain/attendance';
 
 export type { ConcertCreateOutcome, ConcertRecord, CreateConcertInput, CreateEventInput, EventKind, EventRecord };
+export type { AttendanceStatus };
 
 type ConcertMutationResult = {
   data: ConcertRecord | null;
@@ -47,13 +56,41 @@ export const useEventsStore = defineStore('events', () => {
   const supabase = useSupabaseClient<Database>();
   const eventsClient = () => supabase as unknown as EventsClient;
   const concertsClient = () => supabase as unknown as ConcertsClient;
+  const attendanceClient = () => supabase as unknown as AttendanceClient;
 
   const events = ref<EventRecord[]>([]);
   const concerts = ref<ConcertRecord[]>([]);
   const currentEvent = ref<EventRecord | null>(null);
   const currentConcerts = ref<ConcertRecord[]>([]);
+  const attendanceByConcertId = ref<Record<string, AttendanceStatus>>({});
   const loading = ref(false);
   const error = ref<string | null>(null);
+
+  const mergeAttendance = (rows: { concert_id: string; status: AttendanceStatus }[]) => {
+    const next: Record<string, AttendanceStatus> = {};
+    for (const row of rows) {
+      next[row.concert_id] = row.status;
+    }
+    attendanceByConcertId.value = next;
+  };
+
+  const loadAttendance = async () => {
+    const listed = await listMyAttendance(attendanceClient());
+    if (listed.error) {
+      return listed.error.message;
+    }
+
+    mergeAttendance(listed.data ?? []);
+    return null;
+  };
+
+  const attendanceStatus = (concertId: string): AttendanceStatus | null => {
+    return attendanceByConcertId.value[concertId] ?? null;
+  };
+
+  const concertIsPast = (concert: Pick<ConcertRecord, 'date' | 'time'>, now?: Date) => {
+    return isConcertPast(concert, now);
+  };
 
   const concertsForEvent = (eventId: string) => {
     return concerts.value.filter(concert => concert.event_id === eventId);
@@ -82,6 +119,12 @@ export const useEventsStore = defineStore('events', () => {
       }
 
       concerts.value = listedConcerts.data ?? [];
+
+      const attendanceError = await loadAttendance();
+      if (attendanceError) {
+        error.value = attendanceError;
+        return { data: events.value, error: attendanceError };
+      }
 
       return { data: events.value, error: null };
     } catch (err: unknown) {
@@ -119,6 +162,12 @@ export const useEventsStore = defineStore('events', () => {
         }
 
         currentConcerts.value = listed.data ?? [];
+      }
+
+      const attendanceError = await loadAttendance();
+      if (attendanceError) {
+        error.value = attendanceError;
+        return { data: result.data, error: attendanceError };
       }
 
       return { data: result.data, error: null };
@@ -212,6 +261,12 @@ export const useEventsStore = defineStore('events', () => {
         );
       }
 
+      const attendanceError = await loadAttendance();
+      if (attendanceError) {
+        error.value = attendanceError;
+        return mutationResult(result.data, attendanceError, result.outcome, null);
+      }
+
       return mutationResult(result.data, null, result.outcome, null);
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to create concert');
@@ -222,17 +277,60 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const cycleAttendance = async (concert: ConcertRecord) => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const current = attendanceStatus(concert.id);
+      const result = current
+        ? await clearAttendance(attendanceClient(), concert.id)
+        : await setAttendance(attendanceClient(), {
+            concertId: concert.id,
+            status: isConcertPast(concert) ? 'attended' : 'going'
+          });
+
+      if (result.error) {
+        error.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      if (current) {
+        attendanceByConcertId.value = Object.fromEntries(
+          Object.entries(attendanceByConcertId.value).filter(([concertId]) => concertId !== concert.id)
+        );
+      } else if (result.data) {
+        attendanceByConcertId.value = {
+          ...attendanceByConcertId.value,
+          [concert.id]: result.data.status
+        };
+      }
+
+      return { data: result.data, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update attendance');
+      error.value = errorMessage;
+      return { data: null, error: errorMessage };
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     events,
     concerts,
     currentEvent,
     currentConcerts,
+    attendanceByConcertId,
     loading,
     error,
     concertsForEvent,
+    attendanceStatus,
+    concertIsPast,
     fetchEvents,
     fetchEvent,
     createOwnedEvent,
-    createOwnedConcert
+    createOwnedConcert,
+    cycleAttendance
   };
 });

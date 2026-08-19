@@ -244,17 +244,24 @@ await eventsStore.fetchEvents();
             <div
               v-for="concert in group.concerts"
               :key="concert.id"
-              class="py-1.5"
+              class="flex items-start justify-between gap-3 py-1.5"
             >
-              <p class="text-base font-semibold">
-                {{ concert.artist }}
-              </p>
-              <p
-                v-if="concert.time"
-                class="text-[13px] text-muted"
-              >
-                {{ formatConcertClock(concert.time) }}
-              </p>
+              <div class="min-w-0">
+                <p class="text-base font-semibold">
+                  {{ concert.artist }}
+                </p>
+                <p
+                  v-if="concert.time"
+                  class="text-[13px] text-muted"
+                >
+                  {{ formatConcertClock(concert.time) }}
+                </p>
+              </div>
+              <AppAttendanceChip
+                :status="eventsStore.attendanceStatus(concert.id)"
+                :is-past="eventsStore.concertIsPast(concert)"
+                @click="void eventsStore.cycleAttendance(concert)"
+              />
             </div>
           </div>
         </template>
