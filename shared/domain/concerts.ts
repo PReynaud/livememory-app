@@ -71,7 +71,7 @@ export type ConcertRecord = {
 
 /** Columns `authenticated` may SELECT on `concerts` after notes moved to `concert_notes`. */
 export const CONCERT_VISIBLE_COLUMNS
-  = 'id,event_id,owner_id,artist,date,time,place,stage_id' as const;
+  = 'id,event_id,owner_id,artist,date,time,place,stage_id' as const;>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
 
 export type CreateConcertResult = DomainResult<ConcertRecord> & {
   outcome: ConcertCreateOutcome | null;
@@ -499,7 +499,7 @@ const listIdentityCandidates = async (
   date: string,
   ownerId?: string | null
 ): Promise<DomainResult<ConcertRecord[]>> => {
-  const byDate = client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('date', date);
+  const byDate = client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('date', date);>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
   const scoped = ownerId ? byDate.eq('owner_id', ownerId) : byDate;
   const { data, error } = await scoped.order('date', { ascending: true });
 
@@ -604,7 +604,7 @@ const writeAttachTime = async (
     .from('concerts')
     .update({ time: draftTime })
     .eq('id', existing.id)
-    .select(CONCERT_VISIBLE_COLUMNS)
+    .select(CONCERT_VISIBLE_COLUMNS)>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
     .single();
 
   if (error && isUniqueViolation(error)) {
@@ -844,7 +844,7 @@ export const createConcert = async (
     stage_id: placement.data.stageId
   };
 
-  const { data, error } = await client.from('concerts').insert(payload).select(CONCERT_VISIBLE_COLUMNS).single();
+  const { data, error } = await client.from('concerts').insert(payload).select(CONCERT_VISIBLE_COLUMNS).single();>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
 
   if (error || !data) {
     await rollbackNewEvent(client, createdEventId);
@@ -908,7 +908,7 @@ const loadConcert = async (
     return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
   }
 
-  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('id', id).maybeSingle();
+  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('id', id).maybeSingle();>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
   if (error) {
     return {
       data: null,
@@ -1054,7 +1054,7 @@ export const updateConcert = async (
     .from('concerts')
     .update(payload)
     .eq('id', current.id)
-    .select(CONCERT_VISIBLE_COLUMNS)
+    .select(CONCERT_VISIBLE_COLUMNS)>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
     .single();
 
   if (error || !data) {
@@ -1171,7 +1171,7 @@ export const moveConcert = async (
     .from('concerts')
     .update(payload)
     .eq('id', existing.data.id)
-    .select(CONCERT_VISIBLE_COLUMNS)
+    .select(CONCERT_VISIBLE_COLUMNS)>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
     .single();
 
   if (error || !data) {
@@ -1224,7 +1224,7 @@ export const listConcertsForEvent = async (
     return ok([]);
   }
 
-  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('event_id', id).order('date', { ascending: true });
+  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).eq('event_id', id).order('date', { ascending: true });>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
 
   if (error) {
     return {
@@ -1269,7 +1269,7 @@ export const listConcertsForEventIds = async (
 
   const { data, error } = await client
     .from('concerts')
-    .select(CONCERT_VISIBLE_COLUMNS)
+    .select(CONCERT_VISIBLE_COLUMNS)>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
     .in('event_id', ids)
     .order('date', { ascending: true });
 
@@ -1297,7 +1297,7 @@ export const listConcertsForEventIds = async (
 export const listOwnedConcerts = async (
   client: ConcertsClient
 ): Promise<DomainResult<ConcertRecord[]>> => {
-  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).order('date', { ascending: true });
+  const { data, error } = await client.from('concerts').select(CONCERT_VISIBLE_COLUMNS).order('date', { ascending: true });>>>>>>> d2b7637 (Load Concerts without notes so joiners can see the Bill and set Attendance.)
 
   if (error) {
     return {

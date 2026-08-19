@@ -67,21 +67,20 @@ const signInOnPage = async (
 
 const chipFor = (page: import('@playwright/test').Page, artist: string) => {
   return page
-    .locator('div.flex.items-start.justify-between')
-    .filter({ hasText: artist })
-    .getByRole('button', { name: /Mark as (going|attended)/ });
+    .getByText(artist, { exact: true })
+    .locator('xpath=following::button[contains(@aria-label,"Mark as")][1]');
 };
 
 test('joiner sets, changes, and clears only their Attendance and can attend this night', async ({
   page
 }, testInfo) => {
-  const owner = await createE2EAccountForTest(`${testInfo.project.name}-${testInfo.title}-owner-${testInfo.retry}`);
-  const joiner = await createE2EAccountForTest(`${testInfo.project.name}-${testInfo.title}-joiner-${testInfo.retry}`);
+  const owner = await createE2EAccountForTest(`j2a-own-${testInfo.workerIndex}-${testInfo.retry}`);
+  const joiner = await createE2EAccountForTest(`j2a-join-${testInfo.workerIndex}-${testInfo.retry}`);
 
   try {
     const ownerSession = await signInRest(owner);
     const start = addUtcDays(parisToday(), 8);
-    const events = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/events`, ownerSession.headers, {
+    const events = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/events?select=id`, ownerSession.headers, {
       kind: 'single_night',
       name: 'Joiner Night',
       start_date: start,
@@ -91,13 +90,13 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const justice = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts`, ownerSession.headers, {
+    const justice = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts?select=id`, ownerSession.headers, {
       event_id: eventId,
       artist: 'Justice',
       date: start,
       place: 'Paris'
     });
-    const fontaines = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts`, ownerSession.headers, {
+    const fontaines = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts?select=id`, ownerSession.headers, {
       event_id: eventId,
       artist: 'Fontaines D.C.',
       date: start,
@@ -110,7 +109,10 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
 
     const notesPatch = await fetch(`${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${justiceId}`, {
       method: 'PATCH',
-      headers: ownerSession.headers,
+      headers: {
+        ...ownerSession.headers,
+        Prefer: 'return=minimal'
+      },
       body: JSON.stringify({ notes: 'Back of the room.' })
     });
     expect(notesPatch.ok).toBe(true);
@@ -198,13 +200,13 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
 });
 
 test('joiner domain and REST Bill writes are blocked', async ({ page }, testInfo) => {
-  const owner = await createE2EAccountForTest(`${testInfo.project.name}-${testInfo.title}-owner-${testInfo.retry}`);
-  const joiner = await createE2EAccountForTest(`${testInfo.project.name}-${testInfo.title}-joiner-${testInfo.retry}`);
+  const owner = await createE2EAccountForTest(`j2b-own-${testInfo.workerIndex}-${testInfo.retry}`);
+  const joiner = await createE2EAccountForTest(`j2b-join-${testInfo.workerIndex}-${testInfo.retry}`);
 
   try {
     const ownerSession = await signInRest(owner);
     const start = addUtcDays(parisToday(), 9);
-    const events = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/events`, ownerSession.headers, {
+    const events = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/events?select=id`, ownerSession.headers, {
       kind: 'festival',
       name: 'Joiner Fest',
       start_date: start,
@@ -214,7 +216,7 @@ test('joiner domain and REST Bill writes are blocked', async ({ page }, testInfo
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const concerts = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts`, ownerSession.headers, {
+    const concerts = await postJson<{ id: string }[]>(`${ownerSession.supabaseUrl}/rest/v1/concerts?select=id`, ownerSession.headers, {
       event_id: eventId,
       artist: 'Justice',
       date: start,
@@ -245,26 +247,38 @@ test('joiner domain and REST Bill writes are blocked', async ({ page }, testInfo
     });
     expect(addConcert.ok).toBe(false);
 
-    const editConcert = await fetch(`${joinerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
-      method: 'PATCH',
-      headers: joinerSession.headers,
-      body: JSON.stringify({ artist: 'Stolen' })
-    });
+    const editConcert = await fetch(
+      `${joinerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,artist`,
+      {
+        method: 'PATCH',
+        headers: joinerSession.headers,
+        body: JSON.stringify({ artist: 'Stolen' })
+      }
+    );
     expect(editConcert.ok).toBe(true);
     expect(await editConcert.json()).toEqual([]);
 
-    const updateEvent = await fetch(`${joinerSession.supabaseUrl}/rest/v1/events?id=eq.${eventId}`, {
-      method: 'PATCH',
-      headers: joinerSession.headers,
-      body: JSON.stringify({ name: 'Stolen Fest' })
-    });
+    const updateEvent = await fetch(
+      `${joinerSession.supabaseUrl}/rest/v1/events?id=eq.${eventId}&select=id,name`,
+      {
+        method: 'PATCH',
+        headers: joinerSession.headers,
+        body: JSON.stringify({ name: 'Stolen Fest' })
+      }
+    );
     expect(updateEvent.ok).toBe(true);
     expect(await updateEvent.json()).toEqual([]);
 
-    const deleteConcert = await fetch(`${joinerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
-      method: 'DELETE',
-      headers: joinerSession.headers
-    });
+    const deleteConcert = await fetch(
+      `${joinerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          ...joinerSession.headers,
+          Prefer: 'return=minimal'
+        }
+      }
+    );
     expect(deleteConcert.ok).toBe(true);
 
     const stillThere = await fetch(
