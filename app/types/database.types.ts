@@ -12,18 +12,18 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          display_name: string | null
           id: string
+          username: string
         }
         Insert: {
           created_at?: string
-          display_name?: string | null
           id: string
+          username: string
         }
         Update: {
           created_at?: string
-          display_name?: string | null
           id?: string
+          username?: string
         }
         Relationships: []
       }
@@ -32,7 +32,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      username_is_taken: { Args: { candidate: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

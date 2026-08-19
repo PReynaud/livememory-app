@@ -2,9 +2,19 @@ import { defineStore } from 'pinia';
 import { computed } from 'vue';
 import { navigateTo, useSupabaseClient, useSupabaseUser } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
+import {
+  EMAIL_TAKEN_ERROR,
+  isDatabaseErrorSavingNewUser,
+  isDuplicateEmailSignUp,
+  mapSignInError,
+  mapSignUpError,
+  USERNAME_TAKEN_ERROR
+} from '@/utils/auth-errors';
+import { isValidUsername, USERNAME_CHARSET_ERROR } from '@/utils/username';
+import type { Database } from '@/types/database.types';
 
 export const useAuthStore = defineStore('auth', () => {
-  const supabase = useSupabaseClient();
+  const supabase = useSupabaseClient<Database>();
   const supabaseUser = useSupabaseUser();
 
   const user = computed(() => supabaseUser.value);
@@ -25,34 +35,83 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error: unknown) {
       return {
         data: null,
-        error: getErrorMessage(error, 'An error occurred during sign in')
+        error: mapSignInError(error)
       };
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const lookupUsernameTaken = async (candidate: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('username_is_taken', { candidate });
+
+    if (error) {
+      return false;
+    }
+
+    return data === true;
+  };
+
+  const signUp = async (email: string, password: string, username: string) => {
+    if (!isValidUsername(username)) {
+      return {
+        data: null,
+        error: USERNAME_CHARSET_ERROR
+      };
+    }
+
     try {
+      if (await lookupUsernameTaken(username)) {
+        return {
+          data: null,
+          error: USERNAME_TAKEN_ERROR
+        };
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          data: {
+            username
+          }
+        }
       });
 
       if (error) {
         throw error;
       }
 
-      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      if (isDuplicateEmailSignUp(data.user)) {
         return {
           data: null,
-          error: 'An account already exists with this email. Please sign in.'
+          error: EMAIL_TAKEN_ERROR
+        };
+      }
+
+      if (!data.user) {
+        return {
+          data: null,
+          error: 'An error occurred during sign up'
         };
       }
 
       return { data, error: null };
     } catch (error: unknown) {
+      const mapped = mapSignUpError(error);
+
+      if (
+        mapped !== USERNAME_TAKEN_ERROR
+        && isDatabaseErrorSavingNewUser(error)
+        && await lookupUsernameTaken(username)
+      ) {
+        return {
+          data: null,
+          error: USERNAME_TAKEN_ERROR
+        };
+      }
+
       return {
         data: null,
-        error: getErrorMessage(error, 'An error occurred during sign up')
+        error: mapped
       };
     }
   };

@@ -19,6 +19,11 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  colorMode: {
+    preference: 'dark',
+    fallback: 'dark'
+  },
+
   runtimeConfig: {
     public: {
       appName: 'LiveMemory App'

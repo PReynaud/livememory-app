@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { watch } from 'vue';
-import { navigateTo, useSupabaseUser } from '#imports';
+import { navigateTo, useRoute, useSupabaseUser } from '#imports';
+import { getSafeInternalPath } from '@/utils/safe-redirect';
 
 const user = useSupabaseUser();
+const route = useRoute();
+
+const getRedirectPath = (): string => getSafeInternalPath(route.query.redirect);
 
 watch(user, (value) => {
   if (value) {
-    navigateTo('/home');
+    navigateTo(getRedirectPath());
   }
 }, { immediate: true });
 </script>

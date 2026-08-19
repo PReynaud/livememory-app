@@ -7,5 +7,6 @@ describe('app.config.ts', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/app.config.ts'), 'utf8');
 
     expect(source).toMatch(/import \{ defineAppConfig \} from '#imports'/);
+    expect(source).toMatch(/primary:\s*'going'/);
   });
 });
