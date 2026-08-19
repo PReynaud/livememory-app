@@ -2,6 +2,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  ATTENDANCE_STATUS,
+  type AttendanceRecord
+} from '../../shared/domain/attendance';
+import {
   createEvent,
   type EventRecord,
   type EventsClient
@@ -14,10 +18,11 @@ import {
   dateOutsideEventMessage,
   listConcertsForEvent,
   listOwnedConcerts,
+  transparentSingleNightName,
   type ConcertRecord,
   type ConcertsClient
 } from '../../shared/domain/concerts';
-import { groupConcertsByDate, shouldShowDayHeaders } from '../../app/utils/concert-groups';
+import { groupConcertsByDate, isCompactBill, eventNameDiffersFromArtist, formatConcertMetaLine, shouldShowDayHeaders } from '../../app/utils/concert-groups';
 
 const migrationsDir = resolve(process.cwd(), 'supabase/migrations');
 
@@ -95,17 +100,95 @@ const createMockConcertsClient = (options?: {
   concertInsertError?: QueryError;
   concertUpdateError?: QueryError;
   missFirstIdentityLookup?: boolean;
+  attendanceInsertError?: QueryError;
 }) => {
   const events = [...(options?.events ?? [])];
   const concerts = [...(options?.concerts ?? [])];
   const concertInserts: Record<string, unknown>[] = [];
   const concertUpdates: Record<string, unknown>[] = [];
+  const concertDeletes: { column: string; value: string }[] = [];
   const eventInserts: Record<string, unknown>[] = [];
   const eventDeletes: { column: string; value: string }[] = [];
+  const attendanceRows: AttendanceRecord[] = [];
+  const attendanceInserts: Record<string, unknown>[] = [];
   let identityLookups = 0;
 
   const client = {
-    from: (table: 'events' | 'concerts') => {
+    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective') => {
+      if (table === 'attendance' || table === 'attendance_effective') {
+        if (table === 'attendance_effective') {
+          return {
+            select: () => ({
+              order: async () => ({ data: attendanceRows, error: null }),
+              eq: (_column: string, value: string) => ({
+                maybeSingle: async () => ({
+                  data: attendanceRows.find(row => row.concert_id === value) ?? null,
+                  error: null
+                })
+              })
+            })
+          };
+        }
+
+        return {
+          insert: (row: Record<string, unknown>) => {
+            attendanceInserts.push(row);
+            return {
+              select: () => ({
+                single: async () => {
+                  if (options?.attendanceInsertError) {
+                    return { data: null, error: options.attendanceInsertError };
+                  }
+
+                  const created: AttendanceRecord = {
+                    id: `dddddddd-dddd-4ddd-8ddd-${String(attendanceRows.length).padStart(12, '0')}`,
+                    user_id: String(row.user_id ?? 'user-1'),
+                    concert_id: String(row.concert_id),
+                    status: row.status === ATTENDANCE_STATUS.attended
+                      ? ATTENDANCE_STATUS.attended
+                      : ATTENDANCE_STATUS.going
+                  };
+                  attendanceRows.push(created);
+                  return { data: created, error: null };
+                }
+              })
+            };
+          },
+          select: () => ({
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => ({
+                data: attendanceRows.find(row => row.concert_id === value) ?? null,
+                error: null
+              })
+            })
+          }),
+          update: (row: Record<string, unknown>) => ({
+            eq: (_column: string, value: string) => ({
+              select: () => ({
+                single: async () => {
+                  const index = attendanceRows.findIndex(entry => entry.concert_id === value);
+                  if (index < 0) {
+                    return { data: null, error: { message: 'attendance not found' } };
+                  }
+
+                  const updated: AttendanceRecord = {
+                    ...attendanceRows[index]!,
+                    status: row.status === ATTENDANCE_STATUS.attended
+                      ? ATTENDANCE_STATUS.attended
+                      : ATTENDANCE_STATUS.going
+                  };
+                  attendanceRows[index] = updated;
+                  return { data: updated, error: null };
+                }
+              })
+            })
+          }),
+          delete: () => ({
+            eq: async () => ({ data: null, error: null })
+          })
+        };
+      }
+
       if (table === 'events') {
         return {
           insert: (row: Record<string, unknown>) => {
@@ -246,7 +329,20 @@ const createMockConcertsClient = (options?: {
               })
             })
           };
-        }
+        },
+        delete: () => ({
+          eq: async (column: string, value: string) => {
+            concertDeletes.push({ column, value });
+            const index = concerts.findIndex(
+              concert => concert[column as keyof ConcertRecord] === value
+            );
+            if (index >= 0) {
+              concerts.splice(index, 1);
+            }
+
+            return { data: null, error: null };
+          }
+        })
       };
     }
   };
@@ -257,8 +353,11 @@ const createMockConcertsClient = (options?: {
     concerts,
     concertInserts,
     concertUpdates,
+    concertDeletes,
     eventInserts,
-    eventDeletes
+    eventDeletes,
+    attendanceInserts,
+    attendanceRows
   };
 };
 
@@ -312,7 +411,7 @@ describe('concerts migration kernel', () => {
 
 describe('createConcert', () => {
   it('creates an owned concert and copies Place from the Event', async () => {
-    const { client, concertInserts } = createMockConcertsClient({
+    const { client, concertInserts, attendanceInserts } = createMockConcertsClient({
       events: [nightRow]
     });
 
@@ -339,6 +438,7 @@ describe('createConcert', () => {
       time: null,
       place: 'Berlin'
     });
+    expect(attendanceInserts).toHaveLength(0);
   });
 
   it('allows a future date and a blank time', async () => {
@@ -397,14 +497,14 @@ describe('createConcert', () => {
     expect(missingDate.error?.ruleId).toBe(CONCERT_RULE.requiredDate);
     expect(missingDate.error?.message).toBe(CONCERT_RULE_MESSAGE.requiredDate);
 
-    const missingEvent = await createConcert(client, {
+    const missingPlace = await createConcert(client, {
       artist: 'Justice',
       date: '2026-08-18'
     });
 
-    expect(missingEvent.data).toBeNull();
-    expect(missingEvent.error?.ruleId).toBe(CONCERT_RULE.requiredEvent);
-    expect(missingEvent.error?.message).toBe(CONCERT_RULE_MESSAGE.requiredEvent);
+    expect(missingPlace.data).toBeNull();
+    expect(missingPlace.error?.ruleId).toBe(CONCERT_RULE.requiredPlace);
+    expect(missingPlace.error?.message).toBe(CONCERT_RULE_MESSAGE.requiredPlace);
     expect(concertInserts).toHaveLength(0);
   });
 
@@ -775,7 +875,7 @@ describe('createConcert', () => {
   });
 
   it('creates a named night Event and Concert in one save', async () => {
-    const { client, eventInserts, concertInserts } = createMockConcertsClient();
+    const { client, eventInserts, concertInserts, attendanceInserts } = createMockConcertsClient();
 
     const result = await createConcert(client, {
       artist: 'Justice',
@@ -803,6 +903,7 @@ describe('createConcert', () => {
       date: '2026-08-10',
       place: 'Berlin'
     });
+    expect(attendanceInserts).toHaveLength(0);
   });
 
   it('rejects a newEvent Concert date outside the Event range without persisting the Event', async () => {
@@ -916,6 +1017,118 @@ describe('createConcert', () => {
     ]);
     expect(events).toHaveLength(0);
   });
+
+  it('names a transparent single_night from the Concert date and Place', () => {
+    expect(transparentSingleNightName('2026-08-18', 'Berlin')).toBe(
+      'Concerts on 18/08/2026 at Berlin'
+    );
+  });
+
+  it('creates a transparent single_night Event and Concert with past Attendance attended', async () => {
+    const { client, eventInserts, concertInserts, attendanceInserts } = createMockConcertsClient();
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-10',
+      place: 'Berlin'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.created);
+    expect(result.data?.artist).toBe('Justice');
+    expect(result.data?.date).toBe('2026-08-10');
+    expect(result.data?.place).toBe('Berlin');
+    expect(eventInserts[0]).toMatchObject({
+      kind: 'single_night',
+      name: 'Concerts on 10/08/2026 at Berlin',
+      start_date: '2026-08-10',
+      end_date: '2026-08-10',
+      place: 'Berlin'
+    });
+    expect(concertInserts[0]).toMatchObject({
+      artist: 'Justice',
+      date: '2026-08-10',
+      place: 'Berlin'
+    });
+    expect(attendanceInserts[0]).toMatchObject({
+      concert_id: result.data?.id,
+      status: ATTENDANCE_STATUS.attended
+    });
+  });
+
+  it('defaults owner Attendance to going when the transparent Concert is still future', async () => {
+    const { client, attendanceInserts } = createMockConcertsClient();
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-12-01',
+      place: 'Lyon',
+      time: '21:00'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.created);
+    expect(attendanceInserts[0]).toMatchObject({
+      concert_id: result.data?.id,
+      status: ATTENDANCE_STATUS.going
+    });
+  });
+
+  it('rolls back the new Concert and Event when transparent Attendance insert fails', async () => {
+    const {
+      client,
+      events,
+      concerts,
+      eventInserts,
+      concertInserts,
+      concertDeletes,
+      eventDeletes,
+      attendanceInserts
+    } = createMockConcertsClient({
+      attendanceInsertError: { message: 'attendance insert denied' }
+    });
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-10',
+      place: 'Berlin'
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe('persist_failed');
+    expect(result.error?.message).toBe('attendance insert denied');
+    expect(eventInserts).toHaveLength(1);
+    expect(concertInserts).toHaveLength(1);
+    expect(attendanceInserts).toHaveLength(1);
+    expect(concertDeletes).toEqual([
+      { column: 'id', value: '44444444-4444-4444-8444-000000000000' }
+    ]);
+    expect(eventDeletes).toEqual([
+      { column: 'id', value: '33333333-3333-4333-8333-333333333333' }
+    ]);
+    expect(concerts).toHaveLength(0);
+    expect(events).toHaveLength(0);
+  });
+
+  it('does not apply owner Attendance default when identity attaches on the transparent path', async () => {
+    const { client, eventInserts, concertInserts, attendanceInserts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice]
+    });
+
+    const attached = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      place: 'Berlin'
+    });
+
+    expect(attached.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(attached.data?.event_id).toBe(nightRow.id);
+    expect(eventInserts).toHaveLength(0);
+    expect(concertInserts).toHaveLength(0);
+    expect(attendanceInserts).toHaveLength(0);
+  });
 });
 
 describe('concert date grouping', () => {
@@ -951,6 +1164,13 @@ describe('concert date grouping', () => {
     expect(shouldShowDayHeaders(festivalRow, [friday])).toBe(true);
     expect(shouldShowDayHeaders(nightRow, [friday])).toBe(false);
     expect(shouldShowDayHeaders(nightRow, [friday, fridayTwo])).toBe(true);
+    expect(isCompactBill([friday])).toBe(true);
+    expect(isCompactBill([friday, fridayTwo])).toBe(false);
+    expect(isCompactBill([])).toBe(false);
+    expect(formatConcertMetaLine(friday)).toBe('20/08/2026 · Paris · 20:15');
+    expect(formatConcertMetaLine(saturday)).toBe('22/08/2026 · Paris');
+    expect(eventNameDiffersFromArtist('Concerts on 20/08/2026 at Paris', 'The Last Dinner Party')).toBe(true);
+    expect(eventNameDiffersFromArtist('Justice', 'justice')).toBe(false);
   });
 });
 
@@ -1042,6 +1262,10 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(concertsPage).toMatch(/New night/);
     expect(concertsPage).toMatch(/New festival/);
     expect(concertsPage).toMatch(/openSheet|openAddSheet/);
+    expect(concertsPage).toMatch(/data-event-card/);
+    expect(concertsPage).toMatch(/isCompactBill/);
+    expect(concertsPage).toMatch(/formatConcertMetaLine/);
+    expect(concertsPage).toMatch(/cycleAttendance/);
 
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/USlideover/);
@@ -1053,6 +1277,8 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(sheet).toMatch(/needs_choice|pendingChoice/);
     expect(sheet).toMatch(/:disabled="pendingChoice"/);
     expect(sheet).toMatch(/label="Cancel"|label='Cancel'/);
+    expect(sheet).toMatch(/isTransparent/);
+    expect(sheet).toMatch(/place: place\.value/);
 
     const app = readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8');
     expect(app).toMatch(/AppAddConcertSheet/);

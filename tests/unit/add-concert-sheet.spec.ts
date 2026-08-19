@@ -60,4 +60,13 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/pendingChoice\.value = false/);
     expect(sheet).not.toMatch(/dismissChoice[\s\S]{0,80}closeSheet/);
   });
+
+  it('saves without an Event by sending Place and omitting eventId', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(sheet).toMatch(/isTransparent/);
+    expect(sheet).toMatch(/v-if="isTransparent"/);
+    expect(sheet).toMatch(/place: place\.value/);
+    expect(sheet).toMatch(/if \(!picker\.value\)/);
+    expect(sheet).toMatch(/if \(!sheet\.eventId\)/);
+  });
 });

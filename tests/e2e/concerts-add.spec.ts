@@ -90,9 +90,12 @@ test('adds a festival concert on a picked day and groups it', async ({ authentic
   await expect(authenticatedPage.getByText('Paris').first()).toBeVisible();
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await expect(authenticatedPage.getByRole('link', { name: /Rock Week/ })).toBeVisible();
-  await expect(authenticatedPage.getByText('The Last Dinner Party')).toBeVisible();
-  await expect(authenticatedPage.getByText('Saturday 22 Aug')).toBeVisible();
+  const compact = authenticatedPage.locator('[data-event-card="compact"]');
+  await expect(compact).toBeVisible();
+  await expect(compact.getByText('The Last Dinner Party')).toBeVisible();
+  await expect(compact.getByText('22/08/2026 · Paris')).toBeVisible();
+  await expect(compact.getByText('Rock Week')).toBeVisible();
+  await expect(authenticatedPage.getByText('Saturday 22 Aug')).toHaveCount(0);
 });
 
 test('opens Add from nav, creates a New night with a concert, and persists', async ({ authenticatedPage, account }) => {

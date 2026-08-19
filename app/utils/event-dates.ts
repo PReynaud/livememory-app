@@ -1,6 +1,6 @@
 import type { EventRecord } from '#shared/domain/events';
 
-const toDisplayDate = (iso: string): string => {
+export const formatCivilDate = (iso: string): string => {
   const [year, month, day] = iso.split('-');
   if (!year || !month || !day) {
     return iso;
@@ -11,8 +11,8 @@ const toDisplayDate = (iso: string): string => {
 
 export const formatEventDateLabel = (event: EventRecord): string => {
   if (event.start_date === event.end_date) {
-    return toDisplayDate(event.start_date);
+    return formatCivilDate(event.start_date);
   }
 
-  return `${toDisplayDate(event.start_date)} – ${toDisplayDate(event.end_date)}`;
+  return `${formatCivilDate(event.start_date)} – ${formatCivilDate(event.end_date)}`;
 };

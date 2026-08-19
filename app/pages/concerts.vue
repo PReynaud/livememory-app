@@ -8,7 +8,10 @@ import { formatEventDateLabel } from '@/utils/event-dates';
 import {
   formatConcertClock,
   formatConcertDayLabel,
+  formatConcertMetaLine,
   groupConcertsByDate,
+  isCompactBill,
+  eventNameDiffersFromArtist,
   shouldShowDayHeaders
 } from '@/utils/concert-groups';
 
@@ -32,6 +35,18 @@ const hasEvents = computed(() => events.value.length > 0);
 const isFestival = computed(() => createKind.value === 'festival');
 
 const concertsFor = (eventId: string) => eventsStore.concertsForEvent(eventId);
+
+const eventCards = computed(() => {
+  return events.value.map((event) => {
+    const concerts = concertsFor(event.id);
+    return {
+      event,
+      concerts,
+      compact: isCompactBill(concerts),
+      concert: concerts[0] ?? null
+    };
+  });
+});
 
 const openCreate = (kind: EventKind) => {
   createKind.value = kind;
@@ -211,60 +226,92 @@ await eventsStore.fetchEvents();
       class="space-y-2.5"
     >
       <section
-        v-for="event in events"
-        :key="event.id"
-        class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2"
+        v-for="card in eventCards"
+        :key="card.event.id"
+        class="rounded-2xl bg-[#1A1A1A] p-4"
+        :class="card.compact ? '' : 'space-y-2'"
+        :data-event-card="card.compact ? 'compact' : 'group'"
       >
-        <NuxtLink
-          :to="`/e/${event.id}`"
-          class="block space-y-1"
+        <div
+          v-if="card.compact && card.concert"
+          class="flex items-start justify-between gap-3"
         >
-          <p class="text-base font-semibold">
-            {{ event.name }}
-          </p>
-          <p class="text-[13px] text-muted">
-            {{ formatEventDateLabel(event) }}
-          </p>
-          <p class="text-[13px] text-muted">
-            {{ event.place }}
-          </p>
-        </NuxtLink>
-        <template v-if="concertsFor(event.id).length">
-          <div
-            v-for="(group, index) in groupConcertsByDate(concertsFor(event.id))"
-            :key="group.date"
-            :class="index > 0 ? 'border-t border-white/10 pt-2' : ''"
+          <NuxtLink
+            :to="`/e/${card.event.id}`"
+            class="min-w-0 flex-1 space-y-1"
           >
-            <p
-              v-if="shouldShowDayHeaders(event, concertsFor(event.id))"
-              class="text-[13px] font-semibold text-muted"
-            >
-              {{ formatConcertDayLabel(group.date) }}
+            <p class="text-base font-semibold">
+              {{ card.concert.artist }}
             </p>
-            <div
-              v-for="concert in group.concerts"
-              :key="concert.id"
-              class="flex items-start justify-between gap-3 py-1.5"
+            <p class="text-[13px] text-muted">
+              {{ formatConcertMetaLine(card.concert) }}
+            </p>
+            <p
+              v-if="eventNameDiffersFromArtist(card.event.name, card.concert.artist)"
+              class="text-[13px] text-muted"
             >
-              <div class="min-w-0">
-                <p class="text-base font-semibold">
-                  {{ concert.artist }}
-                </p>
-                <p
-                  v-if="concert.time"
-                  class="text-[13px] text-muted"
-                >
-                  {{ formatConcertClock(concert.time) }}
-                </p>
+              {{ card.event.name }}
+            </p>
+          </NuxtLink>
+          <AppAttendanceChip
+            :status="eventsStore.attendanceStatus(card.concert.id)"
+            :is-past="eventsStore.concertIsPast(card.concert)"
+            :disabled="eventsStore.isAttendanceBusy(card.concert.id)"
+            @click="void eventsStore.cycleAttendance(card.concert)"
+          />
+        </div>
+        <template v-else>
+          <NuxtLink
+            :to="`/e/${card.event.id}`"
+            class="block space-y-1"
+          >
+            <p class="text-base font-semibold">
+              {{ card.event.name }}
+            </p>
+            <p class="text-[13px] text-muted">
+              {{ formatEventDateLabel(card.event) }}
+            </p>
+            <p class="text-[13px] text-muted">
+              {{ card.event.place }}
+            </p>
+          </NuxtLink>
+          <template v-if="card.concerts.length">
+            <div
+              v-for="(group, index) in groupConcertsByDate(card.concerts)"
+              :key="group.date"
+              :class="index > 0 ? 'border-t border-white/10 pt-2' : ''"
+            >
+              <p
+                v-if="shouldShowDayHeaders(card.event, card.concerts)"
+                class="text-[13px] font-semibold text-muted"
+              >
+                {{ formatConcertDayLabel(group.date) }}
+              </p>
+              <div
+                v-for="concert in group.concerts"
+                :key="concert.id"
+                class="flex items-start justify-between gap-3 py-1.5"
+              >
+                <div class="min-w-0">
+                  <p class="text-base font-semibold">
+                    {{ concert.artist }}
+                  </p>
+                  <p
+                    v-if="concert.time"
+                    class="text-[13px] text-muted"
+                  >
+                    {{ formatConcertClock(concert.time) }}
+                  </p>
+                </div>
+                <AppAttendanceChip
+                  :status="eventsStore.attendanceStatus(concert.id)"
+                  :is-past="eventsStore.concertIsPast(concert)"
+                  :disabled="eventsStore.isAttendanceBusy(concert.id)"
+                  @click="void eventsStore.cycleAttendance(concert)"
+                />
               </div>
-              <AppAttendanceChip
-                :status="eventsStore.attendanceStatus(concert.id)"
-                :is-past="eventsStore.concertIsPast(concert)"
-                :disabled="eventsStore.isAttendanceBusy(concert.id)"
-                @click="void eventsStore.cycleAttendance(concert)"
-              />
             </div>
-          </div>
+          </template>
         </template>
       </section>
     </div>

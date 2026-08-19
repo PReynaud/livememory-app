@@ -55,6 +55,7 @@ const selectedEvent = computed(() => {
 const isNewNight = computed(() => picker.value === NEW_NIGHT);
 const isNewFestival = computed(() => picker.value === NEW_FESTIVAL);
 const isExistingNight = computed(() => selectedEvent.value?.kind === 'single_night');
+const isTransparent = computed(() => !picker.value);
 const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.value));
 const placeLocked = computed(() => Boolean(selectedEvent.value));
 const dateLocked = computed(() => isExistingNight.value || isNewNight.value);
@@ -117,6 +118,12 @@ const resetForOpen = async () => {
   pendingChoice.value = false;
   artist.value = '';
   concertTime.value = '';
+
+  if (!sheet.eventId) {
+    picker.value = '';
+    resetNewEventFields();
+  }
+
   await eventsStore.fetchEvents({ silent: true });
 
   if (sheet.eventId) {
@@ -125,9 +132,6 @@ const resetForOpen = async () => {
     if (event) {
       applyEvent(event);
     }
-  } else {
-    picker.value = '';
-    resetNewEventFields();
   }
 
   await focusArtist();
@@ -190,6 +194,16 @@ const buildInput = (confirm?: 'attach' | 'create') => {
         endDate: endDate.value,
         place: place.value
       }
+    };
+  }
+
+  if (!picker.value) {
+    return {
+      artist: artist.value,
+      date: concertDate.value,
+      time: concertTime.value,
+      place: place.value,
+      confirm
     };
   }
 
@@ -346,6 +360,19 @@ const slideoverUi = {
             />
           </UFormField>
         </template>
+
+        <UFormField
+          v-if="isTransparent"
+          label="Date"
+          name="date"
+        >
+          <UInput
+            v-model="concertDate"
+            type="date"
+            :disabled="pendingChoice"
+            class="w-full"
+          />
+        </UFormField>
 
         <UFormField
           v-if="isNewNight || isExistingNight"

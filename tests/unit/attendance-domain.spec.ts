@@ -369,12 +369,7 @@ describe('setAttendance / clearAttendance / listMyAttendance', () => {
   });
 });
 
-describe('attendance stays off createConcert, pages, and the store query path', () => {
-  it('does not insert attendance from createConcert', () => {
-    const concertsDomain = readFileSync(resolve(process.cwd(), 'shared/domain/concerts.ts'), 'utf8');
-    expect(concertsDomain).not.toMatch(/attendance/i);
-  });
-
+describe('attendance stays off pages and the store query path', () => {
   it('keeps Attendance queries in shared/domain and chips on Event and Concerts rows', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
     expect(store).toMatch(/from '#shared\/domain\/attendance'/);
@@ -410,7 +405,8 @@ describe('attendance stays off createConcert, pages, and the store query path', 
     const concertsPage = readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8');
     expect(concertsPage).toMatch(/AppAttendanceChip/);
     expect(concertsPage).toMatch(/isAttendanceBusy/);
-    expect(concertsPage).not.toMatch(/compact card|compactCard/i);
+    expect(concertsPage).toMatch(/data-event-card/);
+    expect(concertsPage).toMatch(/cycleAttendance/);
 
     const chip = readFileSync(resolve(process.cwd(), 'app/components/AppAttendanceChip.vue'), 'utf8');
     expect(chip).toMatch(/<button/);
@@ -422,6 +418,7 @@ describe('attendance stays off createConcert, pages, and the store query path', 
     expect(chip).toMatch(/border-dashed/);
     expect(chip).toMatch(/focus-visible/);
     expect(chip).toMatch(/motion-reduce|prefers-reduced-motion/);
+    expect(chip).toMatch(/click\.stop/);
     expect(chip).not.toMatch(/bg-\[#A3A3A3\]/);
     expect(chip).not.toMatch(/Set|On the bill|Skipped/);
   });
