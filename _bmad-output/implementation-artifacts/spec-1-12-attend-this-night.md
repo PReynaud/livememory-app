@@ -2,7 +2,7 @@
 title: 'Story 1.12: Attend this night'
 type: 'feature'
 created: '2026-08-19'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '03397057d026598352f5cbf9a1761aac4ccbca57'
 review_loop_iteration: 0
 context:
@@ -61,11 +61,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/attendance-domain.spec.ts` -- Red tests for matrix + Event CTA source-guards
-- [ ] `tests/e2e/attend-this-night.spec.ts` -- Red journey: soirée attend-all, later add unset, clear one, festival has no control
-- [ ] `shared/domain/attendance.ts` -- `attendThisNight` one-shot; festival named refuse
-- [ ] `app/stores/events.ts` -- `attendThisNight` adapter, no global loading
-- [ ] `app/pages/e/[id].vue` -- **Attend this night** on `single_night` with Concerts only
+- [x] `tests/unit/attendance-domain.spec.ts` -- Red tests for matrix + Event CTA source-guards
+- [x] `tests/e2e/attend-this-night.spec.ts` -- Red journey: soirée attend-all, later add unset, clear one, festival has no control
+- [x] `shared/domain/attendance.ts` -- `attendThisNight` one-shot; festival named refuse
+- [x] `app/stores/events.ts` -- `attendThisNight` adapter, no global loading
+- [x] `app/pages/e/[id].vue` -- **Attend this night** on `single_night` with Concerts only
 
 **Acceptance Criteria:**
 - Given a `single_night` Event with Concerts on the Bill, when I tap **Attend this night**, then each current Concert becomes `going` before the Europe/Paris boundary and `attended` after it.

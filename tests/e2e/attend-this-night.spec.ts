@@ -30,7 +30,7 @@ const createNightWithArtists = async (
   }
 };
 
-test('marks every current Concert on a future night, leaves later adds and cleared chips unset', async ({ authenticatedPage }) => {
+test('future night attend-all marks Going, later add unset, clear stays unset', async ({ authenticatedPage }) => {
   await createNightWithArtists(authenticatedPage, {
     name: 'Club Night',
     date: '2026-12-01',
@@ -65,7 +65,7 @@ test('marks every current Concert on a future night, leaves later adds and clear
   await expect(authenticatedPage.getByText('Justice')).toBeVisible();
 });
 
-test('marks every current Concert on a past night as Attended', async ({ authenticatedPage }) => {
+test('past night attend-all marks Attended', async ({ authenticatedPage }) => {
   await createNightWithArtists(authenticatedPage, {
     name: 'Past Night',
     date: '2026-08-18',
@@ -80,7 +80,7 @@ test('marks every current Concert on a past night as Attended', async ({ authent
   await expect(chipFor(authenticatedPage, 'Fontaines D.C.')).toHaveText('Attended');
 });
 
-test('hides Attend this night on a festival Event', async ({ authenticatedPage }) => {
+test('festival Event hides Attend this night', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await authenticatedPage.getByRole('button', { name: 'New festival' }).click();
   await authenticatedPage.getByLabel('Name').fill('Rock Week');
