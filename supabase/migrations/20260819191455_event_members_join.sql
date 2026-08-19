@@ -116,6 +116,41 @@ grant select on table public.concert_notes to authenticated;
 grant update (notes) on table public.concert_notes to authenticated;
 revoke all on table public.concert_notes from public, anon;
 
+-- Invoker functions cannot SELECT * after notes were revoked. Keep the rowtype
+-- aligned with table column order and fill notes with null.
+create or replace function public.assert_event_bill_valid(p_event_id uuid)
+returns void
+language plpgsql
+stable
+security invoker
+set search_path = public
+as $$
+declare
+  concert public.concerts%rowtype;
+  violation text;
+begin
+  for concert in
+    select
+      id,
+      event_id,
+      artist,
+      date,
+      "time",
+      place,
+      owner_id,
+      null::text,
+      stage_id
+    from public.concerts
+    where event_id = p_event_id
+  loop
+    violation := public.concert_event_rule_violation(concert);
+    if violation is not null then
+      raise exception '%', violation;
+    end if;
+  end loop;
+end;
+$$;
+
 drop policy if exists "Authenticated users can select stages on owned events" on public.event_stages;
 
 create policy "Authenticated users can select stages on owned or joined events"

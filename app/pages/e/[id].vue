@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { definePageMeta, useRoute, useSupabaseUser, useToast } from '#imports';
+import { definePageMeta, useRoute, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEventsStore, type ConcertRecord } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
@@ -20,21 +20,16 @@ definePageMeta({
 
 const route = useRoute();
 const toast = useToast();
-const user = useSupabaseUser();
 const eventsStore = useEventsStore();
 const addSheet = useAddConcertSheetStore();
 const editEventSheet = useEditEventSheetStore();
-const { currentEvent, currentConcerts, error } = storeToRefs(eventsStore);
+const { currentEvent, currentConcerts, error, isOwner } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
 const copyBusy = ref(false);
 
 const eventId = computed(() => {
   const id = route.params.id;
   return typeof id === 'string' ? id : '';
-});
-
-const isOwner = computed(() => {
-  return Boolean(currentEvent.value && user.value?.id === currentEvent.value.owner_id);
 });
 
 const notFound = computed(() => {

@@ -80,6 +80,8 @@ describe('event_members kernel', () => {
     expect(sql).toMatch(/concerts\.owner_id = \(select auth\.uid\(\)\)/);
     expect(sql).toMatch(/grant select on table public\.concert_notes to authenticated/);
     expect(sql).toMatch(/grant update \(notes\) on table public\.concert_notes to authenticated/);
+    expect(sql).toMatch(/create or replace function public\.assert_event_bill_valid/);
+    expect(sql).not.toMatch(/select \*\s+from public\.concerts/);
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/for delete/);
   });
@@ -150,9 +152,12 @@ describe('join surfaces', () => {
     expect(fetchEvent).toMatch(/joinEvent/);
     expect(fetchEvent.indexOf('getOwnedEvent')).toBeLessThan(fetchEvent.indexOf('joinEvent'));
     expect(fetchEvent).toMatch(/if \(joined\.data\)/);
+    expect(store).toMatch(/auth\.getUser/);
+    expect(store).toMatch(/isOwner\.value = Boolean\(data\.user\?\.id && data\.user\.id === event\.owner_id\)/);
 
     const page = read('app/pages/e/[id].vue');
     expect(page).toMatch(/isOwner/);
+    expect(page).not.toMatch(/useSupabaseUser/);
     expect(page).toMatch(/Copy link/);
     expect(page).toMatch(/copyEventLink/);
     expect(page).toMatch(/COPY_LINK_FAILED/);

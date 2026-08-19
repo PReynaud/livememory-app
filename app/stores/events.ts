@@ -87,6 +87,7 @@ export const useEventsStore = defineStore('events', () => {
   const events = ref<EventRecord[]>([]);
   const concerts = ref<ConcertRecord[]>([]);
   const currentEvent = ref<EventRecord | null>(null);
+  const isOwner = ref(false);
   const currentConcerts = ref<ConcertRecord[]>([]);
   const currentStages = ref<EventStageRecord[]>([]);
   const stagesByEventId = ref<Record<string, EventStageRecord[]>>({});
@@ -107,6 +108,16 @@ export const useEventsStore = defineStore('events', () => {
 
     toast.add({ title: OFFLINE_TOAST_TITLE });
     return OFFLINE_TOAST_TITLE;
+  };
+
+  const syncOwner = async (event: EventRecord | null) => {
+    if (!event) {
+      isOwner.value = false;
+      return;
+    }
+
+    const { data } = await supabase.auth.getUser();
+    isOwner.value = Boolean(data.user?.id && data.user.id === event.owner_id);
   };
 
   const mergeConcertsForEvents = (eventIds: string[], incoming: ConcertRecord[]) => {
@@ -275,6 +286,7 @@ export const useEventsStore = defineStore('events', () => {
     loading.value = true;
     error.value = null;
     currentEvent.value = null;
+    isOwner.value = false;
     currentConcerts.value = [];
     currentStages.value = [];
 
@@ -303,6 +315,7 @@ export const useEventsStore = defineStore('events', () => {
       }
 
       currentEvent.value = result.data;
+      await syncOwner(result.data);
 
       if (result.data) {
         const listed = await listConcertsForEvent(concertsClient(), id);
@@ -401,6 +414,7 @@ export const useEventsStore = defineStore('events', () => {
         }
 
         currentEvent.value = result.data;
+        await syncOwner(result.data);
         const stages = await listEventStages(eventsClient(), result.data.id);
         if (!stages.error) {
           currentStages.value = stages.data ?? [];
@@ -653,6 +667,7 @@ export const useEventsStore = defineStore('events', () => {
 
       if (currentEvent.value?.id === eventId) {
         currentEvent.value = null;
+        isOwner.value = false;
         currentConcerts.value = [];
         currentStages.value = [];
       }
@@ -762,6 +777,7 @@ export const useEventsStore = defineStore('events', () => {
     events,
     concerts,
     currentEvent,
+    isOwner,
     currentConcerts,
     currentStages,
     stagesByEventId,
