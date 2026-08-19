@@ -712,6 +712,34 @@ export const updateEvent = async (
   });
 };
 
+export const deleteEvent = async (
+  client: EventsClient,
+  eventId: string
+): Promise<DomainResult<{ id: string }>> => {
+  const id = trim(eventId);
+  if (!id) {
+    return fail(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
+  }
+
+  const existing = await getOwnedEvent(client, id);
+  if (existing.error) {
+    return { data: null, error: existing.error };
+  }
+  if (!existing.data) {
+    return fail(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
+  }
+
+  const { error } = await client.from('events').delete().eq('id', existing.data.id);
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  return ok({ id: existing.data.id });
+};
+
 export const listOwnedEvents = async (
   client: EventsClient,
   options?: { now?: Date }

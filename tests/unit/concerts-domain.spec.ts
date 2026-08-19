@@ -2074,7 +2074,7 @@ describe('concerts store and pages use domain helpers only', () => {
 
     const deleteFn = store.slice(
       store.indexOf('const deleteOwnedConcert ='),
-      store.indexOf('const cycleAttendance =')
+      store.indexOf('const deleteOwnedEvent =')
     );
     expect(deleteFn).toMatch(/dropOwnedConcert|omitConcert/);
     expect(deleteFn.search(/dropOwnedConcert|omitConcert/)).toBeLessThan(
@@ -2082,6 +2082,14 @@ describe('concerts store and pages use domain helpers only', () => {
     );
     expect(deleteFn).toMatch(/error: null/);
     expect(deleteFn).not.toMatch(/return \{ data: null, error: listed/);
+
+    const deleteEventFn = store.slice(
+      store.indexOf('const deleteOwnedEvent ='),
+      store.indexOf('const cycleAttendance =')
+    );
+    expect(deleteEventFn).toMatch(/deleteEvent/);
+    expect(deleteEventFn).toMatch(/error: null/);
+    expect(deleteEventFn).toMatch(/reloadOwnedConcertState/);
 
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
