@@ -901,7 +901,7 @@ export const updateConcert = async (
 
   const stagesResult = await listStagesForEvent(client, eventResult.data.id);
   if (stagesResult.error) {
-    return { data: null, error: stagesResult.error };
+    return { data: null, error: stagesResult.error, outcome: null };
   }
 
   const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
@@ -909,7 +909,7 @@ export const updateConcert = async (
     stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId
   });
   if (placement.error || !placement.data) {
-    return { data: null, error: placement.error };
+    return { data: null, error: placement.error, outcome: null };
   }
 
   const payload = {
