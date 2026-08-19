@@ -9,26 +9,28 @@ import {
 describe('add concert sheet open/close state', () => {
   it('keeps a locked Bill when openSheet is called without options while already open', () => {
     const locked = openAddConcertSheetState(
-      { open: false, eventId: null, lockEvent: false },
+      { open: false, eventId: null, lockEvent: false, concertId: null },
       { eventId: 'event-1', lockEvent: true }
     );
 
     expect(locked).toEqual({
       open: true,
       eventId: 'event-1',
-      lockEvent: true
+      lockEvent: true,
+      concertId: null
     });
 
     expect(openAddConcertSheetState(locked)).toEqual({
       open: true,
       eventId: 'event-1',
-      lockEvent: true
+      lockEvent: true,
+      concertId: null
     });
   });
 
   it('clears lock when opening from closed without options, and closeSheet clears lock', () => {
     const locked = openAddConcertSheetState(
-      { open: false, eventId: null, lockEvent: false },
+      { open: false, eventId: null, lockEvent: false, concertId: null },
       { eventId: 'event-1', lockEvent: true }
     );
     const closed = closedAddConcertSheetState();
@@ -36,21 +38,39 @@ describe('add concert sheet open/close state', () => {
     expect(closed).toEqual({
       open: false,
       eventId: null,
-      lockEvent: false
+      lockEvent: false,
+      concertId: null
     });
     expect(closed.eventId).not.toBe(locked.eventId);
 
     expect(openAddConcertSheetState(closed)).toEqual({
       open: true,
       eventId: null,
-      lockEvent: false
+      lockEvent: false,
+      concertId: null
     });
+  });
+
+  it('opens edit mode with a concertId and closeSheet clears it', () => {
+    const editing = openAddConcertSheetState(
+      { open: false, eventId: null, lockEvent: false, concertId: null },
+      { eventId: 'event-1', lockEvent: true, concertId: 'concert-1' }
+    );
+
+    expect(editing).toEqual({
+      open: true,
+      eventId: 'event-1',
+      lockEvent: true,
+      concertId: 'concert-1'
+    });
+    expect(closedAddConcertSheetState().concertId).toBeNull();
   });
 
   it('wires the store to the open/close helpers', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/add-concert-sheet.ts'), 'utf8');
     expect(store).toMatch(/openAddConcertSheetState/);
     expect(store).toMatch(/closedAddConcertSheetState/);
+    expect(store).toMatch(/concertId/);
   });
 
   it('keeps the Add draft when choice cancel does not close the sheet', () => {
@@ -68,5 +88,31 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/place: place\.value/);
     expect(sheet).toMatch(/if \(!picker\.value\)/);
     expect(sheet).toMatch(/if \(!sheet\.eventId\)/);
+  });
+
+  it('reuses the glass sheet for edit, notes, and delete without joiner copy', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(sheet).toMatch(/Edit concert/);
+    expect(sheet).toMatch(/Private\. Never on your public profile\./);
+    expect(sheet).toMatch(/updateOwnedConcert/);
+    expect(sheet).toMatch(/deleteOwnedConcert/);
+    expect(sheet).toMatch(/Delete this concert\?/);
+    expect(sheet).not.toMatch(/joiner/i);
+  });
+
+  it('runs Concert identity on edit and keeps the draft for needs_choice', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
+    const editBlock = persist.slice(
+      persist.indexOf('updateOwnedConcert'),
+      persist.indexOf('createOwnedConcert')
+    );
+
+    expect(editBlock).toMatch(/confirm/);
+    expect(editBlock).toMatch(/needs_choice/);
+    expect(editBlock).toMatch(/pendingChoice\.value = true/);
+    expect(editBlock).toMatch(/impossible_place/);
+    expect(editBlock).toMatch(/attached/);
+    expect(persist).not.toMatch(/dismissChoice[\s\S]{0,80}closeSheet/);
   });
 });

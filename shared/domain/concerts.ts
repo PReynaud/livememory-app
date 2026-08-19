@@ -19,7 +19,8 @@ export const CONCERT_RULE = {
   requiredPlace: 'required_place',
   dateOutsideEvent: 'date_outside_event',
   impossiblePlace: 'impossible_place',
-  needsChoice: 'needs_choice'
+  needsChoice: 'needs_choice',
+  ownership: 'ownership'
 } as const;
 
 export const CONCERT_RULE_MESSAGE = {
@@ -30,7 +31,8 @@ export const CONCERT_RULE_MESSAGE = {
   dateOutsideEvent: 'This date is outside the Event.',
   impossiblePlace: 'This concert already exists at a different Place.',
   needsChoice: 'This artist and date already exist. Attach to the existing concert or create another.',
-  otherEvent: 'This concert already exists on another Event.'
+  otherEvent: 'This concert already exists on another Event.',
+  ownership: 'You do not own this concert.'
 } as const;
 
 export const CONCERT_IDENTITY = {
@@ -52,6 +54,7 @@ export type ConcertRecord = {
   date: string;
   time: string | null;
   place: string;
+  notes?: string | null;
 };
 
 export type CreateConcertResult = DomainResult<ConcertRecord> & {
@@ -65,6 +68,15 @@ export type CreateConcertInput = {
   place?: string;
   eventId?: string;
   newEvent?: CreateEventInput;
+  confirm?: ConcertIdentityConfirm;
+};
+
+export type UpdateConcertInput = {
+  concertId: string;
+  artist: string;
+  date: string;
+  time?: string | null;
+  notes?: string | null;
   confirm?: ConcertIdentityConfirm;
 };
 
@@ -362,6 +374,42 @@ const pickAttachTarget = (
   return overlap[0] ?? null;
 };
 
+type IdentityDecision
+  = { kind: 'return'; result: CreateConcertResult }
+    | { kind: 'attach'; target: ConcertRecord }
+    | { kind: 'proceed' };
+
+const decideIdentity = (
+  candidates: ConcertRecord[],
+  draftTime: string | null,
+  targetPlace: string,
+  confirm?: ConcertIdentityConfirm
+): IdentityDecision => {
+  const exactTimed = timedMatch(candidates, draftTime);
+  if (exactTimed) {
+    return { kind: 'return', result: concludeTimedMatch(exactTimed, targetPlace) };
+  }
+
+  const overlap = untimedOverlap(candidates, draftTime);
+  if (overlap.length > 0 && confirm !== 'create') {
+    const existing = pickAttachTarget(overlap, draftTime);
+    if (existing && confirm === 'attach') {
+      return { kind: 'attach', target: existing };
+    }
+
+    return {
+      kind: 'return',
+      result: {
+        data: existing ?? null,
+        error: null,
+        outcome: CONCERT_IDENTITY.needsChoice
+      }
+    };
+  }
+
+  return { kind: 'proceed' };
+};
+
 const writeAttachTime = async (
   client: ConcertsClient,
   existing: ConcertRecord,
@@ -539,23 +587,13 @@ export const createConcert = async (
   }
 
   const candidates = candidatesResult.data ?? [];
-  const exactTimed = timedMatch(candidates, draftTime);
-  if (exactTimed) {
-    return concludeTimedMatch(exactTimed, target.data.place);
+  const decision = decideIdentity(candidates, draftTime, target.data.place, request.confirm);
+  if (decision.kind === 'return') {
+    return decision.result;
   }
 
-  const overlap = untimedOverlap(candidates, draftTime);
-  if (overlap.length > 0 && request.confirm !== 'create') {
-    const existing = pickAttachTarget(overlap, draftTime);
-    if (existing && request.confirm === 'attach') {
-      return writeAttachTime(client, existing, draftTime, target.data.place);
-    }
-
-    return {
-      data: existing,
-      error: null,
-      outcome: CONCERT_IDENTITY.needsChoice
-    };
+  if (decision.kind === 'attach') {
+    return writeAttachTime(client, decision.target, draftTime, target.data.place);
   }
 
   let event = target.data.event;
@@ -640,6 +678,198 @@ export const createConcert = async (
   }
 
   return okCreate(data, CONCERT_IDENTITY.created);
+};
+
+const optionalNotes = (value: string | null | undefined): string | null => {
+  const notes = trim(value);
+  return notes || null;
+};
+
+const loadConcert = async (
+  client: ConcertsClient,
+  concertId: string
+): Promise<DomainResult<ConcertRecord>> => {
+  const id = trim(concertId);
+  if (!id) {
+    return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
+  }
+
+  const { data, error } = await client.from('concerts').select('*').eq('id', id).maybeSingle();
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  if (!data) {
+    return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
+  }
+
+  return ok(data);
+};
+
+export const updateConcert = async (
+  client: ConcertsClient,
+  input: UpdateConcertInput
+): Promise<CreateConcertResult> => {
+  const artist = trim(input.artist);
+  if (!artist) {
+    return failCreate(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
+  }
+
+  const date = trim(input.date);
+  if (!date || !CIVIL_DATE.test(date)) {
+    return failCreate(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
+  }
+
+  const existing = await loadConcert(client, input.concertId);
+  if (existing.error || !existing.data) {
+    return {
+      data: null,
+      error: existing.error,
+      outcome: null
+    };
+  }
+
+  const current = existing.data;
+
+  const eventResult = await resolveEvent(client, {
+    artist,
+    date,
+    eventId: current.event_id
+  });
+  if (eventResult.error || !eventResult.data) {
+    return {
+      data: null,
+      error: eventResult.error,
+      outcome: null
+    };
+  }
+
+  if (!isDateInsideEvent(date, eventResult.data)) {
+    return failCreate(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
+  }
+
+  const draftTime = normalizeClock(input.time);
+  const identityUnchanged
+    = sameArtist(current.artist, artist)
+      && current.date === date
+      && normalizeClock(current.time) === draftTime;
+
+  if (!identityUnchanged) {
+    const candidatesResult = await listIdentityCandidates(
+      client,
+      artist,
+      date,
+      current.owner_id
+    );
+    if (candidatesResult.error) {
+      return {
+        data: null,
+        error: candidatesResult.error,
+        outcome: null
+      };
+    }
+
+    const candidates = (candidatesResult.data ?? []).filter(
+      concert => concert.id !== current.id
+    );
+    const decision = decideIdentity(
+      candidates,
+      draftTime,
+      eventResult.data.place,
+      input.confirm
+    );
+    if (decision.kind === 'return') {
+      return decision.result;
+    }
+
+    if (decision.kind === 'attach') {
+      return writeAttachTime(client, decision.target, draftTime, eventResult.data.place);
+    }
+  }
+
+  const payload = {
+    artist,
+    date,
+    time: draftTime,
+    place: eventResult.data.place,
+    notes: optionalNotes(input.notes)
+  };
+
+  const { data, error } = await client
+    .from('concerts')
+    .update(payload)
+    .eq('id', current.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    if (error && isUniqueViolation(error)) {
+      const retry = await listIdentityCandidates(
+        client,
+        artist,
+        date,
+        current.owner_id
+      );
+      if (retry.error) {
+        return {
+          data: null,
+          error: retry.error,
+          outcome: null
+        };
+      }
+
+      const raced = timedMatch(
+        (retry.data ?? []).filter(concert => concert.id !== current.id),
+        draftTime
+      );
+      if (raced) {
+        return concludeTimedMatch(raced, eventResult.data.place);
+      }
+
+      return failCreate(
+        CONCERT_RULE.impossiblePlace,
+        CONCERT_RULE_MESSAGE.impossiblePlace,
+        CONCERT_IDENTITY.impossiblePlace
+      );
+    }
+
+    return failCreate('persist_failed', error?.message ?? 'Failed to update concert');
+  }
+
+  return {
+    data,
+    error: null,
+    outcome: null
+  };
+};
+
+export const deleteConcert = async (
+  client: ConcertsClient,
+  concertId: string
+): Promise<DomainResult<{ id: string; event_id: string }>> => {
+  const existing = await loadConcert(client, concertId);
+  if (existing.error || !existing.data) {
+    return {
+      data: null,
+      error: existing.error
+    };
+  }
+
+  const { error } = await client.from('concerts').delete().eq('id', existing.data.id);
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  return ok({
+    id: existing.data.id,
+    event_id: existing.data.event_id
+  });
 };
 
 export const listConcertsForEvent = async (

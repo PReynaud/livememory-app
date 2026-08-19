@@ -16,9 +16,11 @@ import {
   CONCERT_RULE_MESSAGE,
   createConcert,
   dateOutsideEventMessage,
+  deleteConcert,
   listConcertsForEvent,
   listOwnedConcerts,
   transparentSingleNightName,
+  updateConcert,
   type ConcertRecord,
   type ConcertsClient
 } from '../../shared/domain/concerts';
@@ -259,7 +261,8 @@ const createMockConcertsClient = (options?: {
                   artist: String(row.artist),
                   date: String(row.date),
                   time: row.time == null || row.time === '' ? null : String(row.time),
-                  place: String(row.place)
+                  place: String(row.place),
+                  notes: row.notes == null || row.notes === '' ? null : String(row.notes)
                 };
                 concerts.push(created);
                 return { data: created, error: null };
@@ -319,9 +322,18 @@ const createMockConcertsClient = (options?: {
                     return { data: null, error: { message: 'concert not found' } };
                   }
 
+                  const current = concerts[index]!;
                   const updated: ConcertRecord = {
-                    ...concerts[index]!,
-                    time: row.time == null || row.time === '' ? null : String(row.time)
+                    ...current,
+                    artist: row.artist === undefined ? current.artist : String(row.artist),
+                    date: row.date === undefined ? current.date : String(row.date),
+                    time: row.time === undefined
+                      ? current.time
+                      : (row.time == null || row.time === '' ? null : String(row.time)),
+                    place: row.place === undefined ? current.place : String(row.place),
+                    notes: row.notes === undefined
+                      ? current.notes
+                      : (row.notes == null || row.notes === '' ? null : String(row.notes))
                   };
                   concerts[index] = updated;
                   return { data: updated, error: null };
@@ -337,7 +349,13 @@ const createMockConcertsClient = (options?: {
               concert => concert[column as keyof ConcertRecord] === value
             );
             if (index >= 0) {
+              const removed = concerts[index]!;
               concerts.splice(index, 1);
+              for (let attendanceIndex = attendanceRows.length - 1; attendanceIndex >= 0; attendanceIndex -= 1) {
+                if (attendanceRows[attendanceIndex]?.concert_id === removed.id) {
+                  attendanceRows.splice(attendanceIndex, 1);
+                }
+              }
             }
 
             return { data: null, error: null };
@@ -406,6 +424,29 @@ describe('concerts migration kernel', () => {
     expect(sql).not.toMatch(/for delete/i);
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/where time is null/i);
+  });
+
+  it('adds owner notes, owner delete, and keeps event_id NOT NULL', () => {
+    const notesMigration = readMigrations().find(file => file.name.includes('concert_notes_edit_delete'));
+
+    expect(notesMigration).toBeTruthy();
+    const sql = notesMigration?.sql ?? '';
+
+    expect(sql).toMatch(/add column notes text/i);
+    expect(sql).toMatch(/grant delete/i);
+    expect(sql).toMatch(/for delete/i);
+    expect(sql).toMatch(/for update/i);
+    expect(sql).toMatch(/\(select auth\.uid\(\)\)\s*=\s*owner_id/);
+    expect(sql).toMatch(/concerts_protect_identity/);
+    expect(sql).toMatch(/event_id is distinct from old\.event_id/);
+    expect(sql).toMatch(/drop[\s\S]*concerts_attach_time_only/);
+    expect(sql).toMatch(/btrim\(\s*concerts\.artist\s*\)\s*<>\s*''/);
+    expect(sql).not.toMatch(/service_role/);
+    expect(sql).not.toMatch(/joiner/i);
+
+    const allSql = readMigrations().map(file => file.sql).join('\n');
+    expect(allSql).toMatch(/event_id\s+uuid\s+not null/i);
+    expect(allSql).toMatch(/concert_id uuid not null references public\.concerts \(id\) on delete cascade/);
   });
 });
 
@@ -1131,6 +1172,247 @@ describe('createConcert', () => {
   });
 });
 
+describe('updateConcert and deleteConcert', () => {
+  it('saves owner notes and never writes event_id', async () => {
+    const existing: ConcertRecord = {
+      ...timedJustice,
+      notes: null
+    };
+    const { client, concertUpdates, events } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [existing]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: existing.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      notes: '  Back of the room.  '
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.notes).toBe('Back of the room.');
+    expect(result.data?.event_id).toBe(nightRow.id);
+    expect(concertUpdates[0]).toMatchObject({
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      place: 'Berlin',
+      notes: 'Back of the room.'
+    });
+    expect(concertUpdates[0]).not.toHaveProperty('event_id');
+    expect(events).toHaveLength(1);
+  });
+
+  it('saves notes on a duplicate untimed Concert without treating self as a collision', async () => {
+    const first: ConcertRecord = { ...timedJustice, time: null, notes: null };
+    const second: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      time: null,
+      notes: null
+    };
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [first, second]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: first.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      notes: 'Back of the room.'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBeNull();
+    expect(result.data?.id).toBe(first.id);
+    expect(result.data?.notes).toBe('Back of the room.');
+    expect(concertUpdates).toHaveLength(1);
+  });
+
+  it('returns attached for a timed edit collision at the same Place and does not mutate', async () => {
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      artist: 'Local Band',
+      time: '18:00'
+    };
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice, other]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15'
+    });
+
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(timedJustice.id);
+    expect(concertUpdates).toHaveLength(0);
+  });
+
+  it('returns impossible_place for a timed edit collision at a different Place', async () => {
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      event_id: parisNightRow.id,
+      artist: 'Local Band',
+      time: '18:00',
+      place: 'Paris'
+    };
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow, parisNightRow],
+      concerts: [timedJustice, other]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15'
+    });
+
+    expect(result.outcome).toBe(CONCERT_IDENTITY.impossiblePlace);
+    expect(result.error?.ruleId).toBe(CONCERT_RULE.impossiblePlace);
+    expect(concertUpdates).toHaveLength(0);
+  });
+
+  it('returns needs_choice for an untimed edit collision and mutates only after confirm create', async () => {
+    const existing: ConcertRecord = { ...timedJustice, time: null };
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      artist: 'Local Band',
+      time: null
+    };
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [existing, other]
+    });
+
+    const blocked = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18'
+    });
+
+    expect(blocked.outcome).toBe(CONCERT_IDENTITY.needsChoice);
+    expect(blocked.error).toBeNull();
+    expect(blocked.data?.id).toBe(existing.id);
+    expect(concertUpdates).toHaveLength(0);
+
+    const created = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      confirm: 'create'
+    });
+
+    expect(created.error).toBeNull();
+    expect(created.outcome).toBeNull();
+    expect(created.data?.id).toBe(other.id);
+    expect(created.data?.artist).toBe('Justice');
+    expect(concertUpdates).toHaveLength(1);
+  });
+
+  it('attaches an untimed edit collision to the existing Concert', async () => {
+    const existing: ConcertRecord = { ...timedJustice, time: null };
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      artist: 'Local Band',
+      time: null
+    };
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [existing, other]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '21:00',
+      confirm: 'attach'
+    });
+
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(existing.id);
+    expect(result.data?.time).toBe('21:00');
+    expect(concertUpdates).toEqual([{ time: '21:00' }]);
+  });
+
+  it('maps a unique-guard violation on edit to attached, not persist_failed', async () => {
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      artist: 'Local Band',
+      time: '18:00'
+    };
+    const { client } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [timedJustice, other],
+      concertUpdateError: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "concerts_owner_artist_date_time_idx"'
+      },
+      missFirstIdentityLookup: true
+    });
+
+    const result = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15'
+    });
+
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(timedJustice.id);
+    expect(result.error?.ruleId).not.toBe('persist_failed');
+  });
+
+  it('deletes a concert and its attendance while leaving the Event', async () => {
+    const existing: ConcertRecord = { ...timedJustice, notes: 'Private memory' };
+    const { client, concerts, events, attendanceRows, concertDeletes, eventDeletes } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [existing]
+    });
+
+    attendanceRows.push({
+      id: 'dddddddd-dddd-4ddd-8ddd-000000000001',
+      user_id: 'owner-1',
+      concert_id: existing.id,
+      status: ATTENDANCE_STATUS.attended
+    });
+
+    const listedBefore = await listConcertsForEvent(client, nightRow.id);
+    expect(listedBefore.data).toHaveLength(1);
+
+    const result = await deleteConcert(client, existing.id);
+
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(existing.id);
+    expect(result.data?.event_id).toBe(nightRow.id);
+    expect(concerts).toHaveLength(0);
+    expect(attendanceRows).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.id).toBe(nightRow.id);
+    expect(concertDeletes).toEqual([{ column: 'id', value: existing.id }]);
+    expect(eventDeletes).toHaveLength(0);
+
+    const listedAfter = await listConcertsForEvent(client, nightRow.id);
+    expect(listedAfter.data).toHaveLength(0);
+  });
+});
+
 describe('concert date grouping', () => {
   it('groups consecutive same-day rows and shows day headers for festivals or 2+ concerts', () => {
     const friday: ConcertRecord = {
@@ -1225,7 +1507,10 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
 describe('concerts store and pages use domain helpers only', () => {
   it('keeps Concert queries in shared/domain and out of pages and the store', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
-    expect(store).toMatch(/from '#shared\/domain\/concerts'/);
+    expect(store).toMatch(/updateConcert/);
+    expect(store).toMatch(/deleteConcert/);
+    expect(store).toMatch(/updateOwnedConcert/);
+    expect(store).toMatch(/deleteOwnedConcert/);
     expect(store).toMatch(/createConcert|listOwnedConcerts|listConcertsForEvent/);
     expect(store).not.toMatch(/from\('concerts'\)/);
     expect(store).toMatch(/\{ data, error \}|return \{[\s\S]*data:[\s\S]*error:/);
@@ -1257,6 +1542,8 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(eventPage).toMatch(/Add to this night/);
     expect(eventPage).toMatch(/Add to this festival/);
     expect(eventPage).toMatch(/billLoadFailed/);
+    expect(eventPage).toMatch(/concertId/);
+    expect(eventPage).toMatch(/Edit /);
     expect(eventPage).not.toMatch(/label="Add concert"|label='Add concert'/);
 
     const concertsPage = readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8');
@@ -1270,12 +1557,17 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(eventCard).toMatch(/isCompactBill/);
     expect(eventCard).toMatch(/formatConcertMetaLine/);
     expect(eventCard).toMatch(/cycleAttendance/);
+    expect(eventCard).not.toMatch(/openSheet|concertId/);
 
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/USlideover/);
     expect(sheet).toMatch(/side="bottom"/);
     expect(sheet).toMatch(/Add concert/);
+    expect(sheet).toMatch(/Edit concert/);
+    expect(sheet).toMatch(/Private\. Never on your public profile\./);
     expect(sheet).toMatch(/Add another/);
+    expect(sheet).toMatch(/isEdit/);
+    expect(sheet).toMatch(/deleteOwnedConcert|confirmDelete/);
     expect(sheet).toMatch(/navigateTo\('\/e\/' \+/);
     expect(sheet).toMatch(/CONCERT_RULE_MESSAGE/);
     expect(sheet).toMatch(/needs_choice|pendingChoice/);
@@ -1293,6 +1585,44 @@ describe('concerts store and pages use domain helpers only', () => {
 
     const nav = readFileSync(resolve(process.cwd(), 'app/components/AppGlassNav.vue'), 'utf8');
     expect(nav).toMatch(/openSheet|openAddSheet/);
+  });
+
+  it('keeps update and delete success when the subsequent refresh fails', () => {
+    const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
+    const updateFn = store.slice(
+      store.indexOf('const updateOwnedConcert ='),
+      store.indexOf('const deleteOwnedConcert =')
+    );
+    expect(updateFn).toMatch(/applyOwnedConcert|upsertConcert/);
+    expect(updateFn.search(/applyOwnedConcert|upsertConcert/)).toBeLessThan(
+      updateFn.search(/reloadOwnedConcertState|listOwnedEvents/)
+    );
+    expect(updateFn).toMatch(/return mutationResult\(result\.data, null/);
+    expect(updateFn).not.toMatch(/return await refreshConcertLists/);
+
+    const deleteFn = store.slice(
+      store.indexOf('const deleteOwnedConcert ='),
+      store.indexOf('const cycleAttendance =')
+    );
+    expect(deleteFn).toMatch(/dropOwnedConcert|omitConcert/);
+    expect(deleteFn.search(/dropOwnedConcert|omitConcert/)).toBeLessThan(
+      deleteFn.search(/reloadOwnedConcertState|listOwnedEvents/)
+    );
+    expect(deleteFn).toMatch(/error: null/);
+    expect(deleteFn).not.toMatch(/return \{ data: null, error: listed/);
+
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
+    const editBlock = persist.slice(
+      persist.indexOf('updateOwnedConcert'),
+      persist.indexOf('createOwnedConcert')
+    );
+    expect(editBlock).toMatch(/needs_choice/);
+    expect(editBlock).toMatch(/impossible_place/);
+    expect(editBlock).toMatch(/if \(result\.error\)/);
+    expect(editBlock.indexOf('if (result.error)')).toBeLessThan(editBlock.indexOf('Concert saved.'));
+    expect(editBlock).toMatch(/formError\.value = result\.error/);
+    expect(editBlock).toMatch(/confirm/);
   });
 
   it('exports createEvent for New night/New festival Event rules', () => {

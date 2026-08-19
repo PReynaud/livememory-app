@@ -27,6 +27,8 @@ const concertTime = ref('');
 const formError = ref('');
 const saving = ref(false);
 const pendingChoice = ref(false);
+const notes = ref('');
+const confirmDelete = ref(false);
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -34,7 +36,8 @@ const sheetOpen = computed({
     if (value) {
       sheet.openSheet({
         eventId: sheet.eventId ?? undefined,
-        lockEvent: sheet.lockEvent
+        lockEvent: sheet.lockEvent,
+        concertId: sheet.concertId ?? undefined
       });
       return;
     }
@@ -59,6 +62,8 @@ const isTransparent = computed(() => !picker.value);
 const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.value));
 const placeLocked = computed(() => Boolean(selectedEvent.value));
 const dateLocked = computed(() => isExistingNight.value || isNewNight.value);
+const isEdit = computed(() => Boolean(sheet.concertId));
+const sheetTitle = computed(() => (isEdit.value ? 'Edit concert' : 'Add concert'));
 
 const eventItems = computed(() => {
   const owned = events.value.map(event => ({
@@ -89,6 +94,12 @@ const festivalDays = computed(() => {
 
 const showDayPicker = computed(() => festivalDays.value.length > 0);
 
+const findConcert = (concertId: string) => {
+  return eventsStore.currentConcerts.find(item => item.id === concertId)
+    ?? eventsStore.concerts.find(item => item.id === concertId)
+    ?? null;
+};
+
 const applyEvent = (event: EventRecord) => {
   eventName.value = event.name;
   startDate.value = event.start_date;
@@ -116,6 +127,8 @@ const focusArtist = async () => {
 const resetForOpen = async () => {
   formError.value = '';
   pendingChoice.value = false;
+  confirmDelete.value = false;
+  notes.value = '';
   artist.value = '';
   concertTime.value = '';
 
@@ -131,6 +144,21 @@ const resetForOpen = async () => {
     const event = events.value.find(item => item.id === sheet.eventId);
     if (event) {
       applyEvent(event);
+    }
+  }
+
+  if (sheet.concertId) {
+    const concert = findConcert(sheet.concertId);
+    if (concert) {
+      picker.value = concert.event_id;
+      const event = events.value.find(item => item.id === concert.event_id);
+      if (event) {
+        applyEvent(event);
+      }
+      artist.value = concert.artist;
+      concertDate.value = concert.date;
+      concertTime.value = concert.time ? concert.time.slice(0, 5) : '';
+      notes.value = concert.notes ?? '';
     }
   }
 
@@ -225,6 +253,52 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
   formError.value = '';
 
   try {
+    if (isEdit.value && sheet.concertId) {
+      const result = await eventsStore.updateOwnedConcert({
+        concertId: sheet.concertId,
+        artist: artist.value,
+        date: isExistingNight.value ? (selectedEvent.value?.start_date ?? concertDate.value) : concertDate.value,
+        time: concertTime.value,
+        notes: notes.value,
+        confirm
+      });
+
+      if (result.outcome === 'needs_choice') {
+        pendingChoice.value = true;
+        return;
+      }
+
+      pendingChoice.value = false;
+
+      if (result.outcome === 'impossible_place') {
+        formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
+        return;
+      }
+
+      if (result.outcome === 'attached' && result.data) {
+        const attachedToIntended
+          = picker.value === result.data.event_id
+            && picker.value !== NEW_NIGHT
+            && picker.value !== NEW_FESTIVAL;
+        if (!attachedToIntended) {
+          toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
+        }
+
+        sheet.closeSheet();
+        await navigateTo('/e/' + result.data.event_id);
+        return;
+      }
+
+      if (result.error) {
+        formError.value = result.error;
+        return;
+      }
+
+      toast.add({ title: 'Concert saved.' });
+      sheet.closeSheet();
+      return;
+    }
+
     const intendedEventId = picker.value;
     const result = await eventsStore.createOwnedConcert(buildInput(confirm));
 
@@ -291,6 +365,36 @@ const dismissChoice = () => {
   pendingChoice.value = false;
 };
 
+const requestDelete = () => {
+  confirmDelete.value = true;
+};
+
+const cancelDelete = () => {
+  confirmDelete.value = false;
+};
+
+const removeConcert = async () => {
+  if (!sheet.concertId || saving.value) {
+    return;
+  }
+
+  saving.value = true;
+  formError.value = '';
+
+  try {
+    const result = await eventsStore.deleteOwnedConcert(sheet.concertId);
+    if (result.error) {
+      formError.value = result.error;
+      return;
+    }
+
+    toast.add({ title: 'Concert deleted.' });
+    sheet.closeSheet();
+  } finally {
+    saving.value = false;
+  }
+};
+
 const slideoverUi = {
   overlay: 'bg-white/8',
   content: 'bg-[rgba(20,20,20,0.78)] backdrop-blur-[28px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-1/2 lg:w-[28rem] lg:-translate-x-1/2 max-h-[min(85dvh,36rem)]',
@@ -305,7 +409,7 @@ const slideoverUi = {
   <USlideover
     v-model:open="sheetOpen"
     side="bottom"
-    title="Add concert"
+    :title="sheetTitle"
     :close="false"
     :ui="slideoverUi"
   >
@@ -469,6 +573,20 @@ const slideoverUi = {
           />
         </UFormField>
 
+        <UFormField
+          v-if="isEdit"
+          label="Notes"
+          name="notes"
+        >
+          <UTextarea
+            v-model="notes"
+            placeholder="Private. Never on your public profile."
+            :disabled="pendingChoice"
+            class="w-full"
+            :rows="3"
+          />
+        </UFormField>
+
         <UAlert
           v-if="formError"
           color="error"
@@ -514,25 +632,64 @@ const slideoverUi = {
         </template>
         <div
           v-else
-          class="flex items-center gap-4 pt-1"
+          class="flex flex-col gap-3 pt-1"
         >
-          <UButton
-            type="submit"
-            label="Save"
-            color="primary"
-            variant="outline"
-            class="h-11 flex-1 rounded-full ring-2"
-            :loading="saving"
-          />
-          <UButton
-            type="button"
-            label="Add another"
-            color="neutral"
-            variant="link"
-            class="px-0 font-semibold text-white"
-            :disabled="saving"
-            @click="persist('another')"
-          />
+          <div class="flex items-center gap-4">
+            <UButton
+              type="submit"
+              label="Save"
+              color="primary"
+              variant="outline"
+              class="h-11 flex-1 rounded-full ring-2"
+              :loading="saving"
+            />
+            <UButton
+              v-if="!isEdit"
+              type="button"
+              label="Add another"
+              color="neutral"
+              variant="link"
+              class="px-0 font-semibold text-white"
+              :disabled="saving"
+              @click="persist('another')"
+            />
+            <UButton
+              v-else-if="!confirmDelete"
+              type="button"
+              label="Delete"
+              color="error"
+              variant="link"
+              class="px-0 font-semibold"
+              :disabled="saving"
+              @click="requestDelete"
+            />
+          </div>
+          <div
+            v-if="isEdit && confirmDelete"
+            class="flex items-center gap-4"
+          >
+            <p class="flex-1 text-[15px] text-muted">
+              Delete this concert?
+            </p>
+            <UButton
+              type="button"
+              label="Delete concert"
+              color="error"
+              variant="outline"
+              class="h-11 rounded-full"
+              :loading="saving"
+              @click="removeConcert"
+            />
+            <UButton
+              type="button"
+              label="Cancel"
+              color="neutral"
+              variant="link"
+              class="px-0 font-semibold text-white"
+              :disabled="saving"
+              @click="cancelDelete"
+            />
+          </div>
         </div>
       </form>
     </template>

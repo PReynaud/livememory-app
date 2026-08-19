@@ -104,27 +104,11 @@ const patchConcertDate = (
     }
 
     execFileSync('pnpm', ['exec', 'supabase', 'db', 'query', '--local',
-      'alter table public.concerts disable trigger concerts_attach_time_only'
+      `update public.concerts set date = '${date}' where id = '${concertId}'::uuid`
     ], {
       cwd: process.cwd(),
       encoding: 'utf8'
     });
-
-    try {
-      execFileSync('pnpm', ['exec', 'supabase', 'db', 'query', '--local',
-        `update public.concerts set date = '${date}' where id = '${concertId}'::uuid`
-      ], {
-        cwd: process.cwd(),
-        encoding: 'utf8'
-      });
-    } finally {
-      execFileSync('pnpm', ['exec', 'supabase', 'db', 'query', '--local',
-        'alter table public.concerts enable trigger concerts_attach_time_only'
-      ], {
-        cwd: process.cwd(),
-        encoding: 'utf8'
-      });
-    }
   });
 };
 
