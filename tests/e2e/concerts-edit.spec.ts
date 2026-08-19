@@ -36,7 +36,7 @@ test('owner opens the glass edit sheet from the Event row, saves notes, and dele
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole('heading', { name: 'Edit concert' })).toBeVisible();
   await expect(sheet.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
-  await expect(sheet.getByRole('textbox', { name: 'Event' })).toHaveValue('Club Night');
+  await expect(sheet.getByLabel('Event')).toContainText('Club Night');
   await expect(sheet.getByPlaceholder('Private. Never on your public profile.')).toBeVisible();
   await expect(sheet.getByRole('button', { name: 'Add another' })).toHaveCount(0);
 
@@ -53,6 +53,59 @@ test('owner opens the glass edit sheet from the Event row, saves notes, and dele
   await authenticatedPage.getByRole('dialog').getByRole('button', { name: 'Delete concert' }).click();
   await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
   await expect(authenticatedPage).toHaveURL(new RegExp(`${eventPath}$`));
+  await expect(authenticatedPage.getByRole('heading', { name: 'Club Night' })).toBeVisible();
+  await expect(authenticatedPage.getByText('No concerts on this bill.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Justice')).toHaveCount(0);
+});
+
+test('owner moves a Concert between two owned Events without duplicating', async ({ authenticatedPage }) => {
+  const sourcePath = await addOwnedNightWithConcert(authenticatedPage, {
+    name: 'Club Night',
+    date: '2026-08-18',
+    place: 'Berlin',
+    artist: 'Justice'
+  });
+
+  await authenticatedPage.getByRole('button', { name: 'Edit Justice' }).click();
+  const notesSheet = authenticatedPage.getByRole('dialog');
+  await notesSheet.getByPlaceholder('Private. Never on your public profile.').fill('Back of the room.');
+  await notesSheet.getByRole('button', { name: 'Save' }).click();
+  await expect(notesSheet).toHaveCount(0);
+  await authenticatedPage.getByRole('button', { name: 'Mark as attended' }).click();
+  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+
+  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
+  await authenticatedPage.getByLabel('Name').fill('Other Night');
+  await authenticatedPage.getByLabel('Date').fill('2026-08-18');
+  await authenticatedPage.getByLabel('Place').fill('Berlin');
+  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
+  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  const targetPath = new URL(authenticatedPage.url()).pathname;
+
+  await authenticatedPage.goto(sourcePath);
+  await waitForNuxtHydration(authenticatedPage);
+  await expect(authenticatedPage.getByRole('heading', { name: 'Club Night' })).toBeVisible();
+  await authenticatedPage.getByRole('button', { name: 'Edit Justice' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await expect(sheet.getByRole('heading', { name: 'Edit concert' })).toBeVisible();
+  await sheet.getByLabel('Event').click();
+  await authenticatedPage.getByRole('option', { name: 'Other Night' }).click();
+  await expect(sheet.getByText(/joiner/i)).toHaveCount(0);
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(authenticatedPage).toHaveURL(new RegExp(`${targetPath}$`));
+  await expect(authenticatedPage.getByRole('heading', { name: 'Other Night' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Justice')).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+
+  await authenticatedPage.getByRole('button', { name: 'Edit Justice' }).click();
+  await expect(authenticatedPage.getByRole('dialog').getByPlaceholder('Private. Never on your public profile.')).toHaveValue('Back of the room.');
+  await authenticatedPage.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
+
+  await authenticatedPage.goto(sourcePath);
+  await waitForNuxtHydration(authenticatedPage);
   await expect(authenticatedPage.getByRole('heading', { name: 'Club Night' })).toBeVisible();
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toBeVisible();
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(0);
