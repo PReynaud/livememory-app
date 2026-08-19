@@ -1,5 +1,6 @@
 import type { ConcertRecord } from '#shared/domain/concerts';
 import type { EventRecord } from '#shared/domain/events';
+import { formatCivilDate } from '@/utils/event-dates';
 
 export type ConcertDateGroup = {
   date: string;
@@ -81,4 +82,22 @@ export const formatConcertClock = (time: string | null): string => {
   }
 
   return time.slice(0, 5);
+};
+
+export const isCompactBill = (concerts: ConcertRecord[]) => {
+  return concerts.length === 1;
+};
+
+export const eventNameDiffersFromArtist = (eventName: string, artist: string) => {
+  return eventName.trim().toLowerCase() !== artist.trim().toLowerCase();
+};
+
+export const formatConcertMetaLine = (concert: Pick<ConcertRecord, 'date' | 'place' | 'time'>) => {
+  const parts = [formatCivilDate(concert.date), concert.place];
+  const clock = formatConcertClock(concert.time);
+  if (clock) {
+    parts.push(clock);
+  }
+
+  return parts.join(' · ');
 };

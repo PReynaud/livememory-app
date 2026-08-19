@@ -1,4 +1,9 @@
 import {
+  isConcertPast,
+  setAttendance,
+  type AttendanceClient
+} from './attendance';
+import {
   createEvent,
   type CreateEventInput,
   type DomainError,
@@ -11,6 +16,7 @@ export const CONCERT_RULE = {
   requiredArtist: 'required_artist',
   requiredDate: 'required_date',
   requiredEvent: 'required_event',
+  requiredPlace: 'required_place',
   dateOutsideEvent: 'date_outside_event',
   impossiblePlace: 'impossible_place',
   needsChoice: 'needs_choice'
@@ -20,6 +26,7 @@ export const CONCERT_RULE_MESSAGE = {
   requiredArtist: 'Artist is required.',
   requiredDate: 'Date is required.',
   requiredEvent: 'Event is required.',
+  requiredPlace: 'Place is required.',
   dateOutsideEvent: 'This date is outside the Event.',
   impossiblePlace: 'This concert already exists at a different Place.',
   needsChoice: 'This artist and date already exist. Attach to the existing concert or create another.',
@@ -55,6 +62,7 @@ export type CreateConcertInput = {
   artist: string;
   date: string;
   time?: string | null;
+  place?: string;
   eventId?: string;
   newEvent?: CreateEventInput;
   confirm?: ConcertIdentityConfirm;
@@ -134,6 +142,10 @@ const toDisplayDate = (iso: string): string => {
   }
 
   return `${day}/${month}/${year}`;
+};
+
+export const transparentSingleNightName = (date: string, place: string): string => {
+  return `Concerts on ${toDisplayDate(date)} at ${place}`;
 };
 
 export const formatEventDateRange = (startDate: string, endDate: string): string => {
@@ -434,6 +446,22 @@ const resolveTarget = async (
   });
 };
 
+const applyOwnerAttendanceDefault = async (
+  client: ConcertsClient,
+  concert: ConcertRecord
+): Promise<CreateConcertResult | null> => {
+  const result = await setAttendance(client as unknown as AttendanceClient, {
+    concertId: concert.id,
+    status: isConcertPast(concert) ? 'attended' : 'going'
+  });
+
+  if (result.error) {
+    return failCreate(result.error.ruleId, result.error.message);
+  }
+
+  return null;
+};
+
 export const createConcert = async (
   client: ConcertsClient,
   input: CreateConcertInput
@@ -448,8 +476,28 @@ export const createConcert = async (
     return failCreate(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
   }
 
-  if (input.newEvent) {
-    const plannedRange = eventRangeFromCreateInput(input.newEvent);
+  const isTransparent = !trim(input.eventId) && !input.newEvent;
+  let request = input;
+
+  if (isTransparent) {
+    const place = trim(input.place);
+    if (!place) {
+      return failCreate(CONCERT_RULE.requiredPlace, CONCERT_RULE_MESSAGE.requiredPlace);
+    }
+
+    request = {
+      ...input,
+      newEvent: {
+        kind: 'single_night',
+        name: transparentSingleNightName(date, place),
+        startDate: date,
+        place
+      }
+    };
+  }
+
+  if (request.newEvent) {
+    const plannedRange = eventRangeFromCreateInput(request.newEvent);
     if (plannedRange && !isDateInsideEvent(date, plannedRange)) {
       return failCreate(
         CONCERT_RULE.dateOutsideEvent,
@@ -458,8 +506,8 @@ export const createConcert = async (
     }
   }
 
-  const draftTime = normalizeClock(input.time);
-  const target = await resolveTarget(client, input);
+  const draftTime = normalizeClock(request.time);
+  const target = await resolveTarget(client, request);
   if (target.error || !target.data) {
     return {
       data: null,
@@ -489,9 +537,9 @@ export const createConcert = async (
   }
 
   const overlap = untimedOverlap(candidates, draftTime);
-  if (overlap.length > 0 && input.confirm !== 'create') {
+  if (overlap.length > 0 && request.confirm !== 'create') {
     const existing = pickAttachTarget(overlap, draftTime);
-    if (existing && input.confirm === 'attach') {
+    if (existing && request.confirm === 'attach') {
       return writeAttachTime(client, existing, draftTime, target.data.place);
     }
 
@@ -505,8 +553,8 @@ export const createConcert = async (
   let event = target.data.event;
   let createdEventId: string | null = null;
 
-  if (input.newEvent) {
-    const created = await createEvent(client as unknown as EventsClient, input.newEvent);
+  if (request.newEvent) {
+    const created = await createEvent(client as unknown as EventsClient, request.newEvent);
     if (created.error || !created.data) {
       return {
         data: null,
@@ -572,6 +620,13 @@ export const createConcert = async (
     }
 
     return failCreate('persist_failed', 'Failed to create concert');
+  }
+
+  if (isTransparent) {
+    const attendanceError = await applyOwnerAttendanceDefault(client, data);
+    if (attendanceError) {
+      return attendanceError;
+    }
   }
 
   return okCreate(data, CONCERT_IDENTITY.created);
