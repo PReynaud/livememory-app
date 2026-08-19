@@ -7,6 +7,7 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
 
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Date').fill('2026-08-10');
+  await expect(sheet.getByLabel('Date')).toHaveValue('2026-08-10');
   await sheet.getByLabel('Place').fill('Berlin');
   await sheet.getByLabel('Time').fill('20:15');
   await sheet.getByRole('button', { name: 'Save' }).click();

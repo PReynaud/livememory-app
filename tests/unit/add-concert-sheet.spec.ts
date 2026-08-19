@@ -67,5 +67,6 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/v-if="isTransparent"/);
     expect(sheet).toMatch(/place: place\.value/);
     expect(sheet).toMatch(/if \(!picker\.value\)/);
+    expect(sheet).toMatch(/if \(!sheet\.eventId\)/);
   });
 });

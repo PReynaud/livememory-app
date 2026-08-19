@@ -406,7 +406,7 @@ describe('attendance stays off pages and the store query path', () => {
     expect(concertsPage).toMatch(/AppAttendanceChip/);
     expect(concertsPage).toMatch(/isAttendanceBusy/);
     expect(concertsPage).toMatch(/data-event-card/);
-    expect(concertsPage).toMatch(/click\.stop/);
+    expect(concertsPage).toMatch(/cycleAttendance/);
 
     const chip = readFileSync(resolve(process.cwd(), 'app/components/AppAttendanceChip.vue'), 'utf8');
     expect(chip).toMatch(/<button/);
@@ -418,6 +418,7 @@ describe('attendance stays off pages and the store query path', () => {
     expect(chip).toMatch(/border-dashed/);
     expect(chip).toMatch(/focus-visible/);
     expect(chip).toMatch(/motion-reduce|prefers-reduced-motion/);
+    expect(chip).toMatch(/click\.stop/);
     expect(chip).not.toMatch(/bg-\[#A3A3A3\]/);
     expect(chip).not.toMatch(/Set|On the bill|Skipped/);
   });

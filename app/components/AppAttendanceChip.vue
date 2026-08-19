@@ -48,7 +48,7 @@ const chipClass = computed(() => {
     :aria-pressed="confirmed"
     :class="chipClass"
     :disabled="disabled"
-    @click="$emit('click')"
+    @click.stop="$emit('click')"
   >
     {{ label }}
   </button>

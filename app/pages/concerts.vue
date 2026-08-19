@@ -257,7 +257,7 @@ await eventsStore.fetchEvents();
             :status="eventsStore.attendanceStatus(card.concert.id)"
             :is-past="eventsStore.concertIsPast(card.concert)"
             :disabled="eventsStore.isAttendanceBusy(card.concert.id)"
-            @click.stop="void eventsStore.cycleAttendance(card.concert)"
+            @click="void eventsStore.cycleAttendance(card.concert)"
           />
         </div>
         <template v-else>
@@ -307,7 +307,7 @@ await eventsStore.fetchEvents();
                   :status="eventsStore.attendanceStatus(concert.id)"
                   :is-past="eventsStore.concertIsPast(concert)"
                   :disabled="eventsStore.isAttendanceBusy(concert.id)"
-                  @click.stop="void eventsStore.cycleAttendance(concert)"
+                  @click="void eventsStore.cycleAttendance(concert)"
                 />
               </div>
             </div>

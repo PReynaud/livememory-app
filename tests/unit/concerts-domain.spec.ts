@@ -1214,7 +1214,7 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(concertsPage).toMatch(/data-event-card/);
     expect(concertsPage).toMatch(/isCompactBill/);
     expect(concertsPage).toMatch(/formatConcertMetaLine/);
-    expect(concertsPage).toMatch(/click\.stop/);
+    expect(concertsPage).toMatch(/cycleAttendance/);
 
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/USlideover/);

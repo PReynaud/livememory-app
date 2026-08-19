@@ -118,6 +118,12 @@ const resetForOpen = async () => {
   pendingChoice.value = false;
   artist.value = '';
   concertTime.value = '';
+
+  if (!sheet.eventId) {
+    picker.value = '';
+    resetNewEventFields();
+  }
+
   await eventsStore.fetchEvents({ silent: true });
 
   if (sheet.eventId) {
@@ -126,9 +132,6 @@ const resetForOpen = async () => {
     if (event) {
       applyEvent(event);
     }
-  } else {
-    picker.value = '';
-    resetNewEventFields();
   }
 
   await focusArtist();
