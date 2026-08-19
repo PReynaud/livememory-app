@@ -47,6 +47,7 @@ export type Database = {
           notes: string | null
           owner_id: string
           place: string
+          stage_id: string | null
           time: string | null
         }
         Insert: {
@@ -57,6 +58,7 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           place: string
+          stage_id?: string | null
           time?: string | null
         }
         Update: {
@@ -67,6 +69,7 @@ export type Database = {
           notes?: string | null
           owner_id?: string
           place?: string
+          stage_id?: string | null
           time?: string | null
         }
         Relationships: [
@@ -77,10 +80,44 @@ export type Database = {
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "concerts_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "event_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_stages: {
+        Row: {
+          event_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_stages_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
         ]
       }
       events: {
         Row: {
+          allow_place_override: boolean
           end_date: string
           id: string
           kind: string
@@ -90,6 +127,7 @@ export type Database = {
           start_date: string
         }
         Insert: {
+          allow_place_override?: boolean
           end_date: string
           id?: string
           kind: string
@@ -99,6 +137,7 @@ export type Database = {
           start_date: string
         }
         Update: {
+          allow_place_override?: boolean
           end_date?: string
           id?: string
           kind?: string
@@ -148,9 +187,45 @@ export type Database = {
       }
     }
     Functions: {
+      assert_event_bill_valid: {
+        Args: { p_event_id: string }
+        Returns: undefined
+      }
+      concert_event_rule_violation: {
+        Args: { concert: Database["public"]["Tables"]["concerts"]["Row"] }
+        Returns: string
+      }
       concert_is_past: {
         Args: { p_date: string; p_time: string }
         Returns: boolean
+      }
+      save_event_and_concert_dates: {
+        Args: {
+          p_allow_place_override?: boolean
+          p_concert_dates: Json
+          p_end_date: string
+          p_event_id: string
+          p_name?: string
+          p_place?: string
+          p_stages?: Json
+          p_start_date: string
+        }
+        Returns: {
+          allow_place_override: boolean
+          end_date: string
+          id: string
+          kind: string
+          name: string
+          owner_id: string
+          place: string
+          start_date: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       username_is_taken: { Args: { candidate: string }; Returns: boolean }
     }

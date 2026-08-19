@@ -6,12 +6,17 @@ import type { Database } from '@/types/database.types';
 import {
   createEvent,
   getOwnedEvent,
+  listEventStages,
   listOwnedEvents,
+  listOwnedStages,
   selectFeaturedEvents,
+  updateEvent,
   type CreateEventInput,
   type EventKind,
   type EventRecord,
-  type EventsClient
+  type EventStageRecord,
+  type EventsClient,
+  type UpdateEventInput
 } from '#shared/domain/events';
 import { souvenirStats } from '#shared/domain/home';
 import {
@@ -41,7 +46,7 @@ import {
   upsertConcert
 } from '@/utils/concert-mutation-state';
 
-export type { ConcertCreateOutcome, ConcertRecord, CreateConcertInput, CreateEventInput, EventKind, EventRecord, UpdateConcertInput };
+export type { ConcertCreateOutcome, ConcertRecord, CreateConcertInput, CreateEventInput, EventKind, EventRecord, EventStageRecord, UpdateConcertInput, UpdateEventInput };
 export type { AttendanceStatus };
 
 type ConcertMutationResult = {
@@ -73,6 +78,8 @@ export const useEventsStore = defineStore('events', () => {
   const concerts = ref<ConcertRecord[]>([]);
   const currentEvent = ref<EventRecord | null>(null);
   const currentConcerts = ref<ConcertRecord[]>([]);
+  const currentStages = ref<EventStageRecord[]>([]);
+  const stagesByEventId = ref<Record<string, EventStageRecord[]>>({});
   const attendanceByConcertId = ref<Record<string, AttendanceStatus>>({});
   const attendanceBusyByConcertId = ref<Record<string, true>>({});
   const attendanceError = ref<string | null>(null);
@@ -113,6 +120,18 @@ export const useEventsStore = defineStore('events', () => {
     return concerts.value.filter(concert => concert.event_id === eventId);
   };
 
+  const stagesForEvent = (eventId: string) => {
+    return stagesByEventId.value[eventId] ?? [];
+  };
+
+  const groupStages = (rows: EventStageRecord[]) => {
+    const next: Record<string, EventStageRecord[]> = {};
+    for (const stage of rows) {
+      next[stage.event_id] = [...(next[stage.event_id] ?? []), stage];
+    }
+    stagesByEventId.value = next;
+  };
+
   const featuredEvents = computed(() => selectFeaturedEvents(events.value));
 
   const homeStats = computed(() => souvenirStats({
@@ -144,6 +163,14 @@ export const useEventsStore = defineStore('events', () => {
 
       concerts.value = listedConcerts.data ?? [];
 
+      const listedStages = await listOwnedStages(eventsClient());
+      if (listedStages.error) {
+        error.value = listedStages.error.message;
+        return { data: events.value, error: listedStages.error.message };
+      }
+
+      groupStages(listedStages.data ?? []);
+
       const listedAttendanceError = await loadAttendance();
       attendanceError.value = listedAttendanceError;
       if (listedAttendanceError) {
@@ -168,6 +195,7 @@ export const useEventsStore = defineStore('events', () => {
     error.value = null;
     currentEvent.value = null;
     currentConcerts.value = [];
+    currentStages.value = [];
 
     try {
       const result = await getOwnedEvent(eventsClient(), id);
@@ -187,6 +215,18 @@ export const useEventsStore = defineStore('events', () => {
         }
 
         currentConcerts.value = listed.data ?? [];
+
+        const stages = await listEventStages(eventsClient(), id);
+        if (stages.error) {
+          error.value = stages.error.message;
+          return { data: result.data, error: stages.error.message };
+        }
+
+        currentStages.value = stages.data ?? [];
+        stagesByEventId.value = {
+          ...stagesByEventId.value,
+          [id]: currentStages.value
+        };
       }
 
       const listedAttendanceError = await loadAttendance();
@@ -231,6 +271,50 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const updateOwnedEvent = async (input: UpdateEventInput) => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const result = await updateEvent(eventsClient(), input);
+
+      if (result.error) {
+        error.value = result.error.message;
+        return { data: null, error: result.error.message, conflicts: result.error.conflicts ?? null };
+      }
+
+      if (result.data) {
+        const listed = await listOwnedEvents(eventsClient());
+        if (!listed.error && listed.data) {
+          events.value = listed.data;
+        }
+
+        currentEvent.value = result.data;
+        const stages = await listEventStages(eventsClient(), result.data.id);
+        if (!stages.error) {
+          currentStages.value = stages.data ?? [];
+          stagesByEventId.value = {
+            ...stagesByEventId.value,
+            [result.data.id]: currentStages.value
+          };
+        }
+
+        const listedConcerts = await listConcertsForEvent(concertsClient(), result.data.id);
+        if (!listedConcerts.error) {
+          currentConcerts.value = listedConcerts.data ?? [];
+        }
+      }
+
+      return { data: result.data, error: null, conflicts: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update event');
+      error.value = errorMessage;
+      return { data: null, error: errorMessage, conflicts: null };
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const reloadOwnedConcertState = async () => {
     const listedEvents = await listOwnedEvents(eventsClient());
     if (listedEvents.error) {
@@ -250,6 +334,14 @@ export const useEventsStore = defineStore('events', () => {
     const listedCurrent = currentConcertsForEvent(concerts.value, currentEvent.value?.id);
     if (listedCurrent) {
       currentConcerts.value = listedCurrent;
+    }
+
+    const listedStages = await listOwnedStages(eventsClient());
+    if (!listedStages.error) {
+      groupStages(listedStages.data ?? []);
+      if (currentEvent.value) {
+        currentStages.value = stagesByEventId.value[currentEvent.value.id] ?? [];
+      }
     }
 
     const listedAttendanceError = await loadAttendance();
@@ -432,11 +524,14 @@ export const useEventsStore = defineStore('events', () => {
     concerts,
     currentEvent,
     currentConcerts,
+    currentStages,
+    stagesByEventId,
     attendanceByConcertId,
     attendanceError,
     loading,
     error,
     concertsForEvent,
+    stagesForEvent,
     featuredEvents,
     homeStats,
     attendanceStatus,
@@ -445,6 +540,7 @@ export const useEventsStore = defineStore('events', () => {
     fetchEvents,
     fetchEvent,
     createOwnedEvent,
+    updateOwnedEvent,
     createOwnedConcert,
     updateOwnedConcert,
     deleteOwnedConcert,

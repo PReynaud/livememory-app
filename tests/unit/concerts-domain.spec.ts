@@ -8,6 +8,7 @@ import {
 import {
   createEvent,
   type EventRecord,
+  type EventStageRecord,
   type EventsClient
 } from '../../shared/domain/events';
 import {
@@ -99,6 +100,7 @@ const timedJustice: ConcertRecord = {
 const createMockConcertsClient = (options?: {
   events?: EventRecord[];
   concerts?: ConcertRecord[];
+  stages?: EventStageRecord[];
   concertInsertError?: QueryError;
   concertUpdateError?: QueryError;
   missFirstIdentityLookup?: boolean;
@@ -106,6 +108,7 @@ const createMockConcertsClient = (options?: {
 }) => {
   const events = [...(options?.events ?? [])];
   const concerts = [...(options?.concerts ?? [])];
+  const stages = [...(options?.stages ?? [])];
   const concertInserts: Record<string, unknown>[] = [];
   const concertUpdates: Record<string, unknown>[] = [];
   const concertDeletes: { column: string; value: string }[] = [];
@@ -116,7 +119,69 @@ const createMockConcertsClient = (options?: {
   let identityLookups = 0;
 
   const client = {
-    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective') => {
+    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective' | 'event_stages') => {
+      if (table === 'event_stages') {
+        return {
+          insert: (row: Record<string, unknown>) => {
+            const created: EventStageRecord = {
+              id: String(row.id ?? `stage-${stages.length + 1}`),
+              event_id: String(row.event_id),
+              name: String(row.name)
+            };
+            stages.push(created);
+            return {
+              select: () => ({
+                single: async () => ({ data: created, error: null })
+              })
+            };
+          },
+          select: () => ({
+            order: async () => ({ data: stages, error: null }),
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => ({
+                data: stages.find(stage => stage.event_id === value || stage.id === value) ?? null,
+                error: null
+              }),
+              order: async () => ({
+                data: stages.filter(stage => stage.event_id === value || stage.id === value),
+                error: null
+              }),
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: null }),
+                order: async () => ({ data: [], error: null })
+              })
+            })
+          }),
+          update: (row: Record<string, unknown>) => ({
+            eq: (column: string, value: string) => ({
+              select: () => ({
+                single: async () => {
+                  const index = stages.findIndex(stage => stage[column as keyof EventStageRecord] === value);
+                  if (index < 0) {
+                    return { data: null, error: { message: 'stage not found' } };
+                  }
+
+                  const updated = {
+                    ...stages[index]!,
+                    name: row.name === undefined ? stages[index]!.name : String(row.name)
+                  };
+                  stages[index] = updated;
+                  return { data: updated, error: null };
+                }
+              })
+            })
+          }),
+          delete: () => ({
+            eq: async (column: string, value: string) => {
+              const index = stages.findIndex(stage => stage[column as keyof EventStageRecord] === value);
+              if (index >= 0) {
+                stages.splice(index, 1);
+              }
+              return { data: null, error: null };
+            }
+          })
+        };
+      }
       if (table === 'attendance' || table === 'attendance_effective') {
         if (table === 'attendance_effective') {
           return {
@@ -205,7 +270,8 @@ const createMockConcertsClient = (options?: {
                     name: String(row.name),
                     start_date: String(row.start_date),
                     end_date: String(row.end_date),
-                    place: String(row.place)
+                    place: String(row.place),
+                    allow_place_override: row.allow_place_override === true
                   };
                   events.push(created);
                   return { data: created, error: null };
@@ -262,7 +328,8 @@ const createMockConcertsClient = (options?: {
                   date: String(row.date),
                   time: row.time == null || row.time === '' ? null : String(row.time),
                   place: String(row.place),
-                  notes: row.notes == null || row.notes === '' ? null : String(row.notes)
+                  notes: row.notes == null || row.notes === '' ? null : String(row.notes),
+                  stage_id: row.stage_id == null || row.stage_id === '' ? null : String(row.stage_id)
                 };
                 concerts.push(created);
                 return { data: created, error: null };
@@ -333,7 +400,10 @@ const createMockConcertsClient = (options?: {
                     place: row.place === undefined ? current.place : String(row.place),
                     notes: row.notes === undefined
                       ? current.notes
-                      : (row.notes == null || row.notes === '' ? null : String(row.notes))
+                      : (row.notes == null || row.notes === '' ? null : String(row.notes)),
+                    stage_id: row.stage_id === undefined
+                      ? current.stage_id
+                      : (row.stage_id == null || row.stage_id === '' ? null : String(row.stage_id))
                   };
                   concerts[index] = updated;
                   return { data: updated, error: null };
@@ -1627,5 +1697,117 @@ describe('concerts store and pages use domain helpers only', () => {
 
   it('exports createEvent for New night/New festival Event rules', () => {
     expect(typeof createEvent).toBe('function');
+  });
+});
+
+describe('concert Event rules', () => {
+  const mainStage = {
+    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    event_id: festivalRow.id,
+    name: 'Main'
+  };
+
+  it('requires stage_id when the Event has Stage/Scene rows and stores the id not a name', async () => {
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [festivalRow],
+      stages: [mainStage]
+    });
+
+    const missing = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-20',
+      eventId: festivalRow.id
+    });
+
+    expect(missing.data).toBeNull();
+    expect(missing.error?.ruleId).toBe(CONCERT_RULE.requiredStage);
+    expect(missing.error?.message).toBe(CONCERT_RULE_MESSAGE.requiredStage);
+    expect(concertInserts).toHaveLength(0);
+
+    const created = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-20',
+      eventId: festivalRow.id,
+      stageId: mainStage.id
+    });
+
+    expect(created.error).toBeNull();
+    expect(created.data?.stage_id).toBe(mainStage.id);
+    expect(created.data?.stage_id).not.toBe('Main');
+    expect(concertInserts[0]).toMatchObject({
+      stage_id: mainStage.id,
+      place: 'Paris'
+    });
+  });
+
+  it('does not require a Stage when the Event list is empty', async () => {
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [festivalRow],
+      stages: []
+    });
+
+    const created = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-20',
+      eventId: festivalRow.id
+    });
+
+    expect(created.error).toBeNull();
+    expect(created.data?.stage_id).toBeNull();
+    expect(concertInserts[0]).toMatchObject({ stage_id: null });
+  });
+
+  it('rejects a Concert Place that conflicts with the Event when override is off', async () => {
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [{ ...festivalRow, allow_place_override: false }]
+    });
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-20',
+      eventId: festivalRow.id,
+      place: 'Lyon'
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(CONCERT_RULE.placeConflict);
+    expect(result.error?.message).toBe(CONCERT_RULE_MESSAGE.placeConflict);
+    expect(concertInserts).toHaveLength(0);
+  });
+
+  it('allows a different Concert Place when Place-override is on', async () => {
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [{ ...festivalRow, allow_place_override: true }]
+    });
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-20',
+      eventId: festivalRow.id,
+      place: 'Lyon'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.place).toBe('Lyon');
+    expect(concertInserts[0]).toMatchObject({ place: 'Lyon' });
+  });
+
+  it('blocks a Concert date outside the Event with the named copy plus the range', async () => {
+    const { client } = createMockConcertsClient({
+      events: [festivalRow]
+    });
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-09',
+      eventId: festivalRow.id
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(CONCERT_RULE.dateOutsideEvent);
+    expect(result.error?.message).toBe(dateOutsideEventMessage(festivalRow));
+    expect(result.error?.message).toContain(CONCERT_RULE_MESSAGE.dateOutsideEvent);
+    expect(result.error?.message).toContain('20/08/2026');
+    expect(result.error?.message).toContain('22/08/2026');
   });
 });

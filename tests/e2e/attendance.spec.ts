@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import { test, expect } from './fixtures/auth.fixture';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
@@ -84,7 +83,7 @@ const isUuid = (value: string) => {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 };
 
-const patchConcertDate = (
+const patchConcertDate = async (
   headers: ReturnType<typeof restHeaders>,
   supabaseUrl: string,
   concertId: string,
@@ -94,22 +93,34 @@ const patchConcertDate = (
     throw new Error('Invalid concert date patch');
   }
 
-  return fetch(`${supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
-    method: 'PATCH',
-    headers,
-    body: JSON.stringify({ date })
-  }).then(async (response) => {
-    if (response.ok) {
-      return;
-    }
+  const concertResponse = await fetch(
+    `${supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=event_id`,
+    { headers }
+  );
+  if (!concertResponse.ok) {
+    throw new Error(`Failed to load concert for date patch: ${await concertResponse.text()}`);
+  }
 
-    execFileSync('pnpm', ['exec', 'supabase', 'db', 'query', '--local',
-      `update public.concerts set date = '${date}' where id = '${concertId}'::uuid`
-    ], {
-      cwd: process.cwd(),
-      encoding: 'utf8'
-    });
+  const concerts = await concertResponse.json() as { event_id: string }[];
+  const eventId = concerts[0]?.event_id;
+  if (!eventId) {
+    throw new Error('Concert for date patch was not found');
+  }
+
+  const saved = await fetch(`${supabaseUrl}/rest/v1/rpc/save_event_and_concert_dates`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      p_event_id: eventId,
+      p_start_date: date,
+      p_end_date: date,
+      p_concert_dates: [{ id: concertId, date }]
+    })
   });
+
+  if (!saved.ok) {
+    throw new Error(`Failed to save concert date: ${await saved.text()}`);
+  }
 };
 
 test('marks a future concert Going and a past concert Attended, then clear stays unset', async ({ authenticatedPage }) => {

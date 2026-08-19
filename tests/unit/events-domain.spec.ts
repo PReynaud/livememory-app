@@ -6,9 +6,13 @@ import {
   getOwnedEvent,
   listOwnedEvents,
   selectFeaturedEvents,
+  updateEvent,
   EVENT_RULE,
   EVENT_RULE_MESSAGE,
+  dateOutsideEventMessage,
+  type EventBillConcert,
   type EventRecord,
+  type EventStageRecord,
   type EventsClient
 } from '../../shared/domain/events';
 
@@ -37,16 +41,128 @@ const festivalRow: EventRecord = {
 
 const createMockEventsClient = (options?: {
   rows?: EventRecord[];
+  concerts?: EventBillConcert[];
+  stages?: EventStageRecord[];
   insertCalls?: Record<string, unknown>[];
+  updateCalls?: Record<string, unknown>[];
+  rpcCalls?: Record<string, unknown>[];
   getError?: { message: string; code?: string };
   insertError?: { message: string; code?: string; details?: string; hint?: string };
+  updateError?: { message: string; code?: string; details?: string; hint?: string };
+  rpcError?: { message: string; code?: string; details?: string; hint?: string };
 }) => {
   const rows = [...(options?.rows ?? [])];
+  const concerts = [...(options?.concerts ?? [])];
+  const stages = [...(options?.stages ?? [])];
   const insertCalls = options?.insertCalls ?? [];
+  const updateCalls = options?.updateCalls ?? [];
+  const rpcCalls = options?.rpcCalls ?? [];
 
   const client = {
-    from: (table: 'events') => {
-      expect(table).toBe('events');
+    from: (table: 'events' | 'concerts' | 'event_stages') => {
+      if (table === 'concerts') {
+        return {
+          select: () => ({
+            order: async () => ({ data: concerts, error: null }),
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => ({
+                data: concerts.find(concert => concert.id === value) ?? null,
+                error: null
+              }),
+              order: async () => ({
+                data: concerts.filter(concert => concert.event_id === value),
+                error: null
+              }),
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: null }),
+                order: async () => ({ data: [], error: null })
+              })
+            })
+          }),
+          update: (row: Record<string, unknown>) => ({
+            eq: (column: string, value: string) => ({
+              select: () => ({
+                single: async () => {
+                  const index = concerts.findIndex(concert => concert[column as keyof EventBillConcert] === value);
+                  if (index < 0) {
+                    return { data: null, error: { message: 'concert not found' } };
+                  }
+
+                  const updated = {
+                    ...concerts[index]!,
+                    date: row.date === undefined ? concerts[index]!.date : String(row.date),
+                    place: row.place === undefined ? concerts[index]!.place : String(row.place),
+                    stage_id: row.stage_id === undefined
+                      ? concerts[index]!.stage_id
+                      : (row.stage_id == null ? null : String(row.stage_id))
+                  };
+                  concerts[index] = updated;
+                  return { data: updated, error: null };
+                }
+              })
+            })
+          })
+        };
+      }
+
+      if (table === 'event_stages') {
+        return {
+          select: () => ({
+            order: async () => ({ data: stages, error: null }),
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => ({
+                data: stages.find(stage => stage.id === value || stage.event_id === value) ?? null,
+                error: null
+              }),
+              order: async () => ({
+                data: stages.filter(stage => stage.event_id === value),
+                error: null
+              })
+            })
+          }),
+          insert: (row: Record<string, unknown>) => {
+            const created: EventStageRecord = {
+              id: String(row.id ?? `stage-${stages.length + 1}`),
+              event_id: String(row.event_id),
+              name: String(row.name)
+            };
+            stages.push(created);
+            return {
+              select: () => ({
+                single: async () => ({ data: created, error: null })
+              })
+            };
+          },
+          update: (row: Record<string, unknown>) => ({
+            eq: (column: string, value: string) => ({
+              select: () => ({
+                single: async () => {
+                  const index = stages.findIndex(stage => stage[column as keyof EventStageRecord] === value);
+                  if (index < 0) {
+                    return { data: null, error: { message: 'stage not found' } };
+                  }
+
+                  const updated = {
+                    ...stages[index]!,
+                    name: row.name === undefined ? stages[index]!.name : String(row.name)
+                  };
+                  stages[index] = updated;
+                  return { data: updated, error: null };
+                }
+              })
+            })
+          }),
+          delete: () => ({
+            eq: async (column: string, value: string) => {
+              const index = stages.findIndex(stage => stage[column as keyof EventStageRecord] === value);
+              if (index >= 0) {
+                stages.splice(index, 1);
+              }
+              return { data: null, error: null };
+            }
+          })
+        };
+      }
 
       return {
         insert: (row: Record<string, unknown>) => {
@@ -65,7 +181,8 @@ const createMockEventsClient = (options?: {
                   name: String(row.name),
                   start_date: String(row.start_date),
                   end_date: String(row.end_date),
-                  place: String(row.place)
+                  place: String(row.place),
+                  allow_place_override: row.allow_place_override === true
                 };
                 rows.push(created);
                 return { data: created, error: null };
@@ -85,14 +202,120 @@ const createMockEventsClient = (options?: {
                 data: rows.find(row => row.id === value) ?? null,
                 error: null
               };
-            }
+            },
+            order: async () => ({
+              data: rows.filter(row => row.id === value),
+              error: null
+            })
           })
-        })
+        }),
+        update: (row: Record<string, unknown>) => {
+          updateCalls.push(row);
+          return {
+            eq: (column: string, value: string) => ({
+              select: () => ({
+                single: async () => {
+                  if (options?.updateError) {
+                    return { data: null, error: options.updateError };
+                  }
+
+                  const index = rows.findIndex(event => event[column as keyof EventRecord] === value);
+                  if (index < 0) {
+                    return { data: null, error: { message: 'event not found' } };
+                  }
+
+                  const updated: EventRecord = {
+                    ...rows[index]!,
+                    name: row.name === undefined ? rows[index]!.name : String(row.name),
+                    start_date: row.start_date === undefined ? rows[index]!.start_date : String(row.start_date),
+                    end_date: row.end_date === undefined ? rows[index]!.end_date : String(row.end_date),
+                    place: row.place === undefined ? rows[index]!.place : String(row.place),
+                    allow_place_override: row.allow_place_override === undefined
+                      ? rows[index]!.allow_place_override
+                      : row.allow_place_override === true
+                  };
+                  rows[index] = updated;
+                  return { data: updated, error: null };
+                }
+              })
+            })
+          };
+        }
       };
+    },
+    rpc: async (
+      fn: 'save_event_and_concert_dates',
+      args: {
+        p_event_id: string;
+        p_start_date: string;
+        p_end_date: string;
+        p_concert_dates: Array<{ id: string; date?: string; stage_id?: string | null }> | null;
+        p_name?: string;
+        p_place?: string;
+        p_allow_place_override?: boolean;
+        p_stages?: Array<{ id: string; name: string }> | null;
+      }
+    ) => {
+      rpcCalls.push({ fn, ...args });
+      if (options?.rpcError) {
+        return { data: null, error: options.rpcError };
+      }
+
+      const index = rows.findIndex(event => event.id === args.p_event_id);
+      if (index < 0) {
+        return { data: null, error: { message: 'You do not own this Event.' } };
+      }
+
+      const updated: EventRecord = {
+        ...rows[index]!,
+        start_date: args.p_start_date,
+        end_date: args.p_end_date,
+        name: args.p_name ?? rows[index]!.name,
+        place: args.p_place ?? rows[index]!.place,
+        allow_place_override: args.p_allow_place_override ?? rows[index]!.allow_place_override
+      };
+      rows[index] = updated;
+
+      if (args.p_concert_dates) {
+        for (const patch of args.p_concert_dates) {
+          const concertIndex = concerts.findIndex(concert => concert.id === patch.id);
+          if (concertIndex >= 0) {
+            concerts[concertIndex] = {
+              ...concerts[concertIndex]!,
+              date: patch.date ?? concerts[concertIndex]!.date,
+              stage_id: patch.stage_id === undefined ? concerts[concertIndex]!.stage_id : patch.stage_id
+            };
+          }
+        }
+      }
+
+      if (args.p_stages) {
+        const kept = new Set(args.p_stages.map(stage => stage.id));
+        for (let stageIndex = stages.length - 1; stageIndex >= 0; stageIndex -= 1) {
+          if (stages[stageIndex]?.event_id === args.p_event_id && !kept.has(stages[stageIndex]!.id)) {
+            stages.splice(stageIndex, 1);
+          }
+        }
+        for (const stage of args.p_stages) {
+          const existingIndex = stages.findIndex(row => row.id === stage.id);
+          const next: EventStageRecord = {
+            id: stage.id,
+            event_id: args.p_event_id,
+            name: stage.name
+          };
+          if (existingIndex >= 0) {
+            stages[existingIndex] = next;
+          } else {
+            stages.push(next);
+          }
+        }
+      }
+
+      return { data: updated, error: null };
     }
   };
 
-  return { client: client as EventsClient, rows, insertCalls };
+  return { client: client as unknown as EventsClient, rows, concerts, stages, insertCalls, updateCalls, rpcCalls };
 };
 
 describe('events migration kernel', () => {
@@ -354,7 +577,7 @@ describe('events store and pages use domain helpers only', () => {
   it('keeps Event queries in shared/domain and out of pages and the store', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
     expect(store).toMatch(/from '#shared\/domain\/events'/);
-    expect(store).toMatch(/createEvent|listOwnedEvents|getOwnedEvent/);
+    expect(store).toMatch(/createEvent|listOwnedEvents|getOwnedEvent|updateEvent/);
     expect(store).not.toMatch(/from\('events'\)/);
     expect(store).toMatch(/\{ data, error \}|return \{[\s\S]*data:[\s\S]*error:/);
     expect(store).toMatch(/finally/);
@@ -383,8 +606,14 @@ describe('events store and pages use domain helpers only', () => {
     expect(eventPage).toMatch(/Couldn't load/);
     expect(eventPage).toMatch(/Event not found/);
     expect(eventPage).toMatch(/loadFailed|eventsStore\.error|error\.value/);
+    expect(eventPage).toMatch(/Edit event/);
 
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/home\|concerts\|profile\|e/);
+    expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/AppEditEventSheet/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/updateOwnedEvent/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertDates/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertStages/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).not.toMatch(/firstStage/);
   });
 });
 
@@ -413,5 +642,276 @@ describe('selectFeaturedEvents', () => {
     ]);
     expect(selectFeaturedEvents([past], now)).toEqual([]);
     expect(selectFeaturedEvents([emptySoon], now).map(event => event.name)).toEqual(['Empty Soon']);
+  });
+});
+
+describe('event rules kernel', () => {
+  it('adds stages, place override default off, concert stage_id, and a SECURITY INVOKER combined date save', () => {
+    const migration = readMigrations().find(file => file.name.includes('event_rules_stages_place_override'));
+    expect(migration).toBeTruthy();
+    const sql = migration?.sql ?? '';
+
+    expect(sql).toMatch(/create table public\.event_stages/);
+    expect(sql).toMatch(/allow_place_override boolean not null default false/);
+    expect(sql).toMatch(/add column stage_id uuid/);
+    expect(sql).toMatch(/enable row level security/);
+    expect(sql).toMatch(/\(select auth\.uid\(\)\)/);
+    expect(sql).toMatch(/btrim\(concerts\.artist\) <> ''/);
+    expect(sql).toMatch(/save_event_and_concert_dates/);
+    expect(sql).toMatch(/security invoker/);
+    expect(sql).toMatch(/deferrable initially deferred/);
+    expect(sql).not.toMatch(/service_role/);
+    expect(sql).not.toMatch(/security definer/i);
+  });
+
+  it('validates both source and destination Events when a Stage event_id changes', () => {
+    const migration = readMigrations().find(file => file.name.includes('event_rules_stages_place_override'));
+    const sql = migration?.sql ?? '';
+    const triggerFn = sql.slice(
+      sql.indexOf('create or replace function public.enforce_event_stages_bill_rules()'),
+      sql.indexOf('create constraint trigger event_stages_bill_rules')
+    );
+
+    expect(triggerFn).toMatch(/old\.event_id is distinct from new\.event_id/);
+    expect(triggerFn).toMatch(/stage_id = old\.id/);
+    expect(triggerFn).toMatch(/assert_event_bill_valid\(old\.event_id\)/);
+    expect(triggerFn).toMatch(/assert_event_bill_valid\(new\.event_id\)/);
+    expect(triggerFn).toMatch(/Stage or Scene must be on this Event/);
+  });
+});
+
+describe('updateEvent', () => {
+  const justice: EventBillConcert = {
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    event_id: festivalRow.id,
+    artist: 'Justice',
+    date: '2026-08-20',
+    place: 'Paris',
+    stage_id: null
+  };
+
+  const phoenix: EventBillConcert = {
+    id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    event_id: festivalRow.id,
+    artist: 'Phoenix',
+    date: '2026-08-21',
+    place: 'Paris',
+    stage_id: null
+  };
+
+  it('saves name, Place, and Place-override defaulting off without RPC', async () => {
+    const { client, updateCalls, rpcCalls } = createMockEventsClient({
+      rows: [{ ...festivalRow, allow_place_override: false }]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: 'Rock Week Paris',
+      startDate: '2026-08-20',
+      endDate: '2026-08-22',
+      place: 'La Villette',
+      allowPlaceOverride: false
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.name).toBe('Rock Week Paris');
+    expect(result.data?.place).toBe('La Villette');
+    expect(result.data?.allow_place_override).toBe(false);
+    expect(updateCalls[0]).toMatchObject({
+      name: 'Rock Week Paris',
+      place: 'La Villette',
+      allow_place_override: false
+    });
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it('blocks an Event date change that would invalidate Concerts and lists each Concert and failed rule', async () => {
+    const { client, updateCalls, rpcCalls } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [justice, phoenix]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: '2026-08-10',
+      endDate: '2026-08-12',
+      place: festivalRow.place
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(EVENT_RULE.concertConflict);
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.concertConflict);
+    expect(result.error?.message).toContain('Justice (20/08/2026)');
+    expect(result.error?.message).toContain('Phoenix (21/08/2026)');
+    expect(result.error?.message).toContain(dateOutsideEventMessage({
+      start_date: '2026-08-10',
+      end_date: '2026-08-12'
+    }));
+    expect(result.error?.conflicts).toHaveLength(2);
+    expect(updateCalls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it('saves Event dates and Concert dates together in one domain operation', async () => {
+    const { client, rpcCalls, concerts } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [justice, phoenix]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: '2026-08-10',
+      endDate: '2026-08-12',
+      place: festivalRow.place,
+      concertDates: [
+        { concertId: justice.id, date: '2026-08-10' },
+        { concertId: phoenix.id, date: '2026-08-11' }
+      ]
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.start_date).toBe('2026-08-10');
+    expect(result.data?.end_date).toBe('2026-08-12');
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toMatchObject({
+      fn: 'save_event_and_concert_dates',
+      p_event_id: festivalRow.id,
+      p_start_date: '2026-08-10',
+      p_end_date: '2026-08-12'
+    });
+    expect(concerts.map(concert => concert.date)).toEqual(['2026-08-10', '2026-08-11']);
+  });
+
+  it('blocks adding Stages when existing Concerts have no stage_id and does not assign the first Stage', async () => {
+    const { client, rpcCalls, updateCalls, concerts } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [justice, phoenix]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      stages: [{ name: 'Main' }, { name: 'Valley' }]
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(EVENT_RULE.concertConflict);
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.concertConflict);
+    expect(result.error?.message).toContain('Justice (20/08/2026)');
+    expect(result.error?.message).toContain('Phoenix (21/08/2026)');
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.requiredStage);
+    expect(result.error?.conflicts).toEqual([
+      expect.objectContaining({
+        concertId: justice.id,
+        artist: 'Justice',
+        date: justice.date,
+        ruleId: EVENT_RULE.requiredStage,
+        message: EVENT_RULE_MESSAGE.requiredStage
+      }),
+      expect.objectContaining({
+        concertId: phoenix.id,
+        artist: 'Phoenix',
+        date: phoenix.date,
+        ruleId: EVENT_RULE.requiredStage,
+        message: EVENT_RULE_MESSAGE.requiredStage
+      })
+    ]);
+    expect(concerts.map(concert => concert.stage_id)).toEqual([null, null]);
+    expect(updateCalls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it('saves new Stages with explicit per-Concert Stage choices in one domain operation', async () => {
+    const mainId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const valleyId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const { client, rpcCalls, concerts, stages } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [justice, phoenix]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      stages: [
+        { id: mainId, name: 'Main' },
+        { id: valleyId, name: 'Valley' }
+      ],
+      concertDates: [
+        { concertId: justice.id, date: justice.date, stageId: mainId },
+        { concertId: phoenix.id, date: phoenix.date, stageId: valleyId }
+      ]
+    });
+
+    expect(result.error).toBeNull();
+    expect(stages.map(stage => stage.name)).toEqual(['Main', 'Valley']);
+    expect(concerts.map(concert => concert.stage_id)).toEqual([mainId, valleyId]);
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toMatchObject({
+      fn: 'save_event_and_concert_dates',
+      p_event_id: festivalRow.id,
+      p_stages: [
+        { id: mainId, name: 'Main' },
+        { id: valleyId, name: 'Valley' }
+      ]
+    });
+  });
+
+  it('renames a Stage without detaching Concerts', async () => {
+    const stage: EventStageRecord = {
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      event_id: festivalRow.id,
+      name: 'Main'
+    };
+    const stagedJustice: EventBillConcert = { ...justice, stage_id: stage.id };
+    const { client, stages, concerts } = createMockEventsClient({
+      rows: [festivalRow],
+      concerts: [stagedJustice],
+      stages: [stage]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      stages: [{ id: stage.id, name: 'Valley' }]
+    });
+
+    expect(result.error).toBeNull();
+    expect(stages[0]?.name).toBe('Valley');
+    expect(stages[0]?.id).toBe(stage.id);
+    expect(concerts[0]?.stage_id).toBe(stage.id);
+  });
+
+  it('blocks turning Place-override off when Concert Places differ', async () => {
+    const { client, updateCalls, rpcCalls } = createMockEventsClient({
+      rows: [{ ...festivalRow, allow_place_override: true }],
+      concerts: [{ ...justice, place: 'Lyon' }]
+    });
+
+    const result = await updateEvent(client, {
+      eventId: festivalRow.id,
+      name: festivalRow.name,
+      startDate: festivalRow.start_date,
+      endDate: festivalRow.end_date,
+      place: festivalRow.place,
+      allowPlaceOverride: false
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(EVENT_RULE.concertConflict);
+    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.placeConflict);
+    expect(result.error?.message).toContain('Justice');
+    expect(updateCalls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(0);
   });
 });
