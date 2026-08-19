@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useToast } from '#imports';
+import { navigateTo, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
 import { useEventsStore } from '@/stores/events';
@@ -23,6 +23,7 @@ const concertDates = ref<Record<string, string>>({});
 const concertStages = ref<Record<string, string>>({});
 const formError = ref('');
 const saving = ref(false);
+const confirmDelete = ref(false);
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -61,6 +62,7 @@ const fillFromEvent = () => {
     currentConcerts.value.map(concert => [concert.id, concert.stage_id ?? ''])
   );
   formError.value = '';
+  confirmDelete.value = false;
 };
 
 watch(() => sheet.open, async (isOpen) => {
@@ -141,6 +143,42 @@ const persist = async () => {
 
     toast.add({ title: 'Event saved.' });
     sheet.closeSheet();
+  } finally {
+    saving.value = false;
+  }
+};
+
+const requestDelete = () => {
+  if (!hasConcerts.value) {
+    void removeEvent();
+    return;
+  }
+
+  confirmDelete.value = true;
+};
+
+const cancelDelete = () => {
+  confirmDelete.value = false;
+};
+
+const removeEvent = async () => {
+  if (!sheet.eventId || saving.value) {
+    return;
+  }
+
+  saving.value = true;
+  formError.value = '';
+
+  try {
+    const result = await eventsStore.deleteOwnedEvent(sheet.eventId);
+    if (result.error) {
+      formError.value = result.error;
+      return;
+    }
+
+    toast.add({ title: 'Event deleted.' });
+    sheet.closeSheet();
+    await navigateTo('/concerts');
   } finally {
     saving.value = false;
   }
@@ -319,14 +357,55 @@ const slideoverUi = {
           :title="formError"
         />
 
-        <UButton
-          type="submit"
-          label="Save"
-          color="primary"
-          variant="outline"
-          class="h-11 w-full rounded-full ring-2"
-          :loading="saving"
-        />
+        <div class="flex flex-col gap-3 pt-1">
+          <div class="flex items-center gap-4">
+            <UButton
+              type="submit"
+              label="Save"
+              color="primary"
+              variant="outline"
+              class="h-11 flex-1 rounded-full ring-2"
+              :loading="saving"
+              :disabled="saving"
+            />
+            <UButton
+              v-if="!confirmDelete"
+              type="button"
+              label="Delete"
+              color="error"
+              variant="link"
+              class="px-0 font-semibold"
+              :disabled="saving"
+              @click="requestDelete"
+            />
+          </div>
+          <div
+            v-if="confirmDelete"
+            class="flex items-center gap-4"
+          >
+            <p class="flex-1 text-[15px] text-muted">
+              This Event and all its Concerts will be deleted.
+            </p>
+            <UButton
+              type="button"
+              label="Delete event"
+              color="error"
+              variant="outline"
+              class="h-11 rounded-full"
+              :loading="saving"
+              @click="removeEvent"
+            />
+            <UButton
+              type="button"
+              label="Cancel"
+              color="neutral"
+              variant="link"
+              class="px-0 font-semibold text-white"
+              :disabled="saving"
+              @click="cancelDelete"
+            />
+          </div>
+        </div>
       </form>
     </template>
   </USlideover>

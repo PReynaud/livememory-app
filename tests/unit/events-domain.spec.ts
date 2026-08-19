@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   createEvent,
+  deleteEvent,
   getOwnedEvent,
   listOwnedEvents,
   selectFeaturedEvents,
@@ -46,10 +47,12 @@ const createMockEventsClient = (options?: {
   insertCalls?: Record<string, unknown>[];
   updateCalls?: Record<string, unknown>[];
   rpcCalls?: Record<string, unknown>[];
+  eventDeletes?: { column: string; value: string }[];
   getError?: { message: string; code?: string };
   insertError?: { message: string; code?: string; details?: string; hint?: string };
   updateError?: { message: string; code?: string; details?: string; hint?: string };
   rpcError?: { message: string; code?: string; details?: string; hint?: string };
+  deleteError?: { message: string; code?: string; details?: string; hint?: string };
 }) => {
   const rows = [...(options?.rows ?? [])];
   const concerts = [...(options?.concerts ?? [])];
@@ -57,6 +60,7 @@ const createMockEventsClient = (options?: {
   const insertCalls = options?.insertCalls ?? [];
   const updateCalls = options?.updateCalls ?? [];
   const rpcCalls = options?.rpcCalls ?? [];
+  const eventDeletes = options?.eventDeletes ?? [];
 
   const client = {
     from: (table: 'events' | 'concerts' | 'event_stages') => {
@@ -240,7 +244,33 @@ const createMockEventsClient = (options?: {
               })
             })
           };
-        }
+        },
+        delete: () => ({
+          eq: async (column: string, value: string) => {
+            eventDeletes.push({ column, value });
+            if (options?.deleteError) {
+              return { data: null, error: options.deleteError };
+            }
+
+            const index = rows.findIndex(event => event[column as keyof EventRecord] === value);
+            if (index >= 0) {
+              const eventId = rows[index]!.id;
+              rows.splice(index, 1);
+              for (let concertIndex = concerts.length - 1; concertIndex >= 0; concertIndex -= 1) {
+                if (concerts[concertIndex]?.event_id === eventId) {
+                  concerts.splice(concertIndex, 1);
+                }
+              }
+              for (let stageIndex = stages.length - 1; stageIndex >= 0; stageIndex -= 1) {
+                if (stages[stageIndex]?.event_id === eventId) {
+                  stages.splice(stageIndex, 1);
+                }
+              }
+            }
+
+            return { data: null, error: null };
+          }
+        })
       };
     },
     rpc: async (
@@ -315,7 +345,7 @@ const createMockEventsClient = (options?: {
     }
   };
 
-  return { client: client as unknown as EventsClient, rows, concerts, stages, insertCalls, updateCalls, rpcCalls };
+  return { client: client as unknown as EventsClient, rows, concerts, stages, insertCalls, updateCalls, rpcCalls, eventDeletes };
 };
 
 describe('events migration kernel', () => {
@@ -333,6 +363,22 @@ describe('events migration kernel', () => {
     expect(sql).toMatch(/owner_id/);
     expect(sql).toMatch(/\(select auth\.uid\(\)\)/);
     expect(sql).not.toMatch(/service_role/);
+  });
+
+  it('lets the owner delete an Event and cascades Concerts, Attendance, and notes', () => {
+    const deleteMigration = readMigrations().find(file => file.name.includes('events_owner_delete'));
+    expect(deleteMigration).toBeTruthy();
+    const deleteSql = deleteMigration?.sql ?? '';
+    expect(deleteSql).toMatch(/grant delete on table public\.events to authenticated/);
+    expect(deleteSql).toMatch(/for delete/);
+    expect(deleteSql).toMatch(/\(select auth\.uid\(\)\)\s*=\s*owner_id/);
+    expect(deleteSql).not.toMatch(/service_role/);
+
+    const allSql = readMigrations().map(file => file.sql).join('\n');
+    expect(allSql).toMatch(/event_id uuid not null references public\.events \(id\) on delete cascade/);
+    expect(allSql).toMatch(/concert_id uuid not null references public\.concerts \(id\) on delete cascade/);
+    expect(allSql).toMatch(/add column notes text/);
+    expect(allSql).not.toMatch(/event_id uuid null/);
   });
 });
 
@@ -573,11 +619,94 @@ describe('listOwnedEvents and getOwnedEvent', () => {
   });
 });
 
+describe('deleteEvent', () => {
+  const nightConcert: EventBillConcert = {
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    event_id: festivalRow.id,
+    artist: 'Justice',
+    date: '2026-08-20',
+    place: 'Paris',
+    stage_id: null
+  };
+
+  it('deletes an empty Event without touching Concerts', async () => {
+    const { client, rows, concerts, eventDeletes } = createMockEventsClient({
+      rows: [festivalRow]
+    });
+
+    const result = await deleteEvent(client, festivalRow.id);
+
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(festivalRow.id);
+    expect(rows).toHaveLength(0);
+    expect(concerts).toHaveLength(0);
+    expect(eventDeletes).toEqual([{ column: 'id', value: festivalRow.id }]);
+  });
+
+  it('deletes a non-empty Event and leaves no Concert without an Event', async () => {
+    const sibling: EventRecord = {
+      ...festivalRow,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      name: 'Other Night'
+    };
+    const siblingConcert: EventBillConcert = {
+      ...nightConcert,
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      event_id: sibling.id
+    };
+    const { client, rows, concerts, eventDeletes } = createMockEventsClient({
+      rows: [festivalRow, sibling],
+      concerts: [nightConcert, siblingConcert]
+    });
+
+    const result = await deleteEvent(client, festivalRow.id);
+
+    expect(result.error).toBeNull();
+    expect(rows.map(event => event.id)).toEqual([sibling.id]);
+    expect(concerts.map(concert => concert.id)).toEqual([siblingConcert.id]);
+    expect(concerts.every(concert => rows.some(event => event.id === concert.event_id))).toBe(true);
+    expect(eventDeletes).toEqual([{ column: 'id', value: festivalRow.id }]);
+  });
+
+  it('blocks delete when the Event is missing or not owned', async () => {
+    const { client, rows, eventDeletes } = createMockEventsClient({
+      rows: [festivalRow]
+    });
+
+    const missing = await deleteEvent(client, '00000000-0000-4000-8000-000000000000');
+    expect(missing.data).toBeNull();
+    expect(missing.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(missing.error?.message).toBe(EVENT_RULE_MESSAGE.ownership);
+    expect(rows).toHaveLength(1);
+    expect(eventDeletes).toHaveLength(0);
+
+    const blank = await deleteEvent(client, '  ');
+    expect(blank.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(eventDeletes).toHaveLength(0);
+  });
+
+  it('surfaces persist failures from Event delete', async () => {
+    const { client, rows, eventDeletes } = createMockEventsClient({
+      rows: [festivalRow],
+      deleteError: { message: 'delete denied' }
+    });
+
+    const result = await deleteEvent(client, festivalRow.id);
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe('persist_failed');
+    expect(result.error?.message).toBe('delete denied');
+    expect(rows).toHaveLength(1);
+    expect(eventDeletes).toEqual([{ column: 'id', value: festivalRow.id }]);
+  });
+});
+
 describe('events store and pages use domain helpers only', () => {
   it('keeps Event queries in shared/domain and out of pages and the store', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/events.ts'), 'utf8');
     expect(store).toMatch(/from '#shared\/domain\/events'/);
-    expect(store).toMatch(/createEvent|listOwnedEvents|getOwnedEvent|updateEvent/);
+    expect(store).toMatch(/createEvent|listOwnedEvents|getOwnedEvent|updateEvent|deleteEvent/);
+    expect(store).toMatch(/deleteOwnedEvent/);
     expect(store).not.toMatch(/from\('events'\)/);
     expect(store).toMatch(/\{ data, error \}|return \{[\s\S]*data:[\s\S]*error:/);
     expect(store).toMatch(/finally/);
@@ -611,9 +740,18 @@ describe('events store and pages use domain helpers only', () => {
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/home\|concerts\|profile\|e/);
     expect(readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8')).toMatch(/AppEditEventSheet/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/updateOwnedEvent/);
+    expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/deleteOwnedEvent/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertDates/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertStages/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).not.toMatch(/firstStage/);
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8');
+    expect(sheet).toMatch(/if \(!hasConcerts\.value\)/);
+    expect(sheet).toMatch(/confirmDelete/);
+    expect(sheet).toMatch(/This Event and all its Concerts will be deleted/);
+    expect(sheet).toMatch(/Delete event/);
+    expect(sheet).toMatch(/navigateTo\('\/concerts'\)/);
+    expect(sheet).not.toMatch(/joiner/i);
+    expect(sheet).not.toMatch(/keep-standalone|standalone/);
   });
 });
 

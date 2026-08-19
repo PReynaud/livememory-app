@@ -5,6 +5,7 @@ import { getErrorMessage } from '@/utils/error-message';
 import type { Database } from '@/types/database.types';
 import {
   createEvent,
+  deleteEvent,
   getOwnedEvent,
   listEventStages,
   listOwnedEvents,
@@ -500,6 +501,35 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const deleteOwnedEvent = async (eventId: string) => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const result = await deleteEvent(eventsClient(), eventId);
+
+      if (result.error) {
+        error.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      if (currentEvent.value?.id === eventId) {
+        currentEvent.value = null;
+        currentConcerts.value = [];
+        currentStages.value = [];
+      }
+
+      await reloadOwnedConcertState();
+      return { data: result.data, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to delete event');
+      error.value = errorMessage;
+      return { data: null, error: errorMessage };
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const cycleAttendance = async (concert: ConcertRecord) => {
     if (attendanceBusyByConcertId.value[concert.id]) {
       return { data: null, error: null };
@@ -570,6 +600,7 @@ export const useEventsStore = defineStore('events', () => {
     fetchEvent,
     createOwnedEvent,
     updateOwnedEvent,
+    deleteOwnedEvent,
     createOwnedConcert,
     updateOwnedConcert,
     moveOwnedConcert,
