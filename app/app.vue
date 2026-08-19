@@ -73,6 +73,7 @@ useSeoMeta({
         <NuxtPage />
       </UMain>
       <AppAddConcertSheet />
+      <AppEditEventSheet />
     </div>
     <template v-else>
       <AppHeader />

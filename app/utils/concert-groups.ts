@@ -92,11 +92,17 @@ export const eventNameDiffersFromArtist = (eventName: string, artist: string) =>
   return eventName.trim().toLowerCase() !== artist.trim().toLowerCase();
 };
 
-export const formatConcertMetaLine = (concert: Pick<ConcertRecord, 'date' | 'place' | 'time'>) => {
+export const formatConcertMetaLine = (
+  concert: Pick<ConcertRecord, 'date' | 'place' | 'time'>,
+  stageName?: string | null
+) => {
   const parts = [formatCivilDate(concert.date), concert.place];
   const clock = formatConcertClock(concert.time);
   if (clock) {
     parts.push(clock);
+  }
+  if (stageName) {
+    parts.push(stageName);
   }
 
   return parts.join(' · ');

@@ -4,6 +4,7 @@ import { definePageMeta, useRoute } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEventsStore, type ConcertRecord } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
+import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
 import { formatEventDateLabel } from '@/utils/event-dates';
 import {
   formatConcertClock,
@@ -19,6 +20,7 @@ definePageMeta({
 const route = useRoute();
 const eventsStore = useEventsStore();
 const addSheet = useAddConcertSheetStore();
+const editEventSheet = useEditEventSheetStore();
 const { currentEvent, currentConcerts, error } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
 
@@ -51,6 +53,10 @@ const billCtaLabel = computed(() => {
   return currentEvent.value?.kind === 'festival' ? 'Add to this festival' : 'Add to this night';
 });
 
+const stageName = (concert: ConcertRecord) => {
+  return eventsStore.currentStages.find(stage => stage.id === concert.stage_id)?.name ?? '';
+};
+
 const loadEvent = async (id: string) => {
   hasResolved.value = false;
   if (!id) {
@@ -71,6 +77,14 @@ watch(eventId, (id) => {
 
 const retryLoad = () => {
   void loadEvent(eventId.value);
+};
+
+const openEditEvent = () => {
+  if (!currentEvent.value) {
+    return;
+  }
+
+  editEventSheet.openSheet(currentEvent.value.id);
 };
 
 const openAddSheet = () => {
@@ -109,6 +123,13 @@ const openEditSheet = (concert: ConcertRecord) => {
       <p class="text-[13px] text-muted">
         {{ currentEvent.place }}
       </p>
+      <UButton
+        label="Edit event"
+        color="neutral"
+        variant="link"
+        class="px-0 font-semibold text-white"
+        @click="openEditEvent"
+      />
       <section class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2">
         <template v-if="billLoadFailed">
           <p class="text-lg font-semibold">
@@ -159,6 +180,12 @@ const openEditSheet = (concert: ConcertRecord) => {
                   class="text-[13px] text-muted"
                 >
                   {{ formatConcertClock(concert.time) }}
+                </p>
+                <p
+                  v-if="stageName(concert)"
+                  class="text-[13px] text-muted"
+                >
+                  {{ stageName(concert) }}
                 </p>
               </button>
               <AppAttendanceChip
