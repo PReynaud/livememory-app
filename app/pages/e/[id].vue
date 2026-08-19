@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { definePageMeta, useRoute } from '#imports';
 import { storeToRefs } from 'pinia';
-import { useEventsStore } from '@/stores/events';
+import { useEventsStore, type ConcertRecord } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { formatEventDateLabel } from '@/utils/event-dates';
 import {
@@ -83,6 +83,18 @@ const openAddSheet = () => {
     lockEvent: true
   });
 };
+
+const openEditSheet = (concert: ConcertRecord) => {
+  if (!currentEvent.value) {
+    return;
+  }
+
+  addSheet.openSheet({
+    eventId: currentEvent.value.id,
+    lockEvent: true,
+    concertId: concert.id
+  });
+};
 </script>
 
 <template>
@@ -133,7 +145,12 @@ const openAddSheet = () => {
               :key="concert.id"
               class="flex items-start justify-between gap-3 py-1.5"
             >
-              <div class="min-w-0">
+              <button
+                type="button"
+                class="min-w-0 flex-1 text-left"
+                :aria-label="`Edit ${concert.artist}`"
+                @click="openEditSheet(concert)"
+              >
                 <p class="text-base font-semibold">
                   {{ concert.artist }}
                 </p>
@@ -143,7 +160,7 @@ const openAddSheet = () => {
                 >
                   {{ formatConcertClock(concert.time) }}
                 </p>
-              </div>
+              </button>
               <AppAttendanceChip
                 :status="eventsStore.attendanceStatus(concert.id)"
                 :is-past="eventsStore.concertIsPast(concert)"

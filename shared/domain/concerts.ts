@@ -19,7 +19,8 @@ export const CONCERT_RULE = {
   requiredPlace: 'required_place',
   dateOutsideEvent: 'date_outside_event',
   impossiblePlace: 'impossible_place',
-  needsChoice: 'needs_choice'
+  needsChoice: 'needs_choice',
+  ownership: 'ownership'
 } as const;
 
 export const CONCERT_RULE_MESSAGE = {
@@ -30,7 +31,8 @@ export const CONCERT_RULE_MESSAGE = {
   dateOutsideEvent: 'This date is outside the Event.',
   impossiblePlace: 'This concert already exists at a different Place.',
   needsChoice: 'This artist and date already exist. Attach to the existing concert or create another.',
-  otherEvent: 'This concert already exists on another Event.'
+  otherEvent: 'This concert already exists on another Event.',
+  ownership: 'You do not own this concert.'
 } as const;
 
 export const CONCERT_IDENTITY = {
@@ -52,6 +54,7 @@ export type ConcertRecord = {
   date: string;
   time: string | null;
   place: string;
+  notes?: string | null;
 };
 
 export type CreateConcertResult = DomainResult<ConcertRecord> & {
@@ -66,6 +69,14 @@ export type CreateConcertInput = {
   eventId?: string;
   newEvent?: CreateEventInput;
   confirm?: ConcertIdentityConfirm;
+};
+
+export type UpdateConcertInput = {
+  concertId: string;
+  artist: string;
+  date: string;
+  time?: string | null;
+  notes?: string | null;
 };
 
 type QueryError = {
@@ -640,6 +651,121 @@ export const createConcert = async (
   }
 
   return okCreate(data, CONCERT_IDENTITY.created);
+};
+
+const optionalNotes = (value: string | null | undefined): string | null => {
+  const notes = trim(value);
+  return notes || null;
+};
+
+const loadConcert = async (
+  client: ConcertsClient,
+  concertId: string
+): Promise<DomainResult<ConcertRecord>> => {
+  const id = trim(concertId);
+  if (!id) {
+    return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
+  }
+
+  const { data, error } = await client.from('concerts').select('*').eq('id', id).maybeSingle();
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  if (!data) {
+    return fail(CONCERT_RULE.ownership, CONCERT_RULE_MESSAGE.ownership);
+  }
+
+  return ok(data);
+};
+
+export const updateConcert = async (
+  client: ConcertsClient,
+  input: UpdateConcertInput
+): Promise<DomainResult<ConcertRecord>> => {
+  const artist = trim(input.artist);
+  if (!artist) {
+    return fail(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
+  }
+
+  const date = trim(input.date);
+  if (!date || !CIVIL_DATE.test(date)) {
+    return fail(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
+  }
+
+  const existing = await loadConcert(client, input.concertId);
+  if (existing.error || !existing.data) {
+    return existing;
+  }
+
+  const eventResult = await resolveEvent(client, {
+    artist,
+    date,
+    eventId: existing.data.event_id
+  });
+  if (eventResult.error || !eventResult.data) {
+    return {
+      data: null,
+      error: eventResult.error
+    };
+  }
+
+  if (!isDateInsideEvent(date, eventResult.data)) {
+    return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
+  }
+
+  const payload = {
+    artist,
+    date,
+    time: normalizeClock(input.time),
+    place: eventResult.data.place,
+    notes: optionalNotes(input.notes)
+  };
+
+  const { data, error } = await client
+    .from('concerts')
+    .update(payload)
+    .eq('id', existing.data.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    return {
+      data: null,
+      error: persistFailed(error ?? { message: 'Failed to update concert' })
+    };
+  }
+
+  return ok(data);
+};
+
+export const deleteConcert = async (
+  client: ConcertsClient,
+  concertId: string
+): Promise<DomainResult<{ id: string; event_id: string }>> => {
+  const existing = await loadConcert(client, concertId);
+  if (existing.error || !existing.data) {
+    return {
+      data: null,
+      error: existing.error
+    };
+  }
+
+  const { error } = await client.from('concerts').delete().eq('id', existing.data.id);
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  return ok({
+    id: existing.data.id,
+    event_id: existing.data.event_id
+  });
 };
 
 export const listConcertsForEvent = async (

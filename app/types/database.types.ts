@@ -44,6 +44,7 @@ export type Database = {
           date: string
           event_id: string
           id: string
+          notes: string | null
           owner_id: string
           place: string
           time: string | null
@@ -53,6 +54,7 @@ export type Database = {
           date: string
           event_id: string
           id?: string
+          notes?: string | null
           owner_id?: string
           place: string
           time?: string | null
@@ -62,6 +64,7 @@ export type Database = {
           date?: string
           event_id?: string
           id?: string
+          notes?: string | null
           owner_id?: string
           place?: string
           time?: string | null
