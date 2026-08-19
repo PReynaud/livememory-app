@@ -187,11 +187,14 @@ export type Database = {
       }
     }
     Functions: {
+      assert_event_bill_valid: {
+        Args: { p_event_id: string }
+        Returns: undefined
+      }
       concert_event_rule_violation: {
         Args: { concert: Database["public"]["Tables"]["concerts"]["Row"] }
         Returns: string
       }
-      assert_event_bill_valid: { Args: { p_event_id: string }; Returns: undefined }
       concert_is_past: {
         Args: { p_date: string; p_time: string }
         Returns: boolean
@@ -207,7 +210,22 @@ export type Database = {
           p_stages?: Json
           p_start_date: string
         }
-        Returns: Database["public"]["Tables"]["events"]["Row"]
+        Returns: {
+          allow_place_override: boolean
+          end_date: string
+          id: string
+          kind: string
+          name: string
+          owner_id: string
+          place: string
+          start_date: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       username_is_taken: { Args: { candidate: string }; Returns: boolean }
     }
