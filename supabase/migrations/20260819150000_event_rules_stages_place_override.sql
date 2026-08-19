@@ -227,7 +227,22 @@ security invoker
 set search_path = public
 as $$
 begin
-  perform public.assert_event_bill_valid(coalesce(new.event_id, old.event_id));
+  if tg_op = 'UPDATE' and old.event_id is distinct from new.event_id then
+    if exists (
+      select 1
+      from public.concerts
+      where event_id = old.event_id
+        and stage_id = old.id
+    ) then
+      raise exception 'Stage or Scene must be on this Event.';
+    end if;
+
+    perform public.assert_event_bill_valid(old.event_id);
+    perform public.assert_event_bill_valid(new.event_id);
+  else
+    perform public.assert_event_bill_valid(coalesce(new.event_id, old.event_id));
+  end if;
+
   return coalesce(new, old);
 end;
 $$;
