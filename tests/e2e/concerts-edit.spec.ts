@@ -43,7 +43,7 @@ test('owner opens the glass edit sheet from the Event row, saves notes, and dele
   await sheet.getByPlaceholder('Private. Never on your public profile.').fill('Back of the room.');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toHaveCount(0);
-  await expect(authenticatedPage.getByText('Concert saved.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Concert saved.', { exact: true })).toBeVisible();
 
   await authenticatedPage.getByRole('button', { name: 'Edit Justice' }).click();
   await expect(authenticatedPage.getByRole('dialog').getByPlaceholder('Private. Never on your public profile.')).toHaveValue('Back of the room.');
