@@ -1,36 +1,19 @@
 import { defineNuxtRouteMiddleware, navigateTo } from '#imports';
-import { getSafeInternalPath } from '@/utils/safe-redirect';
+import { nextLoginRedirect } from '@/utils/login-redirect';
 
 export default defineNuxtRouteMiddleware((to, from) => {
-  if (to.path !== '/login') {
+  const next = nextLoginRedirect(
+    {
+      path: to.path,
+      fullPath: to.fullPath,
+      query: to.query
+    },
+    { fullPath: from.fullPath }
+  );
+
+  if (!next) {
     return;
   }
 
-  const existing = Array.isArray(to.query.redirect) ? to.query.redirect[0] : to.query.redirect;
-  if (typeof existing === 'string' && existing.length > 0) {
-    return;
-  }
-
-  const fromPath = from.fullPath;
-  if (
-    !fromPath
-    || fromPath === to.fullPath
-    || fromPath === '/login'
-    || fromPath.startsWith('/login?')
-  ) {
-    return;
-  }
-
-  const redirect = getSafeInternalPath(fromPath);
-  if (redirect === '/home' && fromPath !== '/home' && !fromPath.startsWith('/home?')) {
-    return;
-  }
-
-  return navigateTo({
-    path: '/login',
-    query: {
-      ...to.query,
-      redirect
-    }
-  });
+  return navigateTo(next);
 });
