@@ -116,6 +116,18 @@ describe('add concert sheet open/close state', () => {
     expect(persist).not.toMatch(/dismissChoice[\s\S]{0,80}closeSheet/);
   });
 
+  it('unlocks the owned Event picker in edit so a Concert can move without New night', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(sheet).toMatch(/eventLocked/);
+    expect(sheet).toMatch(/!isEdit\.value/);
+    expect(sheet).toMatch(/eventId: targetEventId/);
+    expect(sheet).not.toMatch(/moveOwnedConcert/);
+    expect(sheet).toMatch(/originalEventId/);
+    expect(sheet).toMatch(/editLoaded/);
+    expect(sheet).toMatch(/if \(isEdit\.value\) \{[\s\S]*return owned/);
+    expect(sheet).not.toMatch(/joiner/i);
+  });
+
   it('asks for Stage or Scene when the Event has rows and unlocks Place only when override is on', () => {
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/Stage or Scene/);

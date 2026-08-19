@@ -6,6 +6,8 @@ import {
 import {
   createEvent,
   eventAllowsPlaceOverride,
+  EVENT_RULE,
+  EVENT_RULE_MESSAGE,
   type CreateEventInput,
   type DomainError,
   type DomainResult,
@@ -88,6 +90,14 @@ export type UpdateConcertInput = {
   time?: string | null;
   notes?: string | null;
   confirm?: ConcertIdentityConfirm;
+  place?: string;
+  stageId?: string | null;
+  eventId?: string;
+};
+
+export type MoveConcertInput = {
+  concertId: string;
+  targetEventId: string;
   place?: string;
   stageId?: string | null;
 };
@@ -314,6 +324,9 @@ const mapConcertKernelError = (error: QueryError): DomainError => {
   }
   if (/stage or scene must be on this event/i.test(text)) {
     return { ruleId: CONCERT_RULE.stageNotOnEvent, message: CONCERT_RULE_MESSAGE.stageNotOnEvent };
+  }
+  if (/you do not own this event/i.test(text)) {
+    return { ruleId: EVENT_RULE.ownership, message: EVENT_RULE_MESSAGE.ownership };
   }
 
   return persistFailed(error);
@@ -842,11 +855,13 @@ export const updateConcert = async (
   }
 
   const current = existing.data;
+  const requestedEventId = trim(input.eventId);
+  const targetEventId = requestedEventId || current.event_id;
 
   const eventResult = await resolveEvent(client, {
     artist,
     date,
-    eventId: current.event_id
+    eventId: targetEventId
   });
   if (eventResult.error || !eventResult.data) {
     return {
@@ -854,6 +869,10 @@ export const updateConcert = async (
       error: eventResult.error,
       outcome: null
     };
+  }
+
+  if (eventResult.data.id !== current.event_id && eventResult.data.owner_id !== current.owner_id) {
+    return failCreate(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
   }
 
   if (!isDateInsideEvent(date, eventResult.data)) {
@@ -918,7 +937,8 @@ export const updateConcert = async (
     time: draftTime,
     place: placement.data.place,
     stage_id: placement.data.stageId,
-    notes: optionalNotes(input.notes)
+    notes: optionalNotes(input.notes),
+    ...(eventResult.data.id !== current.event_id ? { event_id: eventResult.data.id } : {})
   };
 
   const { data, error } = await client
@@ -971,6 +991,80 @@ export const updateConcert = async (
     error: null,
     outcome: null
   };
+};
+
+export const moveConcert = async (
+  client: ConcertsClient,
+  input: MoveConcertInput
+): Promise<DomainResult<ConcertRecord>> => {
+  const existing = await loadConcert(client, input.concertId);
+  if (existing.error || !existing.data) {
+    return existing;
+  }
+
+  const targetEventId = trim(input.targetEventId);
+  if (!targetEventId) {
+    return fail(CONCERT_RULE.requiredEvent, CONCERT_RULE_MESSAGE.requiredEvent);
+  }
+
+  if (targetEventId === existing.data.event_id) {
+    return ok(existing.data);
+  }
+
+  const eventResult = await resolveEvent(client, {
+    artist: existing.data.artist,
+    date: existing.data.date,
+    eventId: targetEventId
+  });
+  if (eventResult.error || !eventResult.data) {
+    return {
+      data: null,
+      error: eventResult.error
+    };
+  }
+
+  if (eventResult.data.owner_id !== existing.data.owner_id) {
+    return fail(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
+  }
+
+  if (!isDateInsideEvent(existing.data.date, eventResult.data)) {
+    return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
+  }
+
+  const stagesResult = await listStagesForEvent(client, eventResult.data.id);
+  if (stagesResult.error) {
+    return { data: null, error: stagesResult.error };
+  }
+
+  const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
+    place: input.place === undefined ? existing.data.place : input.place,
+    stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId
+  });
+  if (placement.error || !placement.data) {
+    return { data: null, error: placement.error };
+  }
+
+  const payload = {
+    event_id: eventResult.data.id,
+    place: placement.data.place,
+    stage_id: placement.data.stageId
+  };
+
+  const { data, error } = await client
+    .from('concerts')
+    .update(payload)
+    .eq('id', existing.data.id)
+    .select()
+    .single();
+
+  if (error || !data) {
+    return {
+      data: null,
+      error: error ? mapConcertKernelError(error) : persistFailed({ message: 'Failed to move concert' })
+    };
+  }
+
+  return ok(data);
 };
 
 export const deleteConcert = async (

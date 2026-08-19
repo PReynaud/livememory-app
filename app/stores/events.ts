@@ -24,11 +24,13 @@ import {
   deleteConcert,
   listConcertsForEvent,
   listOwnedConcerts,
+  moveConcert,
   updateConcert,
   type ConcertCreateOutcome,
   type ConcertRecord,
   type ConcertsClient,
   type CreateConcertInput,
+  type MoveConcertInput,
   type UpdateConcertInput
 } from '#shared/domain/concerts';
 import {
@@ -46,7 +48,7 @@ import {
   upsertConcert
 } from '@/utils/concert-mutation-state';
 
-export type { ConcertCreateOutcome, ConcertRecord, CreateConcertInput, CreateEventInput, EventKind, EventRecord, EventStageRecord, UpdateConcertInput, UpdateEventInput };
+export type { ConcertCreateOutcome, ConcertRecord, CreateConcertInput, CreateEventInput, EventKind, EventRecord, EventStageRecord, MoveConcertInput, UpdateConcertInput, UpdateEventInput };
 export type { AttendanceStatus };
 
 type ConcertMutationResult = {
@@ -447,6 +449,33 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const moveOwnedConcert = async (input: MoveConcertInput) => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const result = await moveConcert(concertsClient(), input);
+
+      if (result.error) {
+        error.value = result.error.message;
+        return mutationResult(null, result.error.message, null, result.error.ruleId);
+      }
+
+      if (result.data) {
+        applyOwnedConcert(result.data);
+      }
+
+      await reloadOwnedConcertState();
+      return mutationResult(result.data, null, null, null);
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to move concert');
+      error.value = errorMessage;
+      return mutationResult(null, errorMessage);
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const deleteOwnedConcert = async (concertId: string) => {
     loading.value = true;
     error.value = null;
@@ -543,6 +572,7 @@ export const useEventsStore = defineStore('events', () => {
     updateOwnedEvent,
     createOwnedConcert,
     updateOwnedConcert,
+    moveOwnedConcert,
     deleteOwnedConcert,
     cycleAttendance
   };
