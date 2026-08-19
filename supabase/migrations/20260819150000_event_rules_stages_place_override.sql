@@ -288,6 +288,7 @@ create policy "Authenticated users can insert own concerts"
   to authenticated
   with check (
     (select auth.uid()) = owner_id
+    and btrim(concerts.artist) <> ''
     and exists (
       select 1
       from public.events
@@ -322,6 +323,7 @@ create policy "Authenticated users can update own concerts"
   using ((select auth.uid()) = owner_id)
   with check (
     (select auth.uid()) = owner_id
+    and btrim(concerts.artist) <> ''
     and exists (
       select 1
       from public.events

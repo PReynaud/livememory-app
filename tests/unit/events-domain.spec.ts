@@ -656,6 +656,7 @@ describe('event rules kernel', () => {
     expect(sql).toMatch(/add column stage_id uuid/);
     expect(sql).toMatch(/enable row level security/);
     expect(sql).toMatch(/\(select auth\.uid\(\)\)/);
+    expect(sql).toMatch(/btrim\(concerts\.artist\) <> ''/);
     expect(sql).toMatch(/save_event_and_concert_dates/);
     expect(sql).toMatch(/security invoker/);
     expect(sql).toMatch(/deferrable initially deferred/);
