@@ -67,3 +67,24 @@ test('invalid Concert date shows the named Event range copy', async ({ authentic
   await expect(sheet.getByText(/These concerts would break the Event rules/)).toBeVisible();
   await expect(sheet).toBeVisible();
 });
+
+test('adding a Stage without assigning Concerts lists the required-stage conflict', async ({ authenticatedPage }) => {
+  await createFestivalWithConcert(authenticatedPage, {
+    name: 'Rock Week',
+    start: '2026-08-20',
+    end: '2026-08-22',
+    place: 'Paris',
+    artist: 'Justice',
+    date: '2026-08-20'
+  });
+
+  await authenticatedPage.getByRole('button', { name: 'Edit event' }).click();
+  const sheet = authenticatedPage.getByRole('dialog');
+  await sheet.getByRole('button', { name: 'Add stage' }).click();
+  await sheet.getByLabel('Stage 1').fill('Main');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet.getByText(/These concerts would break the Event rules/)).toBeVisible();
+  await expect(sheet.getByText('Stage or Scene is required.')).toBeVisible();
+  await expect(sheet.getByText(/Justice \(20\/08\/2026\)/)).toBeVisible();
+  await expect(sheet).toBeVisible();
+});
