@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useSupabaseClient } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
 import type { Database } from '@/types/database.types';
@@ -7,11 +7,13 @@ import {
   createEvent,
   getOwnedEvent,
   listOwnedEvents,
+  selectFeaturedEvents,
   type CreateEventInput,
   type EventKind,
   type EventRecord,
   type EventsClient
 } from '#shared/domain/events';
+import { souvenirStats } from '#shared/domain/home';
 import {
   createConcert,
   listConcertsForEvent,
@@ -102,6 +104,13 @@ export const useEventsStore = defineStore('events', () => {
     return concerts.value.filter(concert => concert.event_id === eventId);
   };
 
+  const featuredEvents = computed(() => selectFeaturedEvents(events.value));
+
+  const homeStats = computed(() => souvenirStats({
+    ownedEventCount: events.value.length,
+    statuses: Object.values(attendanceByConcertId.value)
+  }));
+
   const fetchEvents = async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
       loading.value = true;
@@ -128,6 +137,10 @@ export const useEventsStore = defineStore('events', () => {
 
       const listedAttendanceError = await loadAttendance();
       attendanceError.value = listedAttendanceError;
+      if (listedAttendanceError) {
+        error.value = listedAttendanceError;
+        return { data: events.value, error: listedAttendanceError };
+      }
 
       return { data: events.value, error: null };
     } catch (err: unknown) {
@@ -332,6 +345,8 @@ export const useEventsStore = defineStore('events', () => {
     loading,
     error,
     concertsForEvent,
+    featuredEvents,
+    homeStats,
     attendanceStatus,
     isAttendanceBusy,
     concertIsPast,

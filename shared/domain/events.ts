@@ -107,16 +107,35 @@ export const civilDateInTimeZone = (now: Date, timeZone: string): string => {
   }).format(now);
 };
 
+export const FEATURED_LIMIT = 3;
+
+const compareUpcomingStart = (left: EventRecord, right: EventRecord) => {
+  const byDate = left.start_date.localeCompare(right.start_date);
+  if (byDate !== 0) {
+    return byDate;
+  }
+
+  return left.id.localeCompare(right.id);
+};
+
 export const sortEventsForConcerts = (events: EventRecord[], now = new Date()): EventRecord[] => {
   const today = civilDateInTimeZone(now, PARIS_TIME_ZONE);
   const upcoming = events
     .filter(event => event.start_date >= today)
-    .sort((left, right) => left.start_date.localeCompare(right.start_date));
+    .sort(compareUpcomingStart);
   const past = events
     .filter(event => event.start_date < today)
     .sort((left, right) => right.start_date.localeCompare(left.start_date));
 
   return [...upcoming, ...past];
+};
+
+export const selectFeaturedEvents = (events: EventRecord[], now = new Date()): EventRecord[] => {
+  const today = civilDateInTimeZone(now, PARIS_TIME_ZONE);
+  return events
+    .filter(event => event.start_date >= today)
+    .sort(compareUpcomingStart)
+    .slice(0, FEATURED_LIMIT);
 };
 
 const validateCreateInput = (input: CreateEventInput): DomainResult<{

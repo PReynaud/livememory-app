@@ -387,7 +387,8 @@ describe('attendance stays off pages and the store query path', () => {
     const pageFiles = [
       'app/pages/concerts.vue',
       'app/pages/e/[id].vue',
-      'app/pages/home.vue'
+      'app/pages/home.vue',
+      'app/components/AppEventCard.vue'
     ];
 
     for (const file of pageFiles) {
@@ -403,10 +404,13 @@ describe('attendance stays off pages and the store query path', () => {
     expect(eventPage).not.toMatch(/compact card|compactCard/i);
 
     const concertsPage = readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8');
-    expect(concertsPage).toMatch(/AppAttendanceChip/);
-    expect(concertsPage).toMatch(/isAttendanceBusy/);
-    expect(concertsPage).toMatch(/data-event-card/);
-    expect(concertsPage).toMatch(/cycleAttendance/);
+    expect(concertsPage).toMatch(/AppEventCard/);
+
+    const eventCard = readFileSync(resolve(process.cwd(), 'app/components/AppEventCard.vue'), 'utf8');
+    expect(eventCard).toMatch(/AppAttendanceChip/);
+    expect(eventCard).toMatch(/isAttendanceBusy/);
+    expect(eventCard).toMatch(/data-event-card/);
+    expect(eventCard).toMatch(/cycleAttendance/);
 
     const chip = readFileSync(resolve(process.cwd(), 'app/components/AppAttendanceChip.vue'), 'utf8');
     expect(chip).toMatch(/<button/);
