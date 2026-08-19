@@ -159,7 +159,7 @@ describe('joiner Event attendance surface', () => {
   it('loads Concerts without the owner notes column', () => {
     const concerts = read('shared/domain/concerts.ts');
     expect(concerts).toMatch(/CONCERT_VISIBLE_COLUMNS/);
-    expect(concerts).toMatch(/id, event_id, owner_id, artist, date, time, place, stage_id/);
+    expect(concerts).toMatch(/id,event_id,owner_id,artist,date,time,place,stage_id/);
     expect(concerts).not.toMatch(/from\('concerts'\)[\s\S]{0,80}select\('\*'\)/);
   });
 });

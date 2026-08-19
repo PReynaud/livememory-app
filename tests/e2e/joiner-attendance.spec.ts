@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
+import { concertNotesRest } from './helpers/concert-rest';
 import type { E2EAccount } from './helpers/e2e-account';
 
 const restHeaders = (accessToken: string, anonKey: string) => ({
@@ -107,12 +108,9 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
     expect(justiceId).toBeTruthy();
     expect(fontainesId).toBeTruthy();
 
-    const notesPatch = await fetch(`${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${justiceId}`, {
+    const notesPatch = await fetch(concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${justiceId}`), {
       method: 'PATCH',
-      headers: {
-        ...ownerSession.headers,
-        Prefer: 'return=minimal'
-      },
+      headers: ownerSession.headers,
       body: JSON.stringify({ notes: 'Back of the room.' })
     });
     expect(notesPatch.ok).toBe(true);
