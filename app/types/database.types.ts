@@ -9,6 +9,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          concert_id: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          concert_id: string
+          id?: string
+          status: string
+          user_id?: string
+        }
+        Update: {
+          concert_id?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "concerts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       concerts: {
         Row: {
           artist: string
@@ -97,9 +126,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      attendance_effective: {
+        Row: {
+          concert_id: string | null
+          id: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "concerts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      concert_is_past: {
+        Args: { p_date: string; p_time: string }
+        Returns: boolean
+      }
       username_is_taken: { Args: { candidate: string }; Returns: boolean }
     }
     Enums: {
