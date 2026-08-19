@@ -11,23 +11,44 @@ export const CONCERT_RULE = {
   requiredArtist: 'required_artist',
   requiredDate: 'required_date',
   requiredEvent: 'required_event',
-  dateOutsideEvent: 'date_outside_event'
+  dateOutsideEvent: 'date_outside_event',
+  impossiblePlace: 'impossible_place',
+  needsChoice: 'needs_choice'
 } as const;
 
 export const CONCERT_RULE_MESSAGE = {
   requiredArtist: 'Artist is required.',
   requiredDate: 'Date is required.',
   requiredEvent: 'Event is required.',
-  dateOutsideEvent: 'This date is outside the Event.'
+  dateOutsideEvent: 'This date is outside the Event.',
+  impossiblePlace: 'This concert already exists at a different Place.',
+  needsChoice: 'This artist and date already exist. Attach to the existing concert or create another.',
+  otherEvent: 'This concert already exists on another Event.'
 } as const;
+
+export const CONCERT_IDENTITY = {
+  created: 'created',
+  attached: 'attached',
+  needsChoice: 'needs_choice',
+  impossiblePlace: 'impossible_place'
+} as const;
+
+export type ConcertCreateOutcome = (typeof CONCERT_IDENTITY)[keyof typeof CONCERT_IDENTITY];
+
+export type ConcertIdentityConfirm = 'attach' | 'create';
 
 export type ConcertRecord = {
   id: string;
   event_id: string;
+  owner_id: string;
   artist: string;
   date: string;
   time: string | null;
   place: string;
+};
+
+export type CreateConcertResult = DomainResult<ConcertRecord> & {
+  outcome: ConcertCreateOutcome | null;
 };
 
 export type CreateConcertInput = {
@@ -36,6 +57,7 @@ export type CreateConcertInput = {
   time?: string | null;
   eventId?: string;
   newEvent?: CreateEventInput;
+  confirm?: ConcertIdentityConfirm;
 };
 
 type QueryError = {
@@ -50,6 +72,15 @@ type QueryResult<T> = {
   error: QueryError | null;
 };
 
+type EqFilter<T> = {
+  maybeSingle: () => Promise<QueryResult<T | null>>;
+  order: (
+    column: string,
+    options?: { ascending?: boolean }
+  ) => Promise<QueryResult<T[]>>;
+  eq: (column: string, value: string) => EqFilter<T>;
+};
+
 type TableApi<T> = {
   insert: (values: Record<string, unknown>) => {
     select: () => {
@@ -61,12 +92,13 @@ type TableApi<T> = {
       column: string,
       options?: { ascending?: boolean }
     ) => Promise<QueryResult<T[]>>;
+    eq: (column: string, value: string) => EqFilter<T>;
+  };
+  update: (values: Record<string, unknown>) => {
     eq: (column: string, value: string) => {
-      maybeSingle: () => Promise<QueryResult<T | null>>;
-      order: (
-        column: string,
-        options?: { ascending?: boolean }
-      ) => Promise<QueryResult<T[]>>;
+      select: () => {
+        single: () => Promise<QueryResult<T>>;
+      };
     };
   };
   delete: () => {
@@ -177,26 +209,10 @@ const isDateInsideEvent = (
   return date >= event.start_date && date <= event.end_date;
 };
 
-const rollbackCreatedEvent = async (
-  client: ConcertsClient,
-  eventId: string,
-  createdNewEvent: boolean
-) => {
-  if (!createdNewEvent) {
-    return;
-  }
-
-  await client.from('events').delete().eq('id', eventId);
-};
-
 const resolveEvent = async (
   client: ConcertsClient,
   input: CreateConcertInput
 ): Promise<DomainResult<EventRecord>> => {
-  if (input.newEvent) {
-    return createEvent(client as unknown as EventsClient, input.newEvent);
-  }
-
   const eventId = trim(input.eventId);
   if (!eventId) {
     return fail(CONCERT_RULE.requiredEvent, CONCERT_RULE_MESSAGE.requiredEvent);
@@ -218,25 +234,190 @@ const resolveEvent = async (
   return ok(data);
 };
 
-export const createConcert = async (
+const failCreate = (
+  ruleId: string,
+  message: string,
+  outcome: ConcertCreateOutcome | null = null
+): CreateConcertResult => ({
+  data: null,
+  error: { ruleId, message },
+  outcome
+});
+
+const okCreate = (
+  data: ConcertRecord,
+  outcome: ConcertCreateOutcome
+): CreateConcertResult => ({
+  data,
+  error: null,
+  outcome
+});
+
+const constraintText = (error: QueryError): string => {
+  return [error.code, error.message, error.details, error.hint].filter(Boolean).join(' ');
+};
+
+const isUniqueViolation = (error: QueryError): boolean => {
+  return error.code === '23505' || /duplicate key|unique constraint/i.test(constraintText(error));
+};
+
+const normalizeClock = (value: string | null | undefined): string | null => {
+  const time = clockTime(value);
+  return time ? time.slice(0, 5) : null;
+};
+
+const sameArtist = (left: string, right: string) => {
+  return trim(left).toLowerCase() === trim(right).toLowerCase();
+};
+
+const samePlace = (left: string, right: string) => {
+  return trim(left) === trim(right);
+};
+
+const concludeTimedMatch = (
+  existing: ConcertRecord,
+  targetPlace: string
+): CreateConcertResult => {
+  if (samePlace(existing.place, targetPlace)) {
+    return okCreate(existing, CONCERT_IDENTITY.attached);
+  }
+
+  return failCreate(
+    CONCERT_RULE.impossiblePlace,
+    CONCERT_RULE_MESSAGE.impossiblePlace,
+    CONCERT_IDENTITY.impossiblePlace
+  );
+};
+
+const listIdentityCandidates = async (
+  client: ConcertsClient,
+  artist: string,
+  date: string,
+  ownerId?: string | null
+): Promise<DomainResult<ConcertRecord[]>> => {
+  const byDate = client.from('concerts').select('*').eq('date', date);
+  const scoped = ownerId ? byDate.eq('owner_id', ownerId) : byDate;
+  const { data, error } = await scoped.order('date', { ascending: true });
+
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  return ok((data ?? []).filter(concert => sameArtist(concert.artist, artist)));
+};
+
+const timedMatch = (
+  candidates: ConcertRecord[],
+  draftTime: string | null
+): ConcertRecord | null => {
+  if (!draftTime) {
+    return null;
+  }
+
+  return (
+    candidates.find((concert) => {
+      const existingTime = normalizeClock(concert.time);
+      return existingTime !== null && existingTime === draftTime;
+    }) ?? null
+  );
+};
+
+const untimedOverlap = (
+  candidates: ConcertRecord[],
+  draftTime: string | null
+): ConcertRecord[] => {
+  return candidates.filter((concert) => {
+    const existingTime = normalizeClock(concert.time);
+    return draftTime === null || existingTime === null;
+  });
+};
+
+const pickAttachTarget = (
+  overlap: ConcertRecord[],
+  draftTime: string | null
+): ConcertRecord | null => {
+  if (overlap.length === 0) {
+    return null;
+  }
+
+  if (draftTime) {
+    return overlap.find(concert => normalizeClock(concert.time) === null) ?? overlap[0] ?? null;
+  }
+
+  return overlap[0] ?? null;
+};
+
+const writeAttachTime = async (
+  client: ConcertsClient,
+  existing: ConcertRecord,
+  draftTime: string | null,
+  targetPlace: string
+): Promise<CreateConcertResult> => {
+  if (!draftTime || normalizeClock(existing.time) !== null) {
+    return okCreate(existing, CONCERT_IDENTITY.attached);
+  }
+
+  const { data, error } = await client
+    .from('concerts')
+    .update({ time: draftTime })
+    .eq('id', existing.id)
+    .select()
+    .single();
+
+  if (error && isUniqueViolation(error)) {
+    const retry = await listIdentityCandidates(
+      client,
+      existing.artist,
+      existing.date,
+      existing.owner_id
+    );
+    if (retry.error) {
+      return {
+        data: null,
+        error: retry.error,
+        outcome: null
+      };
+    }
+
+    const raced = timedMatch(retry.data ?? [], draftTime);
+    if (raced) {
+      return concludeTimedMatch(raced, targetPlace);
+    }
+
+    return failCreate(
+      CONCERT_RULE.impossiblePlace,
+      CONCERT_RULE_MESSAGE.impossiblePlace,
+      CONCERT_IDENTITY.impossiblePlace
+    );
+  }
+
+  if (error || !data) {
+    return failCreate('persist_failed', error?.message ?? 'Failed to update concert time');
+  }
+
+  return okCreate(data, CONCERT_IDENTITY.attached);
+};
+
+const rollbackNewEvent = async (client: ConcertsClient, eventId: string | null) => {
+  if (!eventId) {
+    return;
+  }
+
+  await client.from('events').delete().eq('id', eventId);
+};
+
+const resolveTarget = async (
   client: ConcertsClient,
   input: CreateConcertInput
-): Promise<DomainResult<ConcertRecord>> => {
-  const artist = trim(input.artist);
-  if (!artist) {
-    return fail(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
-  }
-
-  const date = trim(input.date);
-  if (!date || !CIVIL_DATE.test(date)) {
-    return fail(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
-  }
-
+): Promise<DomainResult<{ event: EventRecord | null; place: string }>> => {
   if (input.newEvent) {
-    const plannedRange = eventRangeFromCreateInput(input.newEvent);
-    if (plannedRange && !isDateInsideEvent(date, plannedRange)) {
-      return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(plannedRange));
-    }
+    return ok({
+      event: null,
+      place: trim(input.newEvent.place)
+    });
   }
 
   const eventResult = await resolveEvent(client, input);
@@ -247,37 +428,153 @@ export const createConcert = async (
     };
   }
 
-  const event = eventResult.data;
-  const createdNewEvent = Boolean(input.newEvent);
+  return ok({
+    event: eventResult.data,
+    place: eventResult.data.place
+  });
+};
+
+export const createConcert = async (
+  client: ConcertsClient,
+  input: CreateConcertInput
+): Promise<CreateConcertResult> => {
+  const artist = trim(input.artist);
+  if (!artist) {
+    return failCreate(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
+  }
+
+  const date = trim(input.date);
+  if (!date || !CIVIL_DATE.test(date)) {
+    return failCreate(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);
+  }
+
+  if (input.newEvent) {
+    const plannedRange = eventRangeFromCreateInput(input.newEvent);
+    if (plannedRange && !isDateInsideEvent(date, plannedRange)) {
+      return failCreate(
+        CONCERT_RULE.dateOutsideEvent,
+        dateOutsideEventMessage(plannedRange)
+      );
+    }
+  }
+
+  const draftTime = normalizeClock(input.time);
+  const target = await resolveTarget(client, input);
+  if (target.error || !target.data) {
+    return {
+      data: null,
+      error: target.error,
+      outcome: null
+    };
+  }
+
+  const candidatesResult = await listIdentityCandidates(
+    client,
+    artist,
+    date,
+    target.data.event?.owner_id
+  );
+  if (candidatesResult.error) {
+    return {
+      data: null,
+      error: candidatesResult.error,
+      outcome: null
+    };
+  }
+
+  const candidates = candidatesResult.data ?? [];
+  const exactTimed = timedMatch(candidates, draftTime);
+  if (exactTimed) {
+    return concludeTimedMatch(exactTimed, target.data.place);
+  }
+
+  const overlap = untimedOverlap(candidates, draftTime);
+  if (overlap.length > 0 && input.confirm !== 'create') {
+    const existing = pickAttachTarget(overlap, draftTime);
+    if (existing && input.confirm === 'attach') {
+      return writeAttachTime(client, existing, draftTime, target.data.place);
+    }
+
+    return {
+      data: existing,
+      error: null,
+      outcome: CONCERT_IDENTITY.needsChoice
+    };
+  }
+
+  let event = target.data.event;
+  let createdEventId: string | null = null;
+
+  if (input.newEvent) {
+    const created = await createEvent(client as unknown as EventsClient, input.newEvent);
+    if (created.error || !created.data) {
+      return {
+        data: null,
+        error: created.error,
+        outcome: null
+      };
+    }
+
+    event = created.data;
+    createdEventId = created.data.id;
+  }
+
+  if (!event) {
+    return failCreate(CONCERT_RULE.requiredEvent, CONCERT_RULE_MESSAGE.requiredEvent);
+  }
+
   if (!isDateInsideEvent(date, event)) {
-    await rollbackCreatedEvent(client, event.id, createdNewEvent);
-    return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(event));
+    await rollbackNewEvent(client, createdEventId);
+    return failCreate(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(event));
   }
 
   const payload = {
     event_id: event.id,
     artist,
     date,
-    time: clockTime(input.time),
+    time: draftTime,
     place: event.place
   };
 
   const { data, error } = await client.from('concerts').insert(payload).select().single();
 
   if (error || !data) {
-    await rollbackCreatedEvent(client, event.id, createdNewEvent);
+    await rollbackNewEvent(client, createdEventId);
+
+    if (error && isUniqueViolation(error)) {
+      const retry = await listIdentityCandidates(client, artist, date, event.owner_id);
+      if (retry.error) {
+        return {
+          data: null,
+          error: retry.error,
+          outcome: null
+        };
+      }
+
+      const raced = timedMatch(retry.data ?? [], draftTime);
+      if (raced) {
+        return concludeTimedMatch(raced, event.place);
+      }
+
+      return failCreate(
+        CONCERT_RULE.impossiblePlace,
+        CONCERT_RULE_MESSAGE.impossiblePlace,
+        CONCERT_IDENTITY.impossiblePlace
+      );
+    }
 
     if (error) {
       return {
         data: null,
-        error: persistFailed(error)
+        error: persistFailed(error),
+        outcome: null
       };
     }
 
-    return fail('persist_failed', 'Failed to create concert');
+    return failCreate('persist_failed', 'Failed to create concert');
   }
 
-  return ok(data);
+  return okCreate(data, CONCERT_IDENTITY.created);
 };
 
 export const listConcertsForEvent = async (

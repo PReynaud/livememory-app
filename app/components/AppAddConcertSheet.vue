@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { useToast } from '#imports';
+import { navigateTo, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEventsStore, type EventRecord } from '@/stores/events';
 import { eachCivilDateInclusive, formatDayChipParts } from '@/utils/concert-groups';
+import { CONCERT_RULE_MESSAGE } from '#shared/domain/concerts';
 
 const NEW_NIGHT = 'new:single_night';
 const NEW_FESTIVAL = 'new:festival';
@@ -25,6 +26,7 @@ const concertDate = ref('');
 const concertTime = ref('');
 const formError = ref('');
 const saving = ref(false);
+const pendingChoice = ref(false);
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -34,6 +36,11 @@ const sheetOpen = computed({
         eventId: sheet.eventId ?? undefined,
         lockEvent: sheet.lockEvent
       });
+      return;
+    }
+
+    if (pendingChoice.value) {
+      pendingChoice.value = false;
       return;
     }
 
@@ -107,6 +114,7 @@ const focusArtist = async () => {
 
 const resetForOpen = async () => {
   formError.value = '';
+  pendingChoice.value = false;
   artist.value = '';
   concertTime.value = '';
   await eventsStore.fetchEvents({ silent: true });
@@ -153,12 +161,13 @@ watch(festivalDays, (days) => {
   }
 });
 
-const buildInput = () => {
+const buildInput = (confirm?: 'attach' | 'create') => {
   if (isNewNight.value) {
     return {
       artist: artist.value,
       date: startDate.value,
       time: concertTime.value,
+      confirm,
       newEvent: {
         kind: 'single_night' as const,
         name: eventName.value,
@@ -173,6 +182,7 @@ const buildInput = () => {
       artist: artist.value,
       date: concertDate.value,
       time: concertTime.value,
+      confirm,
       newEvent: {
         kind: 'festival' as const,
         name: eventName.value,
@@ -187,11 +197,12 @@ const buildInput = () => {
     artist: artist.value,
     date: isExistingNight.value ? (selectedEvent.value?.start_date ?? concertDate.value) : concertDate.value,
     time: concertTime.value,
+    confirm,
     eventId: picker.value
   };
 };
 
-const persist = async (mode: 'save' | 'another') => {
+const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') => {
   if (saving.value) {
     return;
   }
@@ -200,7 +211,34 @@ const persist = async (mode: 'save' | 'another') => {
   formError.value = '';
 
   try {
-    const result = await eventsStore.createOwnedConcert(buildInput());
+    const intendedEventId = picker.value;
+    const result = await eventsStore.createOwnedConcert(buildInput(confirm));
+
+    if (result.outcome === 'needs_choice') {
+      pendingChoice.value = true;
+      return;
+    }
+
+    pendingChoice.value = false;
+
+    if (result.outcome === 'impossible_place') {
+      formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
+      return;
+    }
+
+    if (result.outcome === 'attached' && result.data) {
+      const attachedToIntended
+        = intendedEventId === result.data.event_id
+          && intendedEventId !== NEW_NIGHT
+          && intendedEventId !== NEW_FESTIVAL;
+      if (!attachedToIntended) {
+        toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
+      }
+
+      sheet.closeSheet();
+      await navigateTo('/e/' + result.data.event_id);
+      return;
+    }
 
     if (result.error && !result.data) {
       formError.value = result.error;
@@ -235,6 +273,10 @@ const persist = async (mode: 'save' | 'another') => {
   }
 };
 
+const dismissChoice = () => {
+  pendingChoice.value = false;
+};
+
 const slideoverUi = {
   overlay: 'bg-white/8',
   content: 'bg-[rgba(20,20,20,0.78)] backdrop-blur-[28px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-1/2 lg:w-[28rem] lg:-translate-x-1/2 max-h-[min(85dvh,36rem)]',
@@ -267,6 +309,7 @@ const slideoverUi = {
             id="add-concert-artist"
             v-model="artist"
             autofocus
+            :disabled="pendingChoice"
             class="w-full"
           />
         </UFormField>
@@ -279,6 +322,7 @@ const slideoverUi = {
             v-if="eventLocked"
             :model-value="eventName"
             readonly
+            :disabled="pendingChoice"
             class="w-full"
           />
           <USelect
@@ -286,6 +330,7 @@ const slideoverUi = {
             v-model="picker"
             :items="eventItems"
             placeholder="Select an Event"
+            :disabled="pendingChoice"
             class="w-full"
           />
         </UFormField>
@@ -311,6 +356,7 @@ const slideoverUi = {
             v-model="startDate"
             type="date"
             :readonly="dateLocked && isExistingNight"
+            :disabled="pendingChoice"
             class="w-full"
           />
         </UFormField>
@@ -323,6 +369,7 @@ const slideoverUi = {
             <UInput
               v-model="startDate"
               type="date"
+              :disabled="pendingChoice"
               class="w-full"
             />
           </UFormField>
@@ -333,6 +380,7 @@ const slideoverUi = {
             <UInput
               v-model="endDate"
               type="date"
+              :disabled="pendingChoice"
               class="w-full"
             />
           </UFormField>
@@ -356,6 +404,7 @@ const slideoverUi = {
                 : 'border-white/16 bg-[rgba(10,10,10,0.88)] text-white'"
               :aria-pressed="concertDate === day"
               :aria-label="day"
+              :disabled="pendingChoice"
               @click="concertDate = day"
             >
               {{ formatDayChipParts(day).weekday }}
@@ -376,6 +425,7 @@ const slideoverUi = {
           <UInput
             v-model="place"
             :readonly="placeLocked"
+            :disabled="pendingChoice"
             class="w-full"
           />
         </UFormField>
@@ -387,6 +437,7 @@ const slideoverUi = {
           <UInput
             v-model="concertTime"
             type="time"
+            :disabled="pendingChoice"
             class="w-full"
           />
         </UFormField>
@@ -398,7 +449,46 @@ const slideoverUi = {
           :title="formError"
         />
 
-        <div class="flex items-center gap-4 pt-1">
+        <template v-if="pendingChoice">
+          <UAlert
+            color="warning"
+            variant="subtle"
+            :title="CONCERT_RULE_MESSAGE.needsChoice"
+          />
+          <div class="flex items-center gap-4 pt-1">
+            <UButton
+              type="button"
+              label="Attach"
+              color="primary"
+              variant="outline"
+              class="h-11 flex-1 rounded-full ring-2"
+              :loading="saving"
+              @click="persist('save', 'attach')"
+            />
+            <UButton
+              type="button"
+              label="Create"
+              color="neutral"
+              variant="outline"
+              class="h-11 flex-1 rounded-full ring-2"
+              :disabled="saving"
+              @click="persist('save', 'create')"
+            />
+            <UButton
+              type="button"
+              label="Cancel"
+              color="neutral"
+              variant="link"
+              class="px-0 font-semibold text-white"
+              :disabled="saving"
+              @click="dismissChoice"
+            />
+          </div>
+        </template>
+        <div
+          v-else
+          class="flex items-center gap-4 pt-1"
+        >
           <UButton
             type="submit"
             label="Save"
