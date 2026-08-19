@@ -70,6 +70,9 @@ create policy "Authenticated users can insert own concerts"
       from public.events
       where events.id = concerts.event_id
         and events.owner_id = (select auth.uid())
+        and concerts.date >= events.start_date
+        and concerts.date <= events.end_date
+        and concerts.place = events.place
     )
   );
 

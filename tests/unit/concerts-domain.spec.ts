@@ -300,6 +300,8 @@ describe('concerts migration kernel', () => {
     expect(sql).toMatch(/where[\s\S]*time[\s\S]*is not null/i);
     expect(sql).toMatch(/grant update/i);
     expect(sql).toMatch(/for update/i);
+    expect(sql).toMatch(/concerts\.date\s*>=\s*events\.start_date/);
+    expect(sql).toMatch(/concerts\.place\s*=\s*events\.place/);
     expect(sql).toMatch(/\(select auth\.uid\(\)\)/);
     expect(sql).not.toMatch(/for delete/i);
     expect(sql).not.toMatch(/service_role/);
