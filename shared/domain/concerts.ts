@@ -5,10 +5,12 @@ import {
 } from './attendance';
 import {
   createEvent,
+  eventAllowsPlaceOverride,
   type CreateEventInput,
   type DomainError,
   type DomainResult,
   type EventRecord,
+  type EventStageRecord,
   type EventsClient
 } from './events';
 
@@ -17,7 +19,10 @@ export const CONCERT_RULE = {
   requiredDate: 'required_date',
   requiredEvent: 'required_event',
   requiredPlace: 'required_place',
+  requiredStage: 'required_stage',
+  stageNotOnEvent: 'stage_not_on_event',
   dateOutsideEvent: 'date_outside_event',
+  placeConflict: 'place_conflict',
   impossiblePlace: 'impossible_place',
   needsChoice: 'needs_choice',
   ownership: 'ownership'
@@ -28,7 +33,10 @@ export const CONCERT_RULE_MESSAGE = {
   requiredDate: 'Date is required.',
   requiredEvent: 'Event is required.',
   requiredPlace: 'Place is required.',
+  requiredStage: 'Stage or Scene is required.',
+  stageNotOnEvent: 'Stage or Scene must be on this Event.',
   dateOutsideEvent: 'This date is outside the Event.',
+  placeConflict: 'This Place conflicts with the Event Place.',
   impossiblePlace: 'This concert already exists at a different Place.',
   needsChoice: 'This artist and date already exist. Attach to the existing concert or create another.',
   otherEvent: 'This concert already exists on another Event.',
@@ -55,6 +63,7 @@ export type ConcertRecord = {
   time: string | null;
   place: string;
   notes?: string | null;
+  stage_id?: string | null;
 };
 
 export type CreateConcertResult = DomainResult<ConcertRecord> & {
@@ -66,6 +75,7 @@ export type CreateConcertInput = {
   date: string;
   time?: string | null;
   place?: string;
+  stageId?: string | null;
   eventId?: string;
   newEvent?: CreateEventInput;
   confirm?: ConcertIdentityConfirm;
@@ -77,6 +87,8 @@ export type UpdateConcertInput = {
   date: string;
   time?: string | null;
   notes?: string | null;
+  place?: string;
+  stageId?: string | null;
 };
 
 type QueryError = {
@@ -129,6 +141,7 @@ export type ConcertsClient = {
   from: {
     (relation: 'events'): TableApi<EventRecord>;
     (relation: 'concerts'): TableApi<ConcertRecord>;
+    (relation: 'event_stages'): TableApi<EventStageRecord>;
   };
 };
 
@@ -230,6 +243,79 @@ const isDateInsideEvent = (
   event: Pick<EventRecord, 'start_date' | 'end_date'>
 ) => {
   return date >= event.start_date && date <= event.end_date;
+};
+
+const listStagesForEvent = async (
+  client: ConcertsClient,
+  eventId: string
+): Promise<DomainResult<EventStageRecord[]>> => {
+  const { data, error } = await client
+    .from('event_stages')
+    .select('*')
+    .eq('event_id', eventId)
+    .order('name', { ascending: true });
+
+  if (error) {
+    return {
+      data: null,
+      error: persistFailed(error)
+    };
+  }
+
+  return ok(data ?? []);
+};
+
+const resolvePlaceAndStage = (
+  event: EventRecord,
+  stages: EventStageRecord[],
+  input: { place?: string; stageId?: string | null }
+): DomainResult<{ place: string; stageId: string | null }> => {
+  const submittedPlace = trim(input.place);
+  const inheritedPlace = trim(event.place);
+  const allowsOverride = eventAllowsPlaceOverride(event);
+
+  if (!allowsOverride && submittedPlace && submittedPlace !== inheritedPlace) {
+    return fail(CONCERT_RULE.placeConflict, CONCERT_RULE_MESSAGE.placeConflict);
+  }
+
+  const place = allowsOverride && submittedPlace ? submittedPlace : inheritedPlace;
+  const stageId = trim(input.stageId) || null;
+
+  if (stages.length > 0) {
+    if (!stageId) {
+      return fail(CONCERT_RULE.requiredStage, CONCERT_RULE_MESSAGE.requiredStage);
+    }
+
+    if (!stages.some(stage => stage.id === stageId)) {
+      return fail(CONCERT_RULE.stageNotOnEvent, CONCERT_RULE_MESSAGE.stageNotOnEvent);
+    }
+
+    return ok({ place, stageId });
+  }
+
+  if (stageId) {
+    return fail(CONCERT_RULE.stageNotOnEvent, CONCERT_RULE_MESSAGE.stageNotOnEvent);
+  }
+
+  return ok({ place, stageId: null });
+};
+
+const mapConcertKernelError = (error: QueryError): DomainError => {
+  const text = constraintText(error);
+  if (/this date is outside the event/i.test(text)) {
+    return { ruleId: CONCERT_RULE.dateOutsideEvent, message: text };
+  }
+  if (/this place conflicts with the event place/i.test(text)) {
+    return { ruleId: CONCERT_RULE.placeConflict, message: CONCERT_RULE_MESSAGE.placeConflict };
+  }
+  if (/stage or scene is required/i.test(text)) {
+    return { ruleId: CONCERT_RULE.requiredStage, message: CONCERT_RULE_MESSAGE.requiredStage };
+  }
+  if (/stage or scene must be on this event/i.test(text)) {
+    return { ruleId: CONCERT_RULE.stageNotOnEvent, message: CONCERT_RULE_MESSAGE.stageNotOnEvent };
+  }
+
+  return persistFailed(error);
 };
 
 const resolveEvent = async (
@@ -595,12 +681,35 @@ export const createConcert = async (
     return failCreate(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(event));
   }
 
+  const stagesResult = await listStagesForEvent(client, event.id);
+  if (stagesResult.error) {
+    await rollbackNewEvent(client, createdEventId);
+    return {
+      data: null,
+      error: stagesResult.error,
+      outcome: null
+    };
+  }
+
+  const placement = resolvePlaceAndStage(event, stagesResult.data ?? [], {
+    place: request.place,
+    stageId: request.stageId
+  });
+  if (placement.error || !placement.data) {
+    await rollbackNewEvent(client, createdEventId);
+    return failCreate(
+      placement.error?.ruleId ?? CONCERT_RULE.requiredStage,
+      placement.error?.message ?? CONCERT_RULE_MESSAGE.requiredStage
+    );
+  }
+
   const payload = {
     event_id: event.id,
     artist,
     date,
     time: draftTime,
-    place: event.place
+    place: placement.data.place,
+    stage_id: placement.data.stageId
   };
 
   const { data, error } = await client.from('concerts').insert(payload).select().single();
@@ -633,7 +742,7 @@ export const createConcert = async (
     if (error) {
       return {
         data: null,
-        error: persistFailed(error),
+        error: mapConcertKernelError(error),
         outcome: null
       };
     }
@@ -717,11 +826,25 @@ export const updateConcert = async (
     return fail(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
   }
 
+  const stagesResult = await listStagesForEvent(client, eventResult.data.id);
+  if (stagesResult.error) {
+    return { data: null, error: stagesResult.error };
+  }
+
+  const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
+    place: input.place,
+    stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId
+  });
+  if (placement.error || !placement.data) {
+    return { data: null, error: placement.error };
+  }
+
   const payload = {
     artist,
     date,
     time: normalizeClock(input.time),
-    place: eventResult.data.place,
+    place: placement.data.place,
+    stage_id: placement.data.stageId,
     notes: optionalNotes(input.notes)
   };
 
@@ -735,7 +858,7 @@ export const updateConcert = async (
   if (error || !data) {
     return {
       data: null,
-      error: persistFailed(error ?? { message: 'Failed to update concert' })
+      error: error ? mapConcertKernelError(error) : persistFailed({ message: 'Failed to update concert' })
     };
   }
 

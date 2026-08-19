@@ -21,6 +21,13 @@ const props = defineProps<{
 const eventsStore = useEventsStore();
 const compact = computed(() => isCompactBill(props.concerts));
 const concert = computed(() => props.concerts[0] ?? null);
+const concertStageName = computed(() => {
+  if (!concert.value?.stage_id) {
+    return '';
+  }
+
+  return eventsStore.stagesForEvent(props.event.id).find(stage => stage.id === concert.value?.stage_id)?.name ?? '';
+});
 const titleClass = computed(() => {
   return props.featured
     ? 'text-2xl font-bold tracking-tight leading-[1.15]'
@@ -49,7 +56,7 @@ const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.co
           {{ concert.artist }}
         </p>
         <p class="text-[13px] text-muted">
-          {{ formatConcertMetaLine(concert) }}
+          {{ formatConcertMetaLine(concert, concertStageName) }}
         </p>
         <p
           v-if="eventNameDiffersFromArtist(event.name, concert.artist)"

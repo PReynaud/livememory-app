@@ -6,6 +6,7 @@ import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEventsStore, type EventRecord } from '@/stores/events';
 import { eachCivilDateInclusive, formatDayChipParts } from '@/utils/concert-groups';
 import { CONCERT_RULE_MESSAGE } from '#shared/domain/concerts';
+import { eventAllowsPlaceOverride } from '#shared/domain/events';
 
 const NEW_NIGHT = 'new:single_night';
 const NEW_FESTIVAL = 'new:festival';
@@ -24,6 +25,7 @@ const endDate = ref('');
 const place = ref('');
 const concertDate = ref('');
 const concertTime = ref('');
+const stageId = ref('');
 const formError = ref('');
 const saving = ref(false);
 const pendingChoice = ref(false);
@@ -60,10 +62,18 @@ const isNewFestival = computed(() => picker.value === NEW_FESTIVAL);
 const isExistingNight = computed(() => selectedEvent.value?.kind === 'single_night');
 const isTransparent = computed(() => !picker.value);
 const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.value));
-const placeLocked = computed(() => Boolean(selectedEvent.value));
+const placeLocked = computed(() => Boolean(selectedEvent.value) && !eventAllowsPlaceOverride(selectedEvent.value));
 const dateLocked = computed(() => isExistingNight.value || isNewNight.value);
 const isEdit = computed(() => Boolean(sheet.concertId));
 const sheetTitle = computed(() => (isEdit.value ? 'Edit concert' : 'Add concert'));
+const eventStages = computed(() => {
+  if (!selectedEvent.value) {
+    return [];
+  }
+
+  return eventsStore.stagesForEvent(selectedEvent.value.id);
+});
+const showStageSelect = computed(() => eventStages.value.length > 0);
 
 const eventItems = computed(() => {
   const owned = events.value.map(event => ({
@@ -131,6 +141,7 @@ const resetForOpen = async () => {
   notes.value = '';
   artist.value = '';
   concertTime.value = '';
+  stageId.value = '';
 
   if (!sheet.eventId) {
     picker.value = '';
@@ -159,6 +170,7 @@ const resetForOpen = async () => {
       concertDate.value = concert.date;
       concertTime.value = concert.time ? concert.time.slice(0, 5) : '';
       notes.value = concert.notes ?? '';
+      stageId.value = concert.stage_id ?? '';
     }
   }
 
@@ -239,6 +251,8 @@ const buildInput = (confirm?: 'attach' | 'create') => {
     artist: artist.value,
     date: isExistingNight.value ? (selectedEvent.value?.start_date ?? concertDate.value) : concertDate.value,
     time: concertTime.value,
+    place: place.value,
+    stageId: stageId.value || null,
     confirm,
     eventId: picker.value
   };
@@ -259,7 +273,9 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
         artist: artist.value,
         date: isExistingNight.value ? (selectedEvent.value?.start_date ?? concertDate.value) : concertDate.value,
         time: concertTime.value,
-        notes: notes.value
+        notes: notes.value,
+        place: place.value,
+        stageId: stageId.value || null
       });
 
       if (result.error) {
@@ -529,6 +545,20 @@ const slideoverUi = {
           <UInput
             v-model="place"
             :readonly="placeLocked"
+            :disabled="pendingChoice"
+            class="w-full"
+          />
+        </UFormField>
+
+        <UFormField
+          v-if="showStageSelect"
+          label="Stage or Scene"
+          name="stage"
+        >
+          <USelect
+            v-model="stageId"
+            :items="eventStages.map(stage => ({ label: stage.name, value: stage.id }))"
+            placeholder="Select a Stage or Scene"
             :disabled="pendingChoice"
             class="w-full"
           />

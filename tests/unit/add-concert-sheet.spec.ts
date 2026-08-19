@@ -99,4 +99,12 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/Delete this concert\?/);
     expect(sheet).not.toMatch(/joiner/i);
   });
+
+  it('asks for Stage or Scene when the Event has rows and unlocks Place only when override is on', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(sheet).toMatch(/Stage or Scene/);
+    expect(sheet).toMatch(/eventAllowsPlaceOverride/);
+    expect(sheet).toMatch(/stageId/);
+    expect(sheet).toMatch(/showStageSelect/);
+  });
 });
