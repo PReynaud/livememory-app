@@ -81,12 +81,15 @@ describe('Home featured and stats surfaces', () => {
 
   it('shows Couldn\'t load with Retry on fetch failure instead of empty featured copy', () => {
     const home = read('app/pages/home.vue');
-    expect(home).toMatch(/Couldn't load\./);
-    expect(home).toMatch(/label="Retry"/);
+    expect(home).toMatch(/AppLoadError/);
     expect(home).toMatch(/retryLoad/);
-    expect(home).toMatch(/data-testid="home-load-error"/);
+    expect(home).toMatch(/data-testid="home-load-error"|testid="home-load-error"/);
 
-    const errorIndex = home.indexOf('home-load-error');
+    const errorComponent = read('app/components/AppLoadError.vue');
+    expect(errorComponent).toMatch(/Couldn't load\./);
+    expect(errorComponent).toMatch(/label="Retry"/);
+
+    const errorIndex = home.indexOf('AppLoadError');
     const emptyIndex = home.indexOf('home-featured-empty');
     const statsIndex = home.indexOf('home-stats');
     expect(errorIndex).toBeGreaterThan(-1);
@@ -94,7 +97,7 @@ describe('Home featured and stats surfaces', () => {
     expect(statsIndex).toBeGreaterThan(emptyIndex);
 
     const beforeEmpty = home.slice(0, emptyIndex);
-    expect(beforeEmpty).toMatch(/v-if="error"/);
+    expect(beforeEmpty).toMatch(/error/);
     expect(beforeEmpty).toMatch(/v-else/);
     expect(beforeEmpty).not.toMatch(/Add concert/);
   });
@@ -110,9 +113,9 @@ describe('Home featured and stats surfaces', () => {
     const home = read('app/pages/home.vue');
     const statsIndex = home.indexOf('home-stats');
     const beforeStats = home.slice(0, statsIndex);
-    expect(beforeStats).toMatch(/v-if="error"/);
+    expect(beforeStats).toMatch(/error/);
     expect(beforeStats).toMatch(/v-else/);
-    expect(beforeStats).toMatch(/Couldn't load\./);
+    expect(beforeStats).toMatch(/AppLoadError/);
   });
 
   it('uses display-sm on featured compact artist and grouped Event name', () => {

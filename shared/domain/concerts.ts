@@ -135,6 +135,15 @@ type TableApi<T> = {
       options?: { ascending?: boolean }
     ) => Promise<QueryResult<T[]>>;
     eq: (column: string, value: string) => EqFilter<T>;
+    in: (
+      column: string,
+      values: readonly string[]
+    ) => {
+      order: (
+        orderColumn: string,
+        options?: { ascending?: boolean }
+      ) => Promise<QueryResult<T[]>>;
+    };
   };
   update: (values: Record<string, unknown>) => {
     eq: (column: string, value: string) => {
@@ -1103,6 +1112,36 @@ export const listConcertsForEvent = async (
   }
 
   const { data, error } = await client.from('concerts').select('*').eq('event_id', id).order('date', { ascending: true });
+
+  if (error) {
+    return {
+      data: null,
+      error: {
+        ruleId: 'list_failed',
+        message: error.message
+      }
+    };
+  }
+
+  return ok(sortConcerts(data ?? []));
+};
+
+export const EVENTS_LIST_WINDOW = 20;
+
+export const listConcertsForEventIds = async (
+  client: ConcertsClient,
+  eventIds: string[]
+): Promise<DomainResult<ConcertRecord[]>> => {
+  const ids = [...new Set(eventIds.map(id => trim(id)).filter(Boolean))];
+  if (ids.length === 0) {
+    return ok([]);
+  }
+
+  const { data, error } = await client
+    .from('concerts')
+    .select('*')
+    .in('event_id', ids)
+    .order('date', { ascending: true });
 
   if (error) {
     return {

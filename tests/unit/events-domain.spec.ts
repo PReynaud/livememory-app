@@ -731,8 +731,8 @@ describe('events store and pages use domain helpers only', () => {
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/useEventsStore/);
     expect(eventPage).toMatch(/middleware:\s*'auth'/);
-    expect(eventPage).toMatch(/Loading event/);
-    expect(eventPage).toMatch(/Couldn't load/);
+    expect(eventPage).toMatch(/AppListSkeleton/);
+    expect(eventPage).toMatch(/AppLoadError/);
     expect(eventPage).toMatch(/Event not found/);
     expect(eventPage).toMatch(/loadFailed|eventsStore\.error|error\.value/);
     expect(eventPage).toMatch(/Edit event/);

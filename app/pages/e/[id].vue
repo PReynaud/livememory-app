@@ -143,16 +143,7 @@ const openEditSheet = (concert: ConcertRecord) => {
       />
       <section class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2">
         <template v-if="billLoadFailed">
-          <p class="text-lg font-semibold">
-            Couldn't load.
-          </p>
-          <UButton
-            label="Retry"
-            color="primary"
-            variant="outline"
-            class="h-11 rounded-full ring-2"
-            @click="retryLoad"
-          />
+          <AppLoadError @retry="retryLoad" />
         </template>
         <p
           v-else-if="!hasConcerts"
@@ -229,22 +220,11 @@ const openEditSheet = (concert: ConcertRecord) => {
     </template>
 
     <template v-else-if="!hasResolved">
-      <p class="text-sm text-muted">
-        Loading event…
-      </p>
+      <AppListSkeleton variant="groups" />
     </template>
 
     <template v-else-if="loadFailed">
-      <p class="text-lg font-semibold">
-        Couldn't load.
-      </p>
-      <UButton
-        label="Retry"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        @click="retryLoad"
-      />
+      <AppLoadError @retry="retryLoad" />
     </template>
 
     <template v-else-if="notFound">

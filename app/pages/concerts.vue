@@ -11,7 +11,14 @@ definePageMeta({
 
 const eventsStore = useEventsStore();
 const addSheet = useAddConcertSheetStore();
-const { events, loading, error } = storeToRefs(eventsStore);
+const {
+  events,
+  visibleEvents,
+  loading,
+  loadingMore,
+  error,
+  hasMoreEvents
+} = storeToRefs(eventsStore);
 
 const createKind = ref<EventKind | null>(null);
 const name = ref('');
@@ -23,6 +30,7 @@ const saving = ref(false);
 
 const hasEvents = computed(() => events.value.length > 0);
 const isFestival = computed(() => createKind.value === 'festival');
+const showSkeleton = computed(() => loading.value && !error.value && !hasEvents.value);
 
 const openCreate = (kind: EventKind) => {
   createKind.value = kind;
@@ -59,7 +67,16 @@ const submitCreate = async () => {
   }
 };
 
-await eventsStore.fetchEvents();
+const retryLoad = () => {
+  if (hasEvents.value) {
+    void eventsStore.loadMoreEvents();
+    return;
+  }
+
+  void eventsStore.fetchEvents();
+};
+
+void eventsStore.fetchEvents({ silent: eventsStore.events.length > 0 });
 </script>
 
 <template>
@@ -167,22 +184,19 @@ await eventsStore.fetchEvents();
       />
     </form>
 
-    <p
-      v-if="error && !formError"
-      class="text-sm text-muted"
-    >
-      {{ error }}
-    </p>
+    <AppListSkeleton
+      v-if="showSkeleton"
+      variant="groups"
+    />
 
-    <p
-      v-if="!error && loading && !hasEvents"
-      class="text-sm text-muted"
-    >
-      Loading events…
-    </p>
+    <AppLoadError
+      v-else-if="error && !formError"
+      testid="concerts-load-error"
+      @retry="retryLoad"
+    />
 
     <section
-      v-else-if="!error && !hasEvents"
+      v-else-if="!hasEvents"
       class="rounded-2xl bg-[#1A1A1A] p-4 space-y-3"
     >
       <p class="text-lg font-semibold">
@@ -198,14 +212,29 @@ await eventsStore.fetchEvents();
     </section>
 
     <div
-      v-if="hasEvents"
+      v-if="hasEvents && !showSkeleton"
       class="space-y-2.5"
     >
       <AppEventCard
-        v-for="event in events"
+        v-for="event in visibleEvents"
         :key="event.id"
         :event="event"
         :concerts="eventsStore.concertsForEvent(event.id)"
+      />
+      <p
+        v-if="loadingMore"
+        data-testid="loading-more"
+        class="text-sm text-muted"
+      >
+        Loading more
+      </p>
+      <UButton
+        v-else-if="hasMoreEvents && !error"
+        label="Load more"
+        color="neutral"
+        variant="ghost"
+        class="w-full"
+        @click="void eventsStore.loadMoreEvents()"
       />
     </div>
   </UContainer>

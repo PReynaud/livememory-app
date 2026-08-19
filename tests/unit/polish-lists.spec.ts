@@ -1,0 +1,131 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { canWriteOnline, OFFLINE_TOAST_TITLE } from '../../app/utils/online-write';
+import { surfaceNameForRoute } from '../../app/utils/surface-name';
+import { EVENTS_LIST_WINDOW } from '../../shared/domain/concerts';
+
+const read = (relative: string) => readFileSync(resolve(process.cwd(), relative), 'utf8');
+
+describe('surface names', () => {
+  it('announces Home, Concerts, Event name, and Profile', () => {
+    expect(surfaceNameForRoute('/home')).toBe('Home');
+    expect(surfaceNameForRoute('/concerts')).toBe('Concerts');
+    expect(surfaceNameForRoute('/profile')).toBe('Profile');
+    expect(surfaceNameForRoute('/e/abc', 'Rock Week')).toBe('Event: Rock Week');
+    expect(surfaceNameForRoute('/e/abc')).toBe('');
+  });
+});
+
+describe('offline writes', () => {
+  it('blocks writes when the browser is offline and names the toast', () => {
+    expect(OFFLINE_TOAST_TITLE).toBe('You\'re offline.');
+    expect(canWriteOnline(true)).toBe(true);
+    expect(canWriteOnline(false)).toBe(false);
+    expect(canWriteOnline(undefined)).toBe(true);
+  });
+});
+
+describe('list polish source guards', () => {
+  it('uses USkeleton on cold Home, Concerts, and Event loads', () => {
+    const home = read('app/pages/home.vue');
+    const concerts = read('app/pages/concerts.vue');
+    const eventPage = read('app/pages/e/[id].vue');
+    const skeleton = read('app/components/AppListSkeleton.vue');
+
+    expect(skeleton).toMatch(/USkeleton/);
+    expect(skeleton).toMatch(/home/);
+    expect(skeleton).toMatch(/groups/);
+    expect(home).toMatch(/AppListSkeleton/);
+    expect(home).toMatch(/variant="home"/);
+    expect(home).toMatch(/loading/);
+    expect(home).not.toMatch(/await eventsStore\.fetchEvents/);
+    expect(concerts).toMatch(/AppListSkeleton/);
+    expect(concerts).toMatch(/variant="groups"/);
+    expect(concerts).not.toMatch(/await eventsStore\.fetchEvents/);
+    expect(concerts).not.toMatch(/Loading events/);
+    expect(eventPage).toMatch(/AppListSkeleton/);
+    expect(eventPage).not.toMatch(/Loading event/);
+  });
+
+  it('shows Couldn\'t load with Retry on Home, Concerts, and Event', () => {
+    const home = read('app/pages/home.vue');
+    const concerts = read('app/pages/concerts.vue');
+    const eventPage = read('app/pages/e/[id].vue');
+    const error = read('app/components/AppLoadError.vue');
+
+    expect(error).toMatch(/Couldn't load\./);
+    expect(error).toMatch(/label="Retry"/);
+    expect(home).toMatch(/AppLoadError/);
+    expect(concerts).toMatch(/AppLoadError/);
+    expect(concerts).not.toMatch(/\{\{\s*error\s*\}\}/);
+    expect(eventPage).toMatch(/AppLoadError/);
+  });
+
+  it('windows Concerts by Event groups with Loading more and no infinite scroll', () => {
+    const store = read('app/stores/events.ts');
+    const concerts = read('app/pages/concerts.vue');
+
+    expect(EVENTS_LIST_WINDOW).toBe(20);
+    expect(store).toMatch(/EVENTS_LIST_WINDOW/);
+    expect(store).toMatch(/listConcertsForEventIds/);
+    expect(store).toMatch(/loadMoreEvents/);
+    expect(store).toMatch(/loadingMore/);
+    expect(store).toMatch(/visibleEvents/);
+    expect(store).toMatch(/hasMoreEvents/);
+    expect(store).not.toMatch(/from\('concerts'\)/);
+    expect(concerts).toMatch(/visibleEvents/);
+    expect(concerts).toMatch(/Loading more/);
+    expect(concerts).toMatch(/Load more/);
+    expect(concerts).toMatch(/loadMoreEvents/);
+    expect(concerts).not.toMatch(/IntersectionObserver|infinite scroll|@scroll/);
+    expect(concerts).not.toMatch(/v-for="event in events"/);
+  });
+
+  it('announces surfaces, keeps focus rings on black, and drops glow plus blur animation under reduced motion', () => {
+    const app = read('app/app.vue');
+    const announcer = read('app/components/AppRouteAnnouncer.vue');
+    const css = read('app/assets/css/main.css');
+    const chip = read('app/components/AppAttendanceChip.vue');
+    const nav = read('app/components/AppGlassNav.vue');
+
+    expect(app).toMatch(/AppRouteAnnouncer/);
+    expect(announcer).toMatch(/aria-live="polite"/);
+    expect(announcer).toMatch(/surfaceNameForRoute/);
+    expect(announcer).toMatch(/data-testid="route-announcer"/);
+    expect(css).toMatch(/:focus-visible/);
+    expect(css).toMatch(/#FF4D8A/);
+    expect(css).toMatch(/prefers-reduced-motion/);
+    expect(chip).toMatch(/motion-reduce:shadow-none/);
+    expect(chip).toMatch(/motion-reduce:outline/);
+    expect(nav).toMatch(/lm-chrome|motion-reduce/);
+  });
+
+  it('blocks offline writes in the store with a toast and no queue', () => {
+    const store = read('app/stores/events.ts');
+    expect(store).toMatch(/canWriteOnline/);
+    expect(store).toMatch(/OFFLINE_TOAST_TITLE/);
+    expect(store).toMatch(/toast\.add/);
+    expect(store).not.toMatch(/offlineQueue|indexedDB|background-sync/);
+    expect(store).toMatch(/createOwnedEvent/);
+    expect(store).toMatch(/createOwnedConcert/);
+    expect(store).toMatch(/cycleAttendance/);
+  });
+
+  it('keeps list actions tappable on small screens, forbids drag-and-drop, and stacks one sheet', () => {
+    const concerts = read('app/pages/concerts.vue');
+    const eventPage = read('app/pages/e/[id].vue');
+    const card = read('app/components/AppEventCard.vue');
+    const addSheet = read('app/components/AppAddConcertSheet.vue');
+    const editSheet = read('app/components/AppEditEventSheet.vue');
+
+    expect(concerts).not.toMatch(/group-hover:opacity|hover:only|md:hidden[\s\S]*hover:/);
+    expect(eventPage).not.toMatch(/draggable|dragstart|vuedraggable/);
+    expect(card).not.toMatch(/draggable|dragstart/);
+    expect(card).toMatch(/AppAttendanceChip/);
+    expect(addSheet).toMatch(/useEditEventSheetStore/);
+    expect(addSheet).toMatch(/closeSheet/);
+    expect(editSheet).toMatch(/useAddConcertSheetStore/);
+    expect(editSheet).toMatch(/closeSheet/);
+  });
+});

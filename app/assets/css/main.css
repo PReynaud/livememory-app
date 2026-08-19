@@ -26,3 +26,15 @@ html {
   --ui-bg: #000000;
   --ui-primary: #FF4D8A;
 }
+
+.dark :focus-visible {
+  outline: 2px solid #FF4D8A;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lm-chrome {
+    transition: none !important;
+    animation: none !important;
+  }
+}

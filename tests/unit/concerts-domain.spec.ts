@@ -18,7 +18,9 @@ import {
   createConcert,
   dateOutsideEventMessage,
   deleteConcert,
+  EVENTS_LIST_WINDOW,
   listConcertsForEvent,
+  listConcertsForEventIds,
   listOwnedConcerts,
   moveConcert,
   transparentSingleNightName,
@@ -370,7 +372,13 @@ const createMockConcertsClient = (options?: {
 
           return {
             order: async () => ({ data: concerts, error: null }),
-            eq: (column: string, value: string) => concertEq([{ column, value }])
+            eq: (column: string, value: string) => concertEq([{ column, value }]),
+            in: (column: string, values: readonly string[]) => ({
+              order: async () => ({
+                data: concerts.filter(concert => values.includes(String(concert[column as keyof ConcertRecord]))),
+                error: null
+              })
+            })
           };
         },
         update: (row: Record<string, unknown>) => {
@@ -1960,6 +1968,42 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const owned = await listOwnedConcerts(client);
     expect(owned.error).toBeNull();
     expect(owned.data).toHaveLength(3);
+  });
+
+  it('lists concerts for a window of Event ids without loading the rest', async () => {
+    expect(EVENTS_LIST_WINDOW).toBe(20);
+
+    const first: ConcertRecord = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      event_id: festivalRow.id,
+      owner_id: festivalRow.owner_id,
+      artist: 'The Last Dinner Party',
+      date: '2026-08-20',
+      time: '20:15',
+      place: 'Paris'
+    };
+    const other: ConcertRecord = {
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      event_id: nightRow.id,
+      owner_id: nightRow.owner_id,
+      artist: 'Local Band',
+      date: '2026-08-18',
+      time: null,
+      place: 'Berlin'
+    };
+
+    const { client } = createMockConcertsClient({
+      events: [festivalRow, nightRow],
+      concerts: [first, other]
+    });
+
+    const empty = await listConcertsForEventIds(client, []);
+    expect(empty.error).toBeNull();
+    expect(empty.data).toEqual([]);
+
+    const windowed = await listConcertsForEventIds(client, [festivalRow.id, '  ']);
+    expect(windowed.error).toBeNull();
+    expect(windowed.data?.map(concert => concert.artist)).toEqual(['The Last Dinner Party']);
   });
 });
 
