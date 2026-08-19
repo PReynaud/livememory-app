@@ -11,14 +11,19 @@ definePageMeta({
 
 const addSheet = useAddConcertSheetStore();
 const eventsStore = useEventsStore();
-const { featuredEvents, homeStats, error } = storeToRefs(eventsStore);
+const { featuredEvents, homeStats, error, loading } = storeToRefs(eventsStore);
 const hasFeatured = computed(() => featuredEvents.value.length > 0);
+const showSkeleton = computed(() => loading.value && !error.value);
 
 const retryLoad = () => {
   void eventsStore.fetchEvents();
 };
 
-await eventsStore.fetchEvents();
+if (import.meta.server) {
+  await eventsStore.fetchEvents({ silent: eventsStore.events.length > 0 });
+} else {
+  void eventsStore.fetchEvents({ silent: eventsStore.events.length > 0 });
+}
 </script>
 
 <template>
@@ -27,21 +32,16 @@ await eventsStore.fetchEvents();
       Home
     </h1>
 
-    <template v-if="error">
-      <p
-        data-testid="home-load-error"
-        class="text-lg font-semibold"
-      >
-        Couldn't load.
-      </p>
-      <UButton
-        label="Retry"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        @click="retryLoad"
-      />
-    </template>
+    <AppListSkeleton
+      v-if="showSkeleton"
+      variant="home"
+    />
+
+    <AppLoadError
+      v-else-if="error"
+      testid="home-load-error"
+      @retry="retryLoad"
+    />
 
     <template v-else>
       <section

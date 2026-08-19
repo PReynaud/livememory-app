@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { navigateTo, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
+import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
 import { useEventsStore, type EventRecord } from '@/stores/events';
 import { eachCivilDateInclusive, formatDayChipParts } from '@/utils/concert-groups';
 import { CONCERT_RULE_MESSAGE } from '#shared/domain/concerts';
@@ -12,6 +13,7 @@ const NEW_NIGHT = 'new:single_night';
 const NEW_FESTIVAL = 'new:festival';
 
 const sheet = useAddConcertSheetStore();
+const editEventSheet = useEditEventSheetStore();
 const eventsStore = useEventsStore();
 const toast = useToast();
 const { events } = storeToRefs(eventsStore);
@@ -38,6 +40,7 @@ const sheetOpen = computed({
   get: () => sheet.open,
   set: (value: boolean) => {
     if (value) {
+      editEventSheet.closeSheet();
       sheet.openSheet({
         eventId: sheet.eventId ?? undefined,
         lockEvent: sheet.lockEvent,
@@ -52,6 +55,12 @@ const sheetOpen = computed({
     }
 
     sheet.closeSheet();
+  }
+});
+
+watch(() => sheet.open, (isOpen) => {
+  if (isOpen) {
+    editEventSheet.closeSheet();
   }
 });
 
@@ -449,7 +458,7 @@ const removeConcert = async () => {
 
 const slideoverUi = {
   overlay: 'bg-white/8',
-  content: 'bg-[rgba(20,20,20,0.78)] backdrop-blur-[28px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-1/2 lg:w-[28rem] lg:-translate-x-1/2 max-h-[min(85dvh,36rem)]',
+  content: 'lm-chrome bg-[rgba(20,20,20,0.78)] backdrop-blur-[28px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-1/2 lg:w-[28rem] lg:-translate-x-1/2 max-h-[min(85dvh,36rem)]',
   header: 'px-4 pt-4 pb-0 sm:px-4',
   body: 'px-4 py-3 sm:px-4 sm:py-3',
   footer: 'px-4 pb-4 sm:px-4',
