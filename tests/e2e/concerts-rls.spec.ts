@@ -9,7 +9,7 @@ const restHeaders = (accessToken: string, anonKey: string) => ({
   'Prefer': 'return=representation'
 });
 
-test('insert RLS rejects out-of-range dates and a Place that is not the Event Place', async (_fixtures, testInfo) => {
+test('insert RLS rejects out-of-range dates and a Place that is not the Event Place', async ({ page: _page }, testInfo) => {
   const account = await createE2EAccountForTest(`${testInfo.project.name}-${testInfo.title}-${testInfo.retry}`);
 
   try {
