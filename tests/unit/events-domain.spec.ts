@@ -662,6 +662,21 @@ describe('event rules kernel', () => {
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/security definer/i);
   });
+
+  it('validates both source and destination Events when a Stage event_id changes', () => {
+    const migration = readMigrations().find(file => file.name.includes('event_rules_stages_place_override'));
+    const sql = migration?.sql ?? '';
+    const triggerFn = sql.slice(
+      sql.indexOf('create or replace function public.enforce_event_stages_bill_rules()'),
+      sql.indexOf('create constraint trigger event_stages_bill_rules')
+    );
+
+    expect(triggerFn).toMatch(/old\.event_id is distinct from new\.event_id/);
+    expect(triggerFn).toMatch(/stage_id = old\.id/);
+    expect(triggerFn).toMatch(/assert_event_bill_valid\(old\.event_id\)/);
+    expect(triggerFn).toMatch(/assert_event_bill_valid\(new\.event_id\)/);
+    expect(triggerFn).toMatch(/Stage or Scene must be on this Event/);
+  });
 });
 
 describe('updateEvent', () => {
