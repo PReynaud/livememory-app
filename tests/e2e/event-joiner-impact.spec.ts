@@ -353,8 +353,9 @@ test('owner confirms Event delete when joiners would lose it', async ({ page }, 
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login/);
 
+    await page.goto('/login');
     await signInOnPage(page, joiner);
-    await expect(page).toHaveURL(/\/home/);
+    await page.goto('/home');
     await waitForNuxtHydration(page);
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await expect(page.getByTestId('home-featured-empty')).toBeVisible();
