@@ -50,9 +50,8 @@ describe('shared list kernel', () => {
     expect(sql).toMatch(/username_key = lower\(btrim\(requested\)\)/);
     expect(sql).toMatch(/grant execute on function public\.get_shared_list_profile\(text\) to anon, authenticated/);
     expect(sql).not.toMatch(/grant select on table public\.shared_list_profiles/);
-    expect(sql).toMatch(/revoke all on table public\.profiles from anon/);
-    expect(sql).toMatch(/grant select, insert on table public\.profiles to authenticated/);
-    expect(sql).toMatch(/grant update \(shared_list_enabled\) on table public\.profiles to authenticated/);
+    expect(sql).toMatch(/grant select, insert, update on table public\.profiles to authenticated/);
+    expect(sql).toMatch(/revoke select, insert, update, delete on table public\.profiles from anon/);
     expect(sql).not.toMatch(/service_role/);
   });
 });
