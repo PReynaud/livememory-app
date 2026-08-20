@@ -383,6 +383,32 @@ const persistFailed = (error: QueryError): DomainError => ({
   message: error.message
 });
 
+export const requireEventOwnerAccess = async (
+  client: EventsClient,
+  eventId: string
+): Promise<DomainError | null> => {
+  const id = trim(eventId);
+  if (!id) {
+    return { ruleId: EVENT_RULE.ownership, message: EVENT_RULE_MESSAGE.ownership };
+  }
+
+  const { data, error } = await client
+    .from('event_members')
+    .select('*')
+    .eq('event_id', id)
+    .maybeSingle();
+
+  if (error) {
+    return persistFailed(error);
+  }
+
+  if (data) {
+    return { ruleId: EVENT_RULE.ownership, message: EVENT_RULE_MESSAGE.ownership };
+  }
+
+  return null;
+};
+
 const mapKernelError = (error: QueryError): DomainError => {
   const text = constraintText(error);
   if (/you do not own this event/i.test(text)) {
@@ -694,6 +720,11 @@ export const updateEvent = async (
     return fail(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
   }
 
+  const joinerRefuse = await requireEventOwnerAccess(client, eventId);
+  if (joinerRefuse) {
+    return { data: null, error: joinerRefuse };
+  }
+
   const validated = validateCreateInput({
     kind: existing.data.kind,
     name: input.name,
@@ -734,6 +765,11 @@ export const deleteEvent = async (
   }
   if (!existing.data) {
     return fail(EVENT_RULE.ownership, EVENT_RULE_MESSAGE.ownership);
+  }
+
+  const joinerRefuse = await requireEventOwnerAccess(client, existing.data.id);
+  if (joinerRefuse) {
+    return { data: null, error: joinerRefuse };
   }
 
   const { error } = await client.from('events').delete().eq('id', existing.data.id);

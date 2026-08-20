@@ -241,7 +241,6 @@ const copyEventLink = async () => {
                 </p>
               </div>
               <AppAttendanceChip
-                v-if="isOwner"
                 :status="eventsStore.attendanceStatus(concert.id)"
                 :is-past="eventsStore.concertIsPast(concert)"
                 :disabled="eventsStore.isAttendanceBusy(concert.id)"
@@ -252,7 +251,7 @@ const copyEventLink = async () => {
         </template>
       </section>
       <UButton
-        v-if="isOwner && showAttendThisNight"
+        v-if="showAttendThisNight"
         label="Attend this night"
         color="primary"
         variant="outline"

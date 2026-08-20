@@ -163,7 +163,8 @@ describe('join surfaces', () => {
     expect(fetchEvent.indexOf('getOwnedEvent')).toBeLessThan(fetchEvent.indexOf('joinEvent'));
     expect(fetchEvent).toMatch(/if \(joined\.data\)/);
     expect(store).toMatch(/auth\.getUser/);
-    expect(store).toMatch(/isOwner\.value = Boolean\(data\.user\?\.id && data\.user\.id === event\.owner_id\)/);
+    expect(store).toMatch(/sessionUserId/);
+    expect(store).toMatch(/isOwner\.value = Boolean\(event && userId && userId === event\.owner_id\)/);
 
     const page = read('app/pages/e/[id].vue');
     expect(page).toMatch(/isOwner/);

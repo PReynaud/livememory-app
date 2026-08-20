@@ -11,6 +11,7 @@ import {
   type CreateEventInput,
   type DomainError,
   type DomainResult,
+  type EventMemberRecord,
   type EventRecord,
   type EventStageRecord,
   type EventsClient
@@ -172,6 +173,7 @@ export type ConcertsClient = {
     (relation: 'concerts'): TableApi<ConcertRecord>;
     (relation: 'event_stages'): TableApi<EventStageRecord>;
     (relation: 'concert_notes'): TableApi<ConcertNoteRecord>;
+    (relation: 'event_members'): TableApi<EventMemberRecord>;
   };
 };
 
@@ -243,6 +245,32 @@ const persistFailed = (error: QueryError): DomainError => ({
   ruleId: 'persist_failed',
   message: error.message
 });
+
+const refuseJoinerBillWrite = async (
+  client: ConcertsClient,
+  eventId: string
+): Promise<DomainError | null> => {
+  const id = trim(eventId);
+  if (!id) {
+    return { ruleId: EVENT_RULE.ownership, message: EVENT_RULE_MESSAGE.ownership };
+  }
+
+  const { data, error } = await client
+    .from('event_members')
+    .select('*')
+    .eq('event_id', id)
+    .maybeSingle();
+
+  if (error) {
+    return persistFailed(error);
+  }
+
+  if (data) {
+    return { ruleId: EVENT_RULE.ownership, message: EVENT_RULE_MESSAGE.ownership };
+  }
+
+  return null;
+};
 
 const attachOwnerNotes = async (
   client: ConcertsClient,
@@ -724,6 +752,17 @@ export const createConcert = async (
     };
   }
 
+  if (target.data.event) {
+    const joinerRefuse = await refuseJoinerBillWrite(client, target.data.event.id);
+    if (joinerRefuse) {
+      return {
+        data: null,
+        error: joinerRefuse,
+        outcome: null
+      };
+    }
+  }
+
   const candidatesResult = await listIdentityCandidates(
     client,
     artist,
@@ -916,6 +955,15 @@ export const updateConcert = async (
   }
 
   const current = existing.data;
+  const joinerRefuse = await refuseJoinerBillWrite(client, current.event_id);
+  if (joinerRefuse) {
+    return {
+      data: null,
+      error: joinerRefuse,
+      outcome: null
+    };
+  }
+
   const requestedEventId = trim(input.eventId);
   const targetEventId = requestedEventId || current.event_id;
 
@@ -1066,6 +1114,11 @@ export const moveConcert = async (
     return existing;
   }
 
+  const joinerRefuse = await refuseJoinerBillWrite(client, existing.data.event_id);
+  if (joinerRefuse) {
+    return { data: null, error: joinerRefuse };
+  }
+
   const targetEventId = trim(input.targetEventId);
   if (!targetEventId) {
     return fail(CONCERT_RULE.requiredEvent, CONCERT_RULE_MESSAGE.requiredEvent);
@@ -1141,6 +1194,11 @@ export const deleteConcert = async (
       data: null,
       error: existing.error
     };
+  }
+
+  const joinerRefuse = await refuseJoinerBillWrite(client, existing.data.event_id);
+  if (joinerRefuse) {
+    return { data: null, error: joinerRefuse };
   }
 
   const { error } = await client.from('concerts').delete().eq('id', existing.data.id);

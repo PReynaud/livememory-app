@@ -7,8 +7,10 @@ import {
 } from '../../shared/domain/attendance';
 import {
   createEvent,
+  EVENT_RULE,
   type EventRecord,
   type EventStageRecord,
+  type EventMemberRecord,
   type EventsClient
 } from '../../shared/domain/events';
 import {
@@ -109,10 +111,12 @@ const createMockConcertsClient = (options?: {
   concertUpdateError?: QueryError;
   missFirstIdentityLookup?: boolean;
   attendanceInsertError?: QueryError;
+  members?: EventMemberRecord[];
 }) => {
   const events = [...(options?.events ?? [])];
   const concerts = [...(options?.concerts ?? [])];
   const stages = [...(options?.stages ?? [])];
+  const members = [...(options?.members ?? [])];
   const concertInserts: Record<string, unknown>[] = [];
   const concertUpdates: Record<string, unknown>[] = [];
   const concertDeletes: { column: string; value: string }[] = [];
@@ -123,7 +127,20 @@ const createMockConcertsClient = (options?: {
   let identityLookups = 0;
 
   const client = {
-    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective' | 'event_stages' | 'concert_notes') => {
+    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective' | 'event_stages' | 'concert_notes' | 'event_members') => {
+      if (table === 'event_members') {
+        return {
+          select: () => ({
+            eq: (_column: string, value: string) => ({
+              maybeSingle: async () => ({
+                data: members.find(member => member.event_id === value) ?? null,
+                error: null
+              })
+            })
+          })
+        };
+      }
+
       if (table === 'concert_notes') {
         return {
           select: () => ({
@@ -1648,6 +1665,51 @@ describe('updateConcert and deleteConcert', () => {
 
     const listedAfter = await listConcertsForEvent(client, nightRow.id);
     expect(listedAfter.data).toHaveLength(0);
+  });
+
+  it('blocks add, edit, move, and delete when the acting User is a member', async () => {
+    const membership: EventMemberRecord = {
+      id: 'mmmmmmmm-mmmm-4mmm-8mmm-mmmmmmmmmmmm',
+      event_id: nightRow.id,
+      user_id: 'joiner-1'
+    };
+    const { client, concertInserts, concertUpdates, concertDeletes } = createMockConcertsClient({
+      events: [nightRow, otherNightRow],
+      concerts: [timedJustice],
+      members: [membership]
+    });
+
+    const created = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Fontaines D.C.',
+      date: '2026-08-18'
+    });
+    expect(created.data).toBeNull();
+    expect(created.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(concertInserts).toHaveLength(0);
+
+    const updated = await updateConcert(client, {
+      concertId: timedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      notes: 'Stolen note'
+    });
+    expect(updated.data).toBeNull();
+    expect(updated.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(concertUpdates).toHaveLength(0);
+
+    const moved = await moveConcert(client, {
+      concertId: timedJustice.id,
+      targetEventId: otherNightRow.id
+    });
+    expect(moved.data).toBeNull();
+    expect(moved.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(concertUpdates).toHaveLength(0);
+
+    const deleted = await deleteConcert(client, timedJustice.id);
+    expect(deleted.data).toBeNull();
+    expect(deleted.error?.ruleId).toBe(EVENT_RULE.ownership);
+    expect(concertDeletes).toHaveLength(0);
   });
 });
 

@@ -16,7 +16,7 @@ const sheet = useAddConcertSheetStore();
 const editEventSheet = useEditEventSheetStore();
 const eventsStore = useEventsStore();
 const toast = useToast();
-const { events } = storeToRefs(eventsStore);
+const { events, sessionUserId } = storeToRefs(eventsStore);
 const { lockEvent } = storeToRefs(sheet);
 
 const picker = ref('');
@@ -87,10 +87,12 @@ const eventStages = computed(() => {
 const showStageSelect = computed(() => eventStages.value.length > 0);
 
 const eventItems = computed(() => {
-  const owned = events.value.map(event => ({
-    label: event.name,
-    value: event.id
-  }));
+  const owned = events.value
+    .filter(event => Boolean(sessionUserId.value) && event.owner_id === sessionUserId.value)
+    .map(event => ({
+      label: event.name,
+      value: event.id
+    }));
 
   if (isEdit.value) {
     return owned;
