@@ -185,16 +185,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          shared_list_enabled: boolean
           username: string
         }
         Insert: {
           created_at?: string
           id: string
+          shared_list_enabled?: boolean
           username: string
         }
         Update: {
           created_at?: string
           id?: string
+          shared_list_enabled?: boolean
           username?: string
         }
         Relationships: []
@@ -240,6 +243,21 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_list_profiles: {
+        Row: {
+          username: string | null
+          username_key: string | null
+        }
+        Insert: {
+          username?: string | null
+          username_key?: never
+        }
+        Update: {
+          username?: string | null
+          username_key?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assert_event_bill_valid: {
@@ -253,6 +271,12 @@ export type Database = {
       concert_is_past: {
         Args: { p_date: string; p_time: string }
         Returns: boolean
+      }
+      get_shared_list_profile: {
+        Args: { requested: string }
+        Returns: {
+          username: string
+        }[]
       }
       save_event_and_concert_dates: {
         Args: {

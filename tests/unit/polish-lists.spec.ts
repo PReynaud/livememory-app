@@ -14,6 +14,7 @@ describe('surface names', () => {
     expect(surfaceNameForRoute('/profile')).toBe('Profile');
     expect(surfaceNameForRoute('/e/abc', 'Rock Week')).toBe('Event: Rock Week');
     expect(surfaceNameForRoute('/e/abc')).toBe('');
+    expect(surfaceNameForRoute('/u/pierre')).toBe('Shared list for pierre');
   });
 });
 

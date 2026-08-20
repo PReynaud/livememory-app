@@ -70,7 +70,9 @@ describe('profile store', () => {
     expect(store).toMatch(/useSupabaseClient/);
     expect(store).toMatch(/from\('profiles'\)/);
     expect(store).toMatch(/username/);
+    expect(store).toMatch(/shared_list_enabled/);
     expect(store).toMatch(/\{ data, error \}|return \{[\s\S]*data:[\s\S]*error:/);
+    expect(store).toMatch(/auth\.getUser/);
 
     const pages = ['home', 'concerts', 'profile', 'login'].map((name) => {
       return readFileSync(resolve(process.cwd(), `app/pages/${name}.vue`), 'utf8');
