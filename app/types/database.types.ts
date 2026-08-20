@@ -185,16 +185,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          shared_list_enabled: boolean
           username: string
         }
         Insert: {
           created_at?: string
           id: string
+          shared_list_enabled?: boolean
           username: string
         }
         Update: {
           created_at?: string
           id?: string
+          shared_list_enabled?: boolean
           username?: string
         }
         Relationships: []
@@ -237,6 +240,13 @@ export type Database = {
         Update: {
           concert_id?: string | null
           notes?: string | null
+        }
+        Relationships: []
+      }
+      shared_list_profiles: {
+        Row: {
+          username: string | null
+          username_key: string | null
         }
         Relationships: []
       }
