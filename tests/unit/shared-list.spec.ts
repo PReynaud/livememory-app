@@ -97,7 +97,8 @@ describe('shared list surfaces', () => {
     expect(profilePage).toMatch(/Copy link/);
     expect(profilePage).toMatch(/COPY_LINK_FAILED/);
     expect(COPY_LINK_FAILED).toBe('Couldn\'t copy the link.');
-    expect(profilePage).toContain(SHARED_LIST_HELPER);
+    expect(profilePage).toMatch(/SHARED_LIST_HELPER/);
+    expect(SHARED_LIST_HELPER).toBe('Friends see Going and Attended. They can open an Event to join — they never edit your bill or see notes.');
     expect(profilePage).not.toMatch(/from\('profiles'\)/);
     expect(profilePage).not.toMatch(/directory|User search|find users/i);
 
@@ -108,8 +109,10 @@ describe('shared list surfaces', () => {
     expect(store).toMatch(/finally/);
 
     const publicPage = read('app/pages/u/[username].vue');
-    expect(publicPage).toContain(SHARED_LIST_EMPTY);
-    expect(publicPage).toContain(SHARED_LIST_NOT_FOUND);
+    expect(publicPage).toMatch(/SHARED_LIST_EMPTY/);
+    expect(publicPage).toMatch(/SHARED_LIST_NOT_FOUND/);
+    expect(SHARED_LIST_EMPTY).toBe('Nothing to show yet.');
+    expect(SHARED_LIST_NOT_FOUND).toBe('Not found.');
     expect(publicPage).toMatch(/fetchPublicProfile/);
     expect(publicPage).not.toMatch(/from\('events'\)|from\('concerts'\)|from\('profiles'\)|from\('attendance'\)/);
     expect(publicPage).not.toMatch(/Add concert|label="Add"/);

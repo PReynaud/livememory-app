@@ -248,6 +248,14 @@ export type Database = {
           username: string | null
           username_key: string | null
         }
+        Insert: {
+          username?: string | null
+          username_key?: never
+        }
+        Update: {
+          username?: string | null
+          username_key?: never
+        }
         Relationships: []
       }
     }
