@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { CONCERT_IDENTITY, CONCERT_RULE_MESSAGE } from '../../shared/domain/concerts';
-import { EVENT_RULE_MESSAGE } from '../../shared/domain/events';
+import { EVENT_RULE, EVENT_RULE_MESSAGE } from '../../shared/domain/events';
 import { JOINER_IMPACT_COPY } from '../../shared/domain/membership';
 import {
   invokeLogTool,
@@ -59,6 +59,9 @@ const domainStub = (overrides: Partial<LogDomain>): LogDomain => ({
   attendThisNight: unused as LogDomain['attendThisNight'],
   eventHasJoiners: unused as LogDomain['eventHasJoiners'],
   concertMoveWouldLoseJoiners: unused as LogDomain['concertMoveWouldLoseJoiners'],
+  joinEvent: unused as LogDomain['joinEvent'],
+  leaveEvent: unused as LogDomain['leaveEvent'],
+  requireEventOwnerAccess: unused as LogDomain['requireEventOwnerAccess'],
   ...overrides
 });
 
@@ -195,11 +198,13 @@ describe('MCP log tools call domain, not SQL', () => {
 
   it('delete_event requires confirm for a non-empty Event and then calls domain delete', async () => {
     const getOwnedEvent = vi.fn().mockResolvedValue({ data: eventRow, error: null });
+    const requireEventOwnerAccess = vi.fn().mockResolvedValue(null);
     const listConcertsForEvent = vi.fn().mockResolvedValue({ data: [concert], error: null });
     const eventHasJoiners = vi.fn().mockResolvedValue({ data: false, error: null });
     const deleteEvent = vi.fn().mockResolvedValue({ data: { id: eventRow.id }, error: null });
     const domain = domainStub({
       getOwnedEvent,
+      requireEventOwnerAccess,
       listConcertsForEvent,
       eventHasJoiners,
       deleteEvent
@@ -222,6 +227,7 @@ describe('MCP log tools call domain, not SQL', () => {
 
   it('move_concert requires confirm when joiners would lose the Concert and does not auto-join', async () => {
     const listOwnedConcerts = vi.fn().mockResolvedValue({ data: [concert], error: null });
+    const requireEventOwnerAccess = vi.fn().mockResolvedValue(null);
     const concertMoveWouldLoseJoiners = vi.fn().mockResolvedValue({ data: true, error: null });
     const moveConcert = vi.fn().mockResolvedValue({
       data: { ...concert, event_id: 'event-2' },
@@ -229,6 +235,7 @@ describe('MCP log tools call domain, not SQL', () => {
     });
     const domain = domainStub({
       listOwnedConcerts,
+      requireEventOwnerAccess,
       concertMoveWouldLoseJoiners,
       moveConcert
     });
@@ -288,6 +295,172 @@ describe('MCP log tools call domain, not SQL', () => {
   });
 });
 
+describe('MCP joiner and membership tools', () => {
+  const ownership = {
+    ruleId: EVENT_RULE.ownership,
+    message: EVENT_RULE_MESSAGE.ownership
+  };
+
+  it('join_event and leave_event call domain membership with the acting User client', async () => {
+    const joinEvent = vi.fn().mockResolvedValue({
+      data: { id: 'member-1', event_id: eventRow.id, user_id: 'joiner-1' },
+      error: null
+    });
+    const leaveEvent = vi.fn().mockResolvedValue({ data: true, error: null });
+
+    const joined = await invokeLogTool(
+      'join_event',
+      { eventId: eventRow.id },
+      { marker: 'client' },
+      domainStub({ joinEvent })
+    );
+    const left = await invokeLogTool(
+      'leave_event',
+      { eventId: eventRow.id },
+      { marker: 'client' },
+      domainStub({ leaveEvent })
+    );
+
+    expect(joinEvent).toHaveBeenCalledWith({ marker: 'client' }, eventRow.id);
+    expect(leaveEvent).toHaveBeenCalledWith({ marker: 'client' }, eventRow.id);
+    expect(joined.ok).toBe(true);
+    expect(left.ok).toBe(true);
+  });
+
+  it('forwards domain ownership for joiner Bill writes and does not ask confirm', async () => {
+    const createConcert = vi.fn().mockResolvedValue({
+      data: null,
+      error: ownership,
+      outcome: null
+    });
+    const updateEvent = vi.fn().mockResolvedValue({ data: null, error: ownership });
+    const requireEventOwnerAccess = vi.fn().mockResolvedValue(ownership);
+    const deleteConcert = vi.fn();
+    const moveConcert = vi.fn();
+    const deleteEvent = vi.fn();
+    const eventHasJoiners = vi.fn();
+    const concertMoveWouldLoseJoiners = vi.fn();
+
+    const created = await invokeLogTool(
+      'create_concert',
+      { artist: 'Justice', date: '2026-08-18', eventId: eventRow.id },
+      {},
+      domainStub({ createConcert })
+    );
+    expect(created.ok).toBe(false);
+    expect(created.ruleId).toBe(EVENT_RULE.ownership);
+    expect(created.message).toBe(EVENT_RULE_MESSAGE.ownership);
+
+    const updated = await invokeLogTool(
+      'update_event',
+      {
+        eventId: eventRow.id,
+        name: 'Club Night',
+        startDate: '2026-08-18',
+        place: 'Paris'
+      },
+      {},
+      domainStub({ updateEvent })
+    );
+    expect(updated.message).toBe(EVENT_RULE_MESSAGE.ownership);
+
+    const deletedConcert = await invokeLogTool(
+      'delete_concert',
+      { concertId: concert.id, confirm: true },
+      {},
+      domainStub({
+        listOwnedConcerts: vi.fn().mockResolvedValue({ data: [concert], error: null }),
+        requireEventOwnerAccess,
+        deleteConcert,
+        eventHasJoiners
+      })
+    );
+    expect(deletedConcert.message).toBe(EVENT_RULE_MESSAGE.ownership);
+    expect(deletedConcert.outcome).not.toBe(MCP_NEEDS_CONFIRM);
+    expect(deleteConcert).not.toHaveBeenCalled();
+    expect(eventHasJoiners).not.toHaveBeenCalled();
+
+    const moved = await invokeLogTool(
+      'move_concert',
+      { concertId: concert.id, targetEventId: 'event-2', confirm: true },
+      {},
+      domainStub({
+        listOwnedConcerts: vi.fn().mockResolvedValue({ data: [concert], error: null }),
+        requireEventOwnerAccess,
+        moveConcert,
+        concertMoveWouldLoseJoiners
+      })
+    );
+    expect(moved.message).toBe(EVENT_RULE_MESSAGE.ownership);
+    expect(moveConcert).not.toHaveBeenCalled();
+
+    const deletedEvent = await invokeLogTool(
+      'delete_event',
+      { eventId: eventRow.id, confirm: true },
+      {},
+      domainStub({
+        getOwnedEvent: vi.fn().mockResolvedValue({ data: eventRow, error: null }),
+        requireEventOwnerAccess,
+        deleteEvent,
+        listConcertsForEvent: vi.fn(),
+        eventHasJoiners
+      })
+    );
+    expect(deletedEvent.message).toBe(EVENT_RULE_MESSAGE.ownership);
+    expect(deleteEvent).not.toHaveBeenCalled();
+  });
+
+  it('lets a joiner set Attendance, attend this night, join, and leave', async () => {
+    const setAttendance = vi.fn().mockResolvedValue({
+      data: { id: 'a1', user_id: 'joiner-1', concert_id: concert.id, status: 'going' },
+      error: null
+    });
+    const attendThisNight = vi.fn().mockResolvedValue({
+      data: [{ id: 'a1', user_id: 'joiner-1', concert_id: concert.id, status: 'going' }],
+      error: null
+    });
+    const joinEvent = vi.fn().mockResolvedValue({ data: true, error: null });
+    const leaveEvent = vi.fn().mockResolvedValue({ data: true, error: null });
+
+    const attendance = await invokeLogTool(
+      'set_attendance',
+      { concertId: concert.id, status: 'going' },
+      {},
+      domainStub({ setAttendance })
+    );
+    const attendAll = await invokeLogTool(
+      'attend_this_night',
+      { eventId: eventRow.id },
+      {},
+      domainStub({ attendThisNight })
+    );
+    const joined = await invokeLogTool(
+      'join_event',
+      { eventId: eventRow.id },
+      {},
+      domainStub({ joinEvent })
+    );
+    const left = await invokeLogTool(
+      'leave_event',
+      { eventId: eventRow.id },
+      {},
+      domainStub({ leaveEvent })
+    );
+
+    expect(attendance.ok).toBe(true);
+    expect(attendAll.ok).toBe(true);
+    expect(joined.ok).toBe(true);
+    expect(left.ok).toBe(true);
+  });
+
+  it('list_attendance uses the domain effective-Attendance helper', async () => {
+    const attendanceSource = read('shared/domain/attendance.ts');
+    expect(attendanceSource).toMatch(/from\('attendance_effective'\)/);
+    expect(read('server/utils/mcp-log-tools.ts')).toMatch(/listMyAttendance/);
+    expect(read('server/utils/mcp-log-tools.ts')).not.toMatch(/from\('attendance_effective'\)/);
+  });
+});
+
 describe('MCP adapter wiring', () => {
   it('binds Streamable HTTP, exchanges the personal key, and never queries domain tables with service_role', () => {
     const tools = read('server/utils/mcp-log-tools.ts');
@@ -307,9 +480,15 @@ describe('MCP adapter wiring', () => {
     expect(tools).toMatch(/listOwnedEvents/);
     expect(tools).toMatch(/listMyAttendance/);
     expect(tools).toMatch(/setAttendance/);
+    expect(tools).toMatch(/joinEvent/);
+    expect(tools).toMatch(/leaveEvent/);
+    expect(tools).toMatch(/requireEventOwnerAccess/);
     expect(tools).not.toMatch(/from\('events'\)/);
     expect(tools).not.toMatch(/from\('concerts'\)/);
     expect(tools).not.toMatch(/from\('attendance'\)/);
+    expect(tools).not.toMatch(/from\('event_members'\)/);
+    expect(tools).not.toMatch(/shared_list_concerts/);
+    expect(tools).not.toMatch(/get_shared_list/);
     expect(tools).not.toMatch(/service_role/);
     expect(tools).toMatch(/value === 'attach' \|\| value === 'create'/);
     expect(tools).toMatch(/CONCERT_IDENTITY\.needsChoice/);
@@ -318,6 +497,8 @@ describe('MCP adapter wiring', () => {
     expect(server).toMatch(/@modelcontextprotocol\/sdk\/server\/mcp/);
     expect(server).toMatch(/invokeLogTool/);
     expect(server).toMatch(/create_concert/);
+    expect(server).toMatch(/join_event/);
+    expect(server).toMatch(/leave_event/);
     expect(server).toMatch(/confirmChoiceSchema/);
     expect(server).not.toMatch(/from\('events'\)/);
     expect(server).not.toMatch(/service_role/);
@@ -343,6 +524,9 @@ describe('MCP adapter wiring', () => {
 
     expect(domain.createConcert).toBeTypeOf('function');
     expect(domain.listMyAttendance).toBeTypeOf('function');
+    expect(domain.joinEvent).toBeTypeOf('function');
+    expect(domain.leaveEvent).toBeTypeOf('function');
+    expect(domain.requireEventOwnerAccess).toBeTypeOf('function');
   });
 
   it('keeps prerender of / independent of the MCP SDK', () => {

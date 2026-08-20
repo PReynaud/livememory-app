@@ -1,18 +1,7 @@
 import { test, expect } from './fixtures/auth.fixture';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
-import { callMcpTool, postMcpUnauthorized } from './helpers/mcp-client';
+import { callMcpTool, createPersonalKeyFromProfile, postMcpUnauthorized } from './helpers/mcp-client';
 import { transparentSingleNightName, CONCERT_IDENTITY, CONCERT_RULE_MESSAGE } from '../../shared/domain/concerts';
-
-const createPersonalKey = async (page: import('@playwright/test').Page) => {
-  await page.getByRole('link', { name: 'Profile' }).click();
-  await expect(page).toHaveURL(/\/profile/);
-  await page.getByTestId('personal-key-create').click();
-  const plaintext = page.getByTestId('personal-key-plaintext');
-  await expect(plaintext).toBeVisible();
-  const key = (await plaintext.innerText()).trim();
-  expect(key.startsWith('lm_')).toBe(true);
-  return key;
-};
 
 const appBaseURL = (page: import('@playwright/test').Page) => {
   return new URL(page.url()).origin;
@@ -22,7 +11,7 @@ test('MCP create_concert with a personal key appears on Concerts like a form row
   authenticatedPage
 }) => {
   const page = authenticatedPage;
-  const key = await createPersonalKey(page);
+  const key = await createPersonalKeyFromProfile(page);
   const created = await callMcpTool(appBaseURL(page), key, 'create_concert', {
     artist: 'MCP Justice',
     date: '2026-10-15',
@@ -50,7 +39,7 @@ test('MCP create_concert returns needs_choice and attach keeps a single Concert'
   authenticatedPage
 }) => {
   const page = authenticatedPage;
-  const key = await createPersonalKey(page);
+  const key = await createPersonalKeyFromProfile(page);
   const first = await callMcpTool(appBaseURL(page), key, 'create_concert', {
     artist: 'MCP Twin',
     date: '2026-10-16',

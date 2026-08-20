@@ -1,3 +1,5 @@
+import { expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { McpToolJson } from '../../../server/utils/mcp-log-tools';
@@ -45,13 +47,29 @@ export const callMcpTool = async (
   }
 };
 
-export const postMcpUnauthorized = async (baseURL: string) => {
+export const createPersonalKeyFromProfile = async (page: Page) => {
+  await page.getByRole('link', { name: 'Profile' }).click();
+  await expect(page).toHaveURL(/\/profile/);
+  await page.getByTestId('personal-key-create').click();
+  const plaintext = page.getByTestId('personal-key-plaintext');
+  await expect(plaintext).toBeVisible();
+  const key = (await plaintext.innerText()).trim();
+  expect(key.startsWith('lm_')).toBe(true);
+  return key;
+};
+
+export const postMcpUnauthorized = async (baseURL: string, personalKey?: string) => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/event-stream'
+  };
+  if (personalKey) {
+    headers.Authorization = `Bearer ${personalKey}`;
+  }
+
   return fetch(`${baseURL.replace(/\/$/, '')}/api/mcp`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream'
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
