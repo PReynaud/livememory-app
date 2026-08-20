@@ -3,11 +3,11 @@ import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute } from '#imports';
 import { useSharedListStore } from '@/stores/shared-list';
-import { SHARED_LIST_NOT_FOUND } from '#shared/domain/shared-list';
+import { SHARED_LIST_EMPTY, SHARED_LIST_NOT_FOUND } from '#shared/domain/shared-list';
 
 const route = useRoute();
 const sharedListStore = useSharedListStore();
-const { profile, error } = storeToRefs(sharedListStore);
+const { profile, groups, error } = storeToRefs(sharedListStore);
 const hasResolved = ref(false);
 
 const username = computed(() => {
@@ -21,6 +21,10 @@ const notFound = computed(() => {
 
 const loadFailed = computed(() => {
   return hasResolved.value && !profile.value && Boolean(error.value);
+});
+
+const isEmpty = computed(() => {
+  return Boolean(profile.value) && groups.value.length === 0;
 });
 
 const loadProfile = async (handle: string) => {
@@ -54,6 +58,28 @@ watch(username, (handle) => {
       <h1 class="text-[34px] font-bold tracking-tight leading-tight">
         {{ profile.username }}
       </h1>
+
+      <p
+        v-if="isEmpty"
+        data-testid="shared-list-empty"
+        class="text-muted"
+      >
+        {{ SHARED_LIST_EMPTY }}
+      </p>
+
+      <div
+        v-else
+        class="space-y-2.5"
+        data-testid="shared-list-groups"
+      >
+        <AppEventCard
+          v-for="group in groups"
+          :key="group.event.id"
+          :event="group.event"
+          :concerts="group.concerts"
+          readonly
+        />
+      </div>
     </template>
 
     <template v-else-if="!hasResolved">
