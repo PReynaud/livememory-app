@@ -11,7 +11,7 @@ const toToken = (seed: string) => seed.toLowerCase().replace(/[^a-z0-9]/g, '').s
 
 export const generateE2EAccountData = (seed: string) => {
   const token = toToken(seed);
-  const suffix = Date.now();
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   return {
     email: `e2e_${token}_${suffix}@example.com`,
     password: `Pw_${token}_${suffix}!`,
