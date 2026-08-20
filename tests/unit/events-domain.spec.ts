@@ -804,12 +804,14 @@ describe('events store and pages use domain helpers only', () => {
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).toMatch(/concertStages/);
     expect(readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8')).not.toMatch(/firstStage/);
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8');
-    expect(sheet).toMatch(/if \(!hasConcerts\.value\)/);
+    expect(sheet).toMatch(/if \(!hasConcerts\.value && !deleteHasJoiners\.value\)/);
     expect(sheet).toMatch(/confirmDelete/);
     expect(sheet).toMatch(/This Event and all its Concerts will be deleted/);
+    expect(sheet).toMatch(/JOINER_IMPACT_COPY/);
+    expect(sheet).toMatch(/eventHasJoiners/);
+    expect(sheet).toMatch(/deleteHasJoiners/);
     expect(sheet).toMatch(/Delete event/);
     expect(sheet).toMatch(/navigateTo\('\/concerts'\)/);
-    expect(sheet).not.toMatch(/joiner/i);
     expect(sheet).not.toMatch(/keep-standalone|standalone/);
   });
 });

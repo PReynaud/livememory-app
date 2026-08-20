@@ -20,7 +20,12 @@ import {
   type EventsClient,
   type UpdateEventInput
 } from '#shared/domain/events';
-import { joinEvent, leaveEvent } from '#shared/domain/membership';
+import {
+  concertMoveWouldLoseJoiners as lookupConcertMoveWouldLoseJoiners,
+  eventHasJoiners as lookupEventHasJoiners,
+  joinEvent,
+  leaveEvent
+} from '#shared/domain/membership';
 import { souvenirStats } from '#shared/domain/home';
 import {
   createConcert,
@@ -721,6 +726,46 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const eventHasJoiners = async (eventId: string) => {
+    error.value = null;
+
+    try {
+      const result = await lookupEventHasJoiners(eventsClient(), eventId);
+      if (result.error) {
+        error.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      return { data: result.data, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to check this Event.');
+      error.value = errorMessage;
+      return { data: null, error: errorMessage };
+    }
+  };
+
+  const concertMoveWouldLoseJoiners = async (sourceEventId: string, targetEventId: string) => {
+    error.value = null;
+
+    try {
+      const result = await lookupConcertMoveWouldLoseJoiners(
+        eventsClient(),
+        sourceEventId,
+        targetEventId
+      );
+      if (result.error) {
+        error.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      return { data: result.data, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to check this move.');
+      error.value = errorMessage;
+      return { data: null, error: errorMessage };
+    }
+  };
+
   const cycleAttendance = async (concert: ConcertRecord) => {
     const offline = offlineWriteError();
     if (offline) {
@@ -842,6 +887,8 @@ export const useEventsStore = defineStore('events', () => {
     updateOwnedEvent,
     deleteOwnedEvent,
     leaveJoinedEvent,
+    eventHasJoiners,
+    concertMoveWouldLoseJoiners,
     createOwnedConcert,
     updateOwnedConcert,
     moveOwnedConcert,

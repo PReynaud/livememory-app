@@ -153,7 +153,7 @@ describe('joiner Event attendance surface', () => {
     expect(sheet).toMatch(/sessionUserId/);
     expect(sheet).toMatch(/event\.owner_id === sessionUserId\.value/);
     expect(sheet).not.toMatch(/useSupabaseUser/);
-    expect(sheet).not.toMatch(/joiner/i);
+    expect(sheet).not.toMatch(/event_members/);
   });
 
   it('loads Concerts without the owner notes column', () => {
