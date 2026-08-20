@@ -49,7 +49,18 @@ test('disabled and unknown usernames are the same quiet not-found', async ({ pag
     await waitForNuxtHydration(page);
     await expect(page.getByRole('heading', { name: SHARED_LIST_NOT_FOUND })).toBeVisible();
     await expect(page.getByText(SHARED_LIST_EMPTY)).toHaveCount(0);
+    await expect(page.getByText(/this user exists/i)).toHaveCount(0);
     await expect(page.getByText(/private/i)).toHaveCount(0);
+
+    const supabaseUrl = (process.env.NUXT_PUBLIC_SUPABASE_URL || LOCAL_SUPABASE_URL).replace(/\/$/, '');
+    const anonKey = process.env.NUXT_PUBLIC_SUPABASE_KEY || LOCAL_SUPABASE_ANON_KEY;
+    const listed = await fetch(`${supabaseUrl}/rest/v1/shared_list_profiles`, {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`
+      }
+    });
+    expect(listed.ok).toBe(false);
 
     await page.goto('/u/this-username-does-not-exist');
     await waitForNuxtHydration(page);
@@ -101,7 +112,7 @@ authTest('enabling sharing makes /u/:username public; disabling matches unknown 
     await visitorPage.goto(`/u/${account.username}`);
     await waitForNuxtHydration(visitorPage);
     await expect(visitorPage.getByRole('heading', { name: account.username })).toBeVisible();
-    await expect(visitorPage.getByText(SHARED_LIST_EMPTY)).toBeVisible();
+    await expect(visitorPage.getByText(SHARED_LIST_EMPTY)).toHaveCount(0);
     await expect(visitorPage.getByRole('button', { name: 'Add concert' })).toHaveCount(0);
     await expect(visitorPage.getByTestId('route-announcer')).toHaveText(`Shared list for ${account.username}`);
 

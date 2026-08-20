@@ -301,6 +301,16 @@ export type Database = {
         }
       }
       username_is_taken: { Args: { candidate: string }; Returns: boolean }
+      get_shared_list_profile: {
+        Args: { requested: string }
+        Returns: { username: string }[]
+        SetofOptions: {
+          from: "*"
+          to: "shared_list_profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       [_ in never]: never

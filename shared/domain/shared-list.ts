@@ -17,18 +17,25 @@ type QueryError = {
 };
 
 export type SharedListClient = {
-  from: (relation: 'shared_list_profiles') => {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        maybeSingle: () => Promise<{ data: SharedListProfile | null; error: QueryError | null }>;
-      };
-    };
-  };
+  rpc: (
+    fn: 'get_shared_list_profile',
+    args: { requested: string }
+  ) => Promise<{ data: SharedListProfile[] | SharedListProfile | null; error: QueryError | null }>;
 };
 
 const trim = (value: string | undefined) => (value ?? '').trim();
 
 const ok = <T>(data: T): SharedListResult<T> => ({ data, error: null });
+
+const asRows = (
+  data: SharedListProfile[] | SharedListProfile | null | undefined
+): SharedListProfile[] => {
+  if (!data) {
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [data];
+};
 
 export const SHARED_LIST_EMPTY = 'Nothing to show yet.';
 export const SHARED_LIST_NOT_FOUND = 'Not found.';
@@ -44,11 +51,9 @@ export const getSharedListProfile = async (
     return ok(null);
   }
 
-  const { data, error } = await client
-    .from('shared_list_profiles')
-    .select('username')
-    .eq('username_key', handle.toLowerCase())
-    .maybeSingle();
+  const { data, error } = await client.rpc('get_shared_list_profile', {
+    requested: handle
+  });
 
   if (error) {
     return {
@@ -60,9 +65,10 @@ export const getSharedListProfile = async (
     };
   }
 
-  if (!data?.username) {
+  const row = asRows(data)[0];
+  if (!row?.username) {
     return ok(null);
   }
 
-  return ok({ username: data.username });
+  return ok({ username: row.username });
 };

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRoute } from '#imports';
 import { useSharedListStore } from '@/stores/shared-list';
-import { SHARED_LIST_EMPTY, SHARED_LIST_NOT_FOUND } from '#shared/domain/shared-list';
+import { SHARED_LIST_NOT_FOUND } from '#shared/domain/shared-list';
 
 const route = useRoute();
 const sharedListStore = useSharedListStore();
@@ -25,7 +25,12 @@ const loadFailed = computed(() => {
 
 const loadProfile = async (handle: string) => {
   hasResolved.value = false;
-  await sharedListStore.fetchPublicProfile(handle);
+  const pending = handle;
+  await sharedListStore.fetchPublicProfile(pending);
+  if (pending !== username.value) {
+    return;
+  }
+
   hasResolved.value = true;
 };
 
@@ -49,9 +54,6 @@ watch(username, (handle) => {
       <h1 class="text-[34px] font-bold tracking-tight leading-tight">
         {{ profile.username }}
       </h1>
-      <p class="text-lg font-semibold">
-        {{ SHARED_LIST_EMPTY }}
-      </p>
     </template>
 
     <template v-else-if="!hasResolved">
