@@ -7,7 +7,7 @@ export type SouvenirStats = {
 };
 
 export const souvenirStats = (input: {
-  ownedEventCount: number;
+  eventCount: number;
   statuses: AttendanceStatus[];
 }): SouvenirStats => {
   let attended = 0;
@@ -23,7 +23,7 @@ export const souvenirStats = (input: {
 
   return {
     attended,
-    events: input.ownedEventCount,
+    events: input.eventCount,
     going
   };
 };

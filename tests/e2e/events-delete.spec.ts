@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { test as authTest, expect as authExpect } from './fixtures/auth.fixture';
+import { concertNotesRest, concertsRest } from './helpers/concert-rest';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 
@@ -136,21 +137,27 @@ test('Event delete is owner-only and cascades Concerts, Attendance, and notes', 
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const concertResponse = await fetch(`${ownerSession.supabaseUrl}/rest/v1/concerts`, {
+    const concertResponse = await fetch(concertsRest(ownerSession.supabaseUrl), {
       method: 'POST',
       headers: ownerSession.headers,
       body: JSON.stringify({
         event_id: eventId,
         artist: 'Justice',
         date: '2026-08-10',
-        place: 'Berlin',
-        notes: 'Back of the room.'
+        place: 'Berlin'
       })
     });
     expect(concertResponse.ok).toBe(true);
     const concerts = await concertResponse.json() as { id: string }[];
     const concertId = concerts[0]?.id;
     expect(concertId).toBeTruthy();
+
+    const notesResponse = await fetch(concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${concertId}`), {
+      method: 'PATCH',
+      headers: ownerSession.headers,
+      body: JSON.stringify({ notes: 'Back of the room.' })
+    });
+    expect(notesResponse.ok).toBe(true);
 
     const attendanceResponse = await fetch(`${ownerSession.supabaseUrl}/rest/v1/attendance`, {
       method: 'POST',
@@ -190,10 +197,16 @@ test('Event delete is owner-only and cascades Concerts, Attendance, and notes', 
     expect(await eventsAfter.json()).toEqual([]);
 
     const concertsAfter = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,event_id,notes`,
+      concertsRest(ownerSession.supabaseUrl, `id=eq.${concertId}`),
       { headers: ownerSession.headers }
     );
     expect(await concertsAfter.json()).toEqual([]);
+
+    const notesAfter = await fetch(
+      concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${concertId}`),
+      { headers: ownerSession.headers }
+    );
+    expect(await notesAfter.json()).toEqual([]);
 
     const attendanceAfter = await fetch(
       `${ownerSession.supabaseUrl}/rest/v1/attendance?concert_id=eq.${concertId}&select=id`,

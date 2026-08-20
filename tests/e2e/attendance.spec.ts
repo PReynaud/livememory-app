@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { concertsRest } from './helpers/concert-rest';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
@@ -56,7 +57,7 @@ const createOwnedConcert = async (
     throw new Error('Failed to create event');
   }
 
-  const concertResponse = await fetch(`${supabaseUrl}/rest/v1/concerts`, {
+  const concertResponse = await fetch(concertsRest(supabaseUrl), {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -94,7 +95,7 @@ const patchConcertDate = async (
   }
 
   const concertResponse = await fetch(
-    `${supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=event_id`,
+    concertsRest(supabaseUrl, `id=eq.${concertId}`),
     { headers }
   );
   if (!concertResponse.ok) {

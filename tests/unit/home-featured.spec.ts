@@ -18,14 +18,14 @@ const eventAt = (id: string, name: string, start: string): EventRecord => ({
 
 describe('souvenirStats', () => {
   it('counts effective attended, owned Events, and current going, including zeros', () => {
-    expect(souvenirStats({ ownedEventCount: 0, statuses: [] })).toEqual({
+    expect(souvenirStats({ eventCount: 0, statuses: [] })).toEqual({
       attended: 0,
       events: 0,
       going: 0
     });
 
     expect(souvenirStats({
-      ownedEventCount: 4,
+      eventCount: 4,
       statuses: ['attended', 'going', 'attended', 'going', 'going']
     })).toEqual({
       attended: 2,
@@ -75,6 +75,7 @@ describe('Home featured and stats surfaces', () => {
     expect(store).toMatch(/souvenirStats/);
     expect(store).toMatch(/featuredEvents/);
     expect(store).toMatch(/homeStats/);
+    expect(store).toMatch(/eventCount:/);
     expect(store).not.toMatch(/from\('attendance'\)/);
     expect(store).not.toMatch(/from\('attendance_effective'\)/);
   });

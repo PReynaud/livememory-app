@@ -123,7 +123,25 @@ const createMockConcertsClient = (options?: {
   let identityLookups = 0;
 
   const client = {
-    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective' | 'event_stages') => {
+    from: (table: 'events' | 'concerts' | 'attendance' | 'attendance_effective' | 'event_stages' | 'concert_notes') => {
+      if (table === 'concert_notes') {
+        return {
+          select: () => ({
+            in: (_column: string, values: string[]) => ({
+              order: async () => ({
+                data: concerts
+                  .filter(concert => values.includes(concert.id))
+                  .map(concert => ({
+                    concert_id: concert.id,
+                    notes: concert.notes ?? null
+                  })),
+                error: null
+              })
+            })
+          })
+        };
+      }
+
       if (table === 'event_stages') {
         return {
           insert: (row: Record<string, unknown>) => {

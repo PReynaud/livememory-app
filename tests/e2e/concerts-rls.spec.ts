@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { concertNotesRest, concertsRest } from './helpers/concert-rest';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 
@@ -48,7 +49,7 @@ test('insert RLS rejects out-of-range dates and a Place that is not the Event Pl
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const outOfRange = await fetch(`${supabaseUrl}/rest/v1/concerts`, {
+    const outOfRange = await fetch(concertsRest(supabaseUrl), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -60,7 +61,7 @@ test('insert RLS rejects out-of-range dates and a Place that is not the Event Pl
     });
     expect(outOfRange.ok).toBe(false);
 
-    const wrongPlace = await fetch(`${supabaseUrl}/rest/v1/concerts`, {
+    const wrongPlace = await fetch(concertsRest(supabaseUrl), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -72,7 +73,7 @@ test('insert RLS rejects out-of-range dates and a Place that is not the Event Pl
     });
     expect(wrongPlace.ok).toBe(false);
 
-    const valid = await fetch(`${supabaseUrl}/rest/v1/concerts`, {
+    const valid = await fetch(concertsRest(supabaseUrl), {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -87,7 +88,7 @@ test('insert RLS rejects out-of-range dates and a Place that is not the Event Pl
     expect(concerts[0]?.date).toBe('2026-08-21');
     expect(concerts[0]?.place).toBe('Paris');
 
-    const listed = await fetch(`${supabaseUrl}/rest/v1/concerts?event_id=eq.${eventId}`, {
+    const listed = await fetch(concertsRest(supabaseUrl, `event_id=eq.${eventId}`), {
       headers
     });
     expect(listed.ok).toBe(true);
@@ -138,7 +139,7 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const concertResponse = await fetch(`${ownerSession.supabaseUrl}/rest/v1/concerts`, {
+    const concertResponse = await fetch(concertsRest(ownerSession.supabaseUrl), {
       method: 'POST',
       headers: ownerSession.headers,
       body: JSON.stringify({
@@ -153,32 +154,43 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     const concertId = concerts[0]?.id;
     expect(concertId).toBeTruthy();
 
-    const notesResponse = await fetch(`${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    const notesResponse = await fetch(concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${concertId}`), {
       method: 'PATCH',
       headers: ownerSession.headers,
       body: JSON.stringify({ notes: 'Back of the room.' })
     });
     expect(notesResponse.ok).toBe(true);
-    const updated = await notesResponse.json() as { notes: string | null }[];
-    expect(updated[0]?.notes).toBe('Back of the room.');
 
     const ownerRead = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${concertId}`),
       { headers: ownerSession.headers }
     );
     expect(ownerRead.ok).toBe(true);
     const ownerRows = await ownerRead.json() as { notes: string | null }[];
-    expect(ownerRows).toEqual([{ notes: 'Back of the room.' }]);
+    expect(ownerRows).toEqual([{ concert_id: concertId, notes: 'Back of the room.' }]);
+
+    const ownerColumn = await fetch(
+      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      { headers: ownerSession.headers }
+    );
+    expect(ownerColumn.ok).toBe(false);
 
     const otherRead = await fetch(
-      `${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      concertsRest(otherSession.supabaseUrl, `id=eq.${concertId}`),
       { headers: otherSession.headers }
     );
     expect(otherRead.ok).toBe(true);
     const otherRows = await otherRead.json() as unknown[];
     expect(otherRows).toEqual([]);
 
-    const otherPatch = await fetch(`${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    const otherNotesView = await fetch(
+      concertNotesRest(otherSession.supabaseUrl, `concert_id=eq.${concertId}`),
+      { headers: otherSession.headers }
+    );
+    expect(otherNotesView.ok).toBe(true);
+    expect(await otherNotesView.json()).toEqual([]);
+
+    const otherPatch = await fetch(concertNotesRest(otherSession.supabaseUrl, `concert_id=eq.${concertId}`), {
       method: 'PATCH',
       headers: otherSession.headers,
       body: JSON.stringify({ notes: 'Stolen note' })
@@ -188,20 +200,20 @@ test('notes SELECT and UPDATE are Event-owner only', async ({ page: _page }, tes
     expect(otherPatched).toEqual([]);
 
     const afterTheft = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=notes`,
+      concertNotesRest(ownerSession.supabaseUrl, `concert_id=eq.${concertId}`),
       { headers: ownerSession.headers }
     );
     const afterTheftRows = await afterTheft.json() as { notes: string | null }[];
     expect(afterTheftRows[0]?.notes).toBe('Back of the room.');
 
-    const otherDelete = await fetch(`${otherSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    const otherDelete = await fetch(concertsRest(otherSession.supabaseUrl, `id=eq.${concertId}`), {
       method: 'DELETE',
       headers: otherSession.headers
     });
     expect(otherDelete.ok).toBe(true);
 
     const stillThere = await fetch(
-      `${ownerSession.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=id,notes`,
+      concertsRest(ownerSession.supabaseUrl, `id=eq.${concertId}`),
       { headers: ownerSession.headers }
     );
     const stillThereRows = await stillThere.json() as { id: string }[];
@@ -234,7 +246,7 @@ test('owner UPDATE RLS rejects a blank artist name', async ({ page: _page }, tes
     const eventId = events[0]?.id;
     expect(eventId).toBeTruthy();
 
-    const concertResponse = await fetch(`${session.supabaseUrl}/rest/v1/concerts`, {
+    const concertResponse = await fetch(concertsRest(session.supabaseUrl), {
       method: 'POST',
       headers: session.headers,
       body: JSON.stringify({
@@ -249,7 +261,7 @@ test('owner UPDATE RLS rejects a blank artist name', async ({ page: _page }, tes
     const concertId = concerts[0]?.id;
     expect(concertId).toBeTruthy();
 
-    const blankArtist = await fetch(`${session.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    const blankArtist = await fetch(concertsRest(session.supabaseUrl, `id=eq.${concertId}`), {
       method: 'PATCH',
       headers: session.headers,
       body: JSON.stringify({ artist: '   ' })
@@ -257,14 +269,14 @@ test('owner UPDATE RLS rejects a blank artist name', async ({ page: _page }, tes
     expect(blankArtist.ok).toBe(false);
 
     const stillNamed = await fetch(
-      `${session.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}&select=artist`,
+      concertsRest(session.supabaseUrl, `id=eq.${concertId}`),
       { headers: session.headers }
     );
     expect(stillNamed.ok).toBe(true);
     const stillNamedRows = await stillNamed.json() as { artist: string }[];
     expect(stillNamedRows[0]?.artist).toBe('Justice');
 
-    const renamed = await fetch(`${session.supabaseUrl}/rest/v1/concerts?id=eq.${concertId}`, {
+    const renamed = await fetch(concertsRest(session.supabaseUrl, `id=eq.${concertId}`), {
       method: 'PATCH',
       headers: session.headers,
       body: JSON.stringify({ artist: 'The Last Dinner Party' })
