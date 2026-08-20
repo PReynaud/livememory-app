@@ -209,6 +209,35 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_keys_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -364,6 +393,7 @@ export type Database = {
           username: string
         }[]
       }
+      lookup_personal_key_user: { Args: { key_hash: string }; Returns: string }
       save_event_and_concert_dates: {
         Args: {
           p_allow_place_override?: boolean
