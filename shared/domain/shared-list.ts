@@ -16,7 +16,7 @@ type QueryError = {
   message: string;
 };
 
-type SharedListClient = {
+export type SharedListClient = {
   from: (relation: 'shared_list_profiles') => {
     select: (columns: string) => {
       eq: (column: string, value: string) => {

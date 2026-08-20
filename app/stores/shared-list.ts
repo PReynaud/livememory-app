@@ -5,11 +5,13 @@ import { getErrorMessage } from '@/utils/error-message';
 import type { Database } from '@/types/database.types';
 import {
   getSharedListProfile,
+  type SharedListClient,
   type SharedListProfile
 } from '#shared/domain/shared-list';
 
 export const useSharedListStore = defineStore('sharedList', () => {
   const supabase = useSupabaseClient<Database>();
+  const sharedListClient = () => supabase as unknown as SharedListClient;
 
   const profile = ref<SharedListProfile | null>(null);
   const loading = ref(false);
@@ -21,7 +23,7 @@ export const useSharedListStore = defineStore('sharedList', () => {
     profile.value = null;
 
     try {
-      const result = await getSharedListProfile(supabase, username);
+      const result = await getSharedListProfile(sharedListClient(), username);
       if (result.error) {
         error.value = result.error.message;
         return { data: null, error: result.error.message };
