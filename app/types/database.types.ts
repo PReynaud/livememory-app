@@ -335,6 +335,11 @@ export type Database = {
         Args: { p_date: string; p_time: string }
         Returns: boolean
       }
+      concert_move_would_lose_joiners: {
+        Args: { p_source_event_id: string; p_target_event_id: string }
+        Returns: boolean
+      }
+      event_has_joiners: { Args: { p_event_id: string }; Returns: boolean }
       get_shared_list_concerts: {
         Args: { requested: string }
         Returns: {

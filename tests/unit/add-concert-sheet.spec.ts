@@ -90,14 +90,16 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/if \(!sheet\.eventId\)/);
   });
 
-  it('reuses the glass sheet for edit, notes, and delete without joiner copy', () => {
+  it('reuses the glass sheet for edit, notes, and joiner-aware delete copy', () => {
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/Edit concert/);
     expect(sheet).toMatch(/Private\. Never on your public profile\./);
     expect(sheet).toMatch(/updateOwnedConcert/);
     expect(sheet).toMatch(/deleteOwnedConcert/);
     expect(sheet).toMatch(/Delete this concert\?/);
-    expect(sheet).not.toMatch(/joiner/i);
+    expect(sheet).toMatch(/JOINER_IMPACT_COPY\.deleteConcert/);
+    expect(sheet).toMatch(/eventHasJoiners/);
+    expect(sheet).not.toMatch(/username|user_id/);
   });
 
   it('runs Concert identity on edit and keeps the draft for needs_choice', () => {
@@ -125,7 +127,9 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/originalEventId/);
     expect(sheet).toMatch(/editLoaded/);
     expect(sheet).toMatch(/if \(isEdit\.value\) \{[\s\S]*return owned/);
-    expect(sheet).not.toMatch(/joiner/i);
+    expect(sheet).toMatch(/concertMoveWouldLoseJoiners/);
+    expect(sheet).toMatch(/JOINER_IMPACT_COPY\.moveConcert/);
+    expect(sheet).toMatch(/confirmMove/);
   });
 
   it('asks for Stage or Scene when the Event has rows and unlocks Place only when override is on', () => {

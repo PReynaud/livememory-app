@@ -8,6 +8,7 @@ import { useEventsStore, type EventRecord } from '@/stores/events';
 import { eachCivilDateInclusive, formatDayChipParts } from '@/utils/concert-groups';
 import { CONCERT_RULE_MESSAGE } from '#shared/domain/concerts';
 import { eventAllowsPlaceOverride } from '#shared/domain/events';
+import { JOINER_IMPACT_COPY } from '#shared/domain/membership';
 
 const NEW_NIGHT = 'new:single_night';
 const NEW_FESTIVAL = 'new:festival';
@@ -33,6 +34,8 @@ const saving = ref(false);
 const pendingChoice = ref(false);
 const notes = ref('');
 const confirmDelete = ref(false);
+const confirmMove = ref(false);
+const hasJoiners = ref(false);
 const originalEventId = ref('');
 const editLoaded = ref(false);
 
@@ -77,6 +80,9 @@ const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.valu
 const placeLocked = computed(() => Boolean(selectedEvent.value) && !eventAllowsPlaceOverride(selectedEvent.value));
 const dateLocked = computed(() => isExistingNight.value || isNewNight.value);
 const sheetTitle = computed(() => (isEdit.value ? 'Edit concert' : 'Add concert'));
+const concertDeleteCopy = computed(() => {
+  return hasJoiners.value ? JOINER_IMPACT_COPY.deleteConcert : 'Delete this concert?';
+});
 const eventStages = computed(() => {
   if (!selectedEvent.value) {
     return [];
@@ -155,6 +161,8 @@ const resetForOpen = async () => {
   formError.value = '';
   pendingChoice.value = false;
   confirmDelete.value = false;
+  confirmMove.value = false;
+  hasJoiners.value = false;
   notes.value = '';
   artist.value = '';
   concertTime.value = '';
@@ -194,6 +202,11 @@ const resetForOpen = async () => {
       place.value = concert.place;
     }
     editLoaded.value = true;
+
+    if (originalEventId.value) {
+      const joiners = await eventsStore.eventHasJoiners(originalEventId.value);
+      hasJoiners.value = Boolean(joiners.data);
+    }
   }
 
   await focusArtist();
@@ -206,6 +219,8 @@ watch(() => sheet.open, (isOpen) => {
 });
 
 watch(picker, (value) => {
+  confirmMove.value = false;
+
   if (isEdit.value) {
     const event = events.value.find(item => item.id === value);
     if (event) {
@@ -310,6 +325,22 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
       const nextDate = isExistingNight.value
         ? (selectedEvent.value?.start_date ?? concertDate.value)
         : concertDate.value;
+
+      if (moved && targetEventId && !confirmMove.value) {
+        const impact = await eventsStore.concertMoveWouldLoseJoiners(
+          originalEventId.value,
+          targetEventId
+        );
+        if (impact.error) {
+          formError.value = impact.error;
+          return;
+        }
+
+        if (impact.data) {
+          confirmMove.value = true;
+          return;
+        }
+      }
 
       const result = await eventsStore.updateOwnedConcert({
         concertId: sheet.concertId,
@@ -428,12 +459,26 @@ const dismissChoice = () => {
   pendingChoice.value = false;
 };
 
-const requestDelete = () => {
+const requestDelete = async () => {
+  if (originalEventId.value) {
+    const joiners = await eventsStore.eventHasJoiners(originalEventId.value);
+    if (joiners.error) {
+      formError.value = joiners.error;
+      return;
+    }
+
+    hasJoiners.value = Boolean(joiners.data);
+  }
+
   confirmDelete.value = true;
 };
 
 const cancelDelete = () => {
   confirmDelete.value = false;
+};
+
+const cancelMove = () => {
+  confirmMove.value = false;
 };
 
 const removeConcert = async () => {
@@ -719,7 +764,7 @@ const slideoverUi = {
               variant="outline"
               class="h-11 flex-1 rounded-full ring-2"
               :loading="saving"
-              :disabled="saving || (isEdit && !editLoaded)"
+              :disabled="saving || (isEdit && !editLoaded) || confirmMove"
             />
             <UButton
               v-if="!isEdit"
@@ -747,7 +792,7 @@ const slideoverUi = {
             class="flex items-center gap-4"
           >
             <p class="flex-1 text-[15px] text-muted">
-              Delete this concert?
+              {{ concertDeleteCopy }}
             </p>
             <UButton
               type="button"
@@ -766,6 +811,32 @@ const slideoverUi = {
               class="px-0 font-semibold text-white"
               :disabled="saving"
               @click="cancelDelete"
+            />
+          </div>
+          <div
+            v-if="isEdit && confirmMove"
+            class="flex items-center gap-4"
+          >
+            <p class="flex-1 text-[15px] text-muted">
+              {{ JOINER_IMPACT_COPY.moveConcert }}
+            </p>
+            <UButton
+              type="button"
+              label="Move concert"
+              color="error"
+              variant="outline"
+              class="h-11 rounded-full"
+              :loading="saving"
+              @click="persist('save')"
+            />
+            <UButton
+              type="button"
+              label="Cancel"
+              color="neutral"
+              variant="link"
+              class="px-0 font-semibold text-white"
+              :disabled="saving"
+              @click="cancelMove"
             />
           </div>
         </div>

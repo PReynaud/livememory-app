@@ -124,7 +124,10 @@ export const useAuthStore = defineStore('auth', () => {
         throw error;
       }
 
-      await navigateTo('/login');
+      await navigateTo({
+        path: '/login',
+        query: { redirect: '/home' }
+      });
       return { error: null };
     } catch (error: unknown) {
       return {
