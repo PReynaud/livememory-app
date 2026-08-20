@@ -37,4 +37,5 @@ revoke all on function public.get_shared_list_profile(text) from public;
 grant execute on function public.get_shared_list_profile(text) to anon, authenticated;
 
 revoke all on table public.profiles from anon;
+grant select, insert on table public.profiles to authenticated;
 grant update (shared_list_enabled) on table public.profiles to authenticated;
