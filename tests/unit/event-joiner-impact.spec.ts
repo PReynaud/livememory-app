@@ -184,5 +184,6 @@ describe('joiner-impact copy and wiring', () => {
     const e2e = read('tests/e2e/event-joiner-impact.spec.ts');
     expect(e2e).toMatch(/signInOnPage\(page, joiner\);\s*await expect\(page\)\.toHaveURL\(\/\\\/home\/\)/);
     expect(e2e).not.toMatch(/signInOnPage\(page, joiner\);\s*await page\.goto\('\/home'\)/);
+    expect(read('app/stores/auth.ts')).toMatch(/redirect: '\/home'/);
   });
 });
