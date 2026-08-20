@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { definePageMeta, useRoute, useToast } from '#imports';
+import { definePageMeta, navigateTo, useRoute, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useEventsStore, type ConcertRecord } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
@@ -26,6 +26,10 @@ const editEventSheet = useEditEventSheetStore();
 const { currentEvent, currentConcerts, error, isOwner } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
 const copyBusy = ref(false);
+const confirmLeave = ref(false);
+const leaving = ref(false);
+const hasLeft = ref(false);
+const leaveError = ref('');
 
 const eventId = computed(() => {
   const id = route.params.id;
@@ -33,7 +37,7 @@ const eventId = computed(() => {
 });
 
 const notFound = computed(() => {
-  return hasResolved.value && !currentEvent.value && !error.value;
+  return hasResolved.value && !currentEvent.value && !error.value && !hasLeft.value && !leaving.value;
 });
 
 const loadFailed = computed(() => {
@@ -65,6 +69,9 @@ const stageName = (concert: ConcertRecord) => {
 
 const loadEvent = async (id: string) => {
   hasResolved.value = false;
+  confirmLeave.value = false;
+  leaveError.value = '';
+  hasLeft.value = false;
   if (!id) {
     hasResolved.value = true;
     return;
@@ -137,6 +144,37 @@ const copyEventLink = async () => {
     }
   } finally {
     copyBusy.value = false;
+  }
+};
+
+const requestLeave = () => {
+  confirmLeave.value = true;
+  leaveError.value = '';
+};
+
+const cancelLeave = () => {
+  confirmLeave.value = false;
+};
+
+const leaveThisEvent = async () => {
+  if (!currentEvent.value || leaving.value) {
+    return;
+  }
+
+  leaving.value = true;
+  leaveError.value = '';
+
+  try {
+    const result = await eventsStore.leaveJoinedEvent(currentEvent.value.id);
+    if (result.error) {
+      leaveError.value = result.error;
+      return;
+    }
+
+    hasLeft.value = true;
+    await navigateTo('/concerts');
+  } finally {
+    leaving.value = false;
   }
 };
 </script>
@@ -267,6 +305,48 @@ const copyEventLink = async () => {
         variant="outline"
         class="h-11 rounded-full ring-2"
         @click="openAddSheet"
+      />
+      <UButton
+        v-if="!isOwner && !confirmLeave"
+        label="Leave Event"
+        color="neutral"
+        variant="link"
+        class="px-0 text-[13px] font-medium text-muted"
+        :disabled="leaving"
+        @click="requestLeave"
+      />
+      <div
+        v-if="!isOwner && confirmLeave"
+        class="space-y-3"
+      >
+        <p class="text-[15px] text-muted">
+          Leave this Event? It will leave your list. The bill stays for the owner.
+        </p>
+        <div class="flex items-center gap-4">
+          <UButton
+            label="Leave"
+            color="error"
+            variant="outline"
+            class="h-11 rounded-full"
+            :loading="leaving"
+            :disabled="leaving"
+            @click="void leaveThisEvent()"
+          />
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="link"
+            class="px-0 font-semibold text-white"
+            :disabled="leaving"
+            @click="cancelLeave"
+          />
+        </div>
+      </div>
+      <UAlert
+        v-if="leaveError"
+        color="error"
+        variant="subtle"
+        :title="leaveError"
       />
     </template>
 
