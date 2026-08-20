@@ -96,6 +96,7 @@ describe('event_members leave kernel', () => {
     expect(sql).toMatch(/concerts\.event_id = old\.event_id/);
     expect(sql).toMatch(/security invoker/);
     expect(sql).toMatch(/revoke execute on function public\.event_members_leave_attendance/);
+    expect(sql).not.toMatch(/raise exception/);
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/grant update/);
     expect(sql).not.toMatch(/grant all/i);

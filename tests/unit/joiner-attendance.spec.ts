@@ -144,7 +144,6 @@ describe('joiner Event attendance surface', () => {
     expect(page).toMatch(/Edit event/);
     expect(page).toMatch(/billCtaLabel/);
     expect(page).toMatch(/openEditSheet/);
-    expect(page).not.toMatch(/Leave Event/);
     expect(page).not.toMatch(/label="Notes"|name="notes"/);
     expect(page).not.toMatch(/concert\.notes|currentEvent\.notes/);
   });

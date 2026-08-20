@@ -2,7 +2,7 @@
 title: 'Story 2.3: Leave an Event'
 type: 'feature'
 created: '2026-08-20'
-status: 'in-progress'
+status: 'done'
 review_loop_iteration: 0
 baseline_commit: '0dc335ad49cc01b47c1836fdf6d74d39ca328fd5'
 context:
@@ -65,13 +65,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/event-leave.spec.ts` -- Red tests for kernel, domain, store/page guards
-- [ ] `tests/e2e/event-leave.spec.ts` -- Red journey: confirm, cancel, leave, lists, other joiner, rejoin, owner hidden
-- [ ] `supabase/migrations/*_event_members_leave.sql` -- DELETE grant, own-row policy, Attendance cleanup trigger
-- [ ] `shared/domain/membership.ts` -- `leaveEvent`
-- [ ] `app/stores/events.ts` -- `leaveJoinedEvent`
-- [ ] `app/pages/e/[id].vue` -- quiet Leave Event + in-page confirm
-- [ ] `pnpm db:types` -- commit `app/types/database.types.ts` if it changes
+- [x] `tests/unit/event-leave.spec.ts` -- Red tests for kernel, domain, store/page guards
+- [x] `tests/e2e/event-leave.spec.ts` -- Red journey: confirm, cancel, leave, lists, other joiner, rejoin, owner hidden
+- [x] `supabase/migrations/*_event_members_leave.sql` -- DELETE grant, own-row policy, Attendance cleanup trigger
+- [x] `shared/domain/membership.ts` -- `leaveEvent`
+- [x] `app/stores/events.ts` -- `leaveJoinedEvent`
+- [x] `app/pages/e/[id].vue` -- quiet Leave Event + in-page confirm
+- [x] `pnpm db:types` -- commit `app/types/database.types.ts` if it changes
 
 **Acceptance Criteria:**
 - Given I am a joiner, when I tap Leave Event, then I see "Leave this Event? It will leave your list. The bill stays for the owner." and Leave is not a primary button.
@@ -84,7 +84,7 @@ context:
 
 ## Design Notes
 
-Leave is a domain DELETE of `event_members`, not a second Attendance loop in TypeScript. Attendance DELETE RLS requires Concert visibility, so cleanup must run BEFORE membership is gone (trigger on the same statement). Domain still refuses owners so a stray adapter call cannot no-op as success. Rejoin is `fetchEvent` → `joinEvent` from 2.1; do not add a second join path.
+Leave is a domain DELETE of `event_members`, not a second Attendance loop in TypeScript. Attendance DELETE RLS requires Concert visibility, so cleanup must run BEFORE membership is gone (trigger on the same statement). The trigger must not compare `auth.uid()` — Event delete and auth user delete cascade through `event_members` and would otherwise abort with a false not-found. Domain still refuses owners so a stray adapter call cannot no-op as success. Rejoin is `fetchEvent` → `joinEvent` from 2.1; do not add a second join path.
 
 ## Verification
 
