@@ -16,12 +16,17 @@ const props = defineProps<{
   event: EventRecord;
   concerts: ConcertRecord[];
   featured?: boolean;
+  readonly?: boolean;
 }>();
 
 const eventsStore = useEventsStore();
 const compact = computed(() => isCompactBill(props.concerts));
 const concert = computed(() => props.concerts[0] ?? null);
 const concertStageName = computed(() => {
+  if (concert.value?.stage_name) {
+    return concert.value.stage_name;
+  }
+
   if (!concert.value?.stage_id) {
     return '';
   }
@@ -66,6 +71,7 @@ const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.co
         </p>
       </NuxtLink>
       <AppAttendanceChip
+        v-if="!readonly"
         :status="eventsStore.attendanceStatus(concert.id)"
         :is-past="eventsStore.concertIsPast(concert)"
         :disabled="eventsStore.isAttendanceBusy(concert.id)"
@@ -116,6 +122,7 @@ const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.co
               </p>
             </div>
             <AppAttendanceChip
+              v-if="!readonly"
               :status="eventsStore.attendanceStatus(row.id)"
               :is-past="eventsStore.concertIsPast(row)"
               :disabled="eventsStore.isAttendanceBusy(row.id)"
