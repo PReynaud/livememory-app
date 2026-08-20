@@ -40,6 +40,7 @@ const titleClass = computed(() => {
 });
 const groups = computed(() => groupConcertsByDate(props.concerts));
 const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.concerts));
+const eventPath = computed(() => `/e/${props.event.id}`);
 </script>
 
 <template>
@@ -53,8 +54,27 @@ const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.co
       v-if="compact && concert"
       class="flex items-start justify-between gap-3"
     >
+      <a
+        v-if="readonly"
+        :href="eventPath"
+        class="min-w-0 flex-1 space-y-1"
+      >
+        <p :class="titleClass">
+          {{ concert.artist }}
+        </p>
+        <p class="text-[13px] text-muted">
+          {{ formatConcertMetaLine(concert, concertStageName) }}
+        </p>
+        <p
+          v-if="eventNameDiffersFromArtist(event.name, concert.artist)"
+          class="text-[13px] text-muted"
+        >
+          {{ event.name }}
+        </p>
+      </a>
       <NuxtLink
-        :to="`/e/${event.id}`"
+        v-else
+        :to="eventPath"
         class="min-w-0 flex-1 space-y-1"
       >
         <p :class="titleClass">
@@ -79,8 +99,24 @@ const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.co
       />
     </div>
     <template v-else>
+      <a
+        v-if="readonly"
+        :href="eventPath"
+        class="block space-y-1"
+      >
+        <p :class="titleClass">
+          {{ event.name }}
+        </p>
+        <p class="text-[13px] text-muted">
+          {{ formatEventDateLabel(event) }}
+        </p>
+        <p class="text-[13px] text-muted">
+          {{ event.place }}
+        </p>
+      </a>
       <NuxtLink
-        :to="`/e/${event.id}`"
+        v-else
+        :to="eventPath"
         class="block space-y-1"
       >
         <p :class="titleClass">

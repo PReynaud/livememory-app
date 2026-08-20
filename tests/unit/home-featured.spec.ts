@@ -129,7 +129,8 @@ describe('Home featured and stats surfaces', () => {
     expect(card).toMatch(/data-featured/);
     expect(card).toMatch(/text-2xl font-bold tracking-tight leading-\[1\.15\]/);
     expect(card).toMatch(/text-base font-semibold/);
-    expect(card).toMatch(/`\/e\/\$\{event\.id\}`/);
+    expect(card).toMatch(/eventPath/);
+    expect(card).toMatch(/`\/e\/\$\{props\.event\.id\}`/);
     expect(card).not.toMatch(/for you|Pour vous|album/i);
   });
 });

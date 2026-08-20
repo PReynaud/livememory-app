@@ -2,7 +2,7 @@
 title: 'Browse a Shared List and open an Event to join'
 type: 'feature'
 created: '2026-08-20'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '3cd3d3394ab04e6f8c956c37d48b91ea252e8747'
 review_loop_iteration: 0
 context:
@@ -67,14 +67,14 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/*_shared_list_concerts.sql` -- kernel view + username RPC; revoke SELECT; effective Attendance; no notes; no directory grant
-- [ ] `shared/domain/shared-list.ts` -- fetch concerts by username; group by Event for compact/group cards
-- [ ] `app/stores/shared-list.ts` -- load groups through domain; reset loading in `finally`
-- [ ] `app/components/AppEventCard.vue` -- `readonly` hides Attendance chips; links still go to `/e/:id`
-- [ ] `app/pages/u/[username].vue` -- render groups or `SHARED_LIST_EMPTY`; no write controls
-- [ ] `tests/unit/shared-list.spec.ts` -- kernel, grouping, empty vs not-found, readonly surface
-- [ ] `tests/e2e/shared-list.spec.ts` -- browse, empty, tap-without-join, join-from-list, joined-Event listing, anon SELECT limits
-- [ ] `app/types/database.types.ts` -- `pnpm db:types` after schema change
+- [x] `supabase/migrations/*_shared_list_concerts.sql` -- kernel view + username RPC; revoke SELECT; effective Attendance; no notes; no directory grant
+- [x] `shared/domain/shared-list.ts` -- fetch concerts by username; group by Event for compact/group cards
+- [x] `app/stores/shared-list.ts` -- load groups through domain; reset loading in `finally`
+- [x] `app/components/AppEventCard.vue` -- `readonly` hides Attendance chips; links still go to `/e/:id`
+- [x] `app/pages/u/[username].vue` -- render groups or `SHARED_LIST_EMPTY`; no write controls
+- [x] `tests/unit/shared-list.spec.ts` -- kernel, grouping, empty vs not-found, readonly surface
+- [x] `tests/e2e/shared-list.spec.ts` -- browse, empty, tap-without-join, join-from-list, joined-Event listing, anon SELECT limits
+- [x] `app/types/database.types.ts` -- `pnpm db:types` after schema change
 
 **Acceptance Criteria:**
 - Given sharing is on and the User has effective going/attended Concerts, when I open `/u/:username` signed out or as someone else, then those Concerts are grouped by Event using compact/group rules, and notes, unset Attendance, empty Events, and write controls are omitted.
@@ -87,6 +87,10 @@ context:
 - Given a screen reader on Shared List, when the page loads, then it announces "Shared list for {username}" and does not announce missing notes or bill-only Concerts; auth redirect excludes `/u/**`.
 
 ## Spec Change Log
+
+## Design Notes
+
+Readonly Shared List cards use a native `/e/:id` href so a signed-out tap is a document load of the Event URL. Client-side `NuxtLink` from `/u/:username` was redirected to login with `redirect=/u/...` (the profile), which would not join.
 
 ## Verification
 

@@ -463,7 +463,7 @@ test('tapping a Shared List Event does not join until the Event URL; joined Even
     expect(membersBefore.ok).toBe(true);
     expect(await membersBefore.json()).toEqual([]);
 
-    await page.getByText('Phoenix').click();
+    await page.getByRole('link', { name: /Phoenix/ }).click();
     await expect(page).toHaveURL(new RegExp(`/e/${ownedId}`));
     await waitForNuxtHydration(page);
     await expect(page.getByRole('heading', { name: 'Pierre Night' })).toBeVisible();
@@ -482,7 +482,7 @@ test('tapping a Shared List Event does not join until the Event URL; joined Even
 
     await page.goto(`/u/${owner.username}`);
     await waitForNuxtHydration(page);
-    await page.getByText('Moodoïd').click();
+    await page.getByRole('link', { name: /Moodoïd/ }).click();
     await expect(page).toHaveURL(new RegExp(`/e/${friendsId}`));
     await waitForNuxtHydration(page);
     await expect(page.getByRole('heading', { name: 'Sam Night' })).toBeVisible();
@@ -523,7 +523,7 @@ test('signed-out tap of a Shared List grouping signs in then joins the Event', a
 
     await page.goto(`/u/${owner.username}`);
     await waitForNuxtHydration(page);
-    await page.getByText('Kavinsky').click();
+    await page.getByRole('link', { name: /Kavinsky/ }).click();
     await expect(page).toHaveURL(new RegExp(`/login\\?redirect=/e/${eventId}`));
 
     await signInOnPage(page, visitor);
