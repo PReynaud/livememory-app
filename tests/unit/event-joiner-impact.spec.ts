@@ -179,4 +179,10 @@ describe('joiner-impact copy and wiring', () => {
       expect(source).not.toMatch(/from\('event_members'\)/);
     }
   });
+
+  it('waits for joiner Home after owner sign-out instead of racing a second navigation', () => {
+    const e2e = read('tests/e2e/event-joiner-impact.spec.ts');
+    expect(e2e).toMatch(/signInOnPage\(page, joiner\);\s*await expect\(page\)\.toHaveURL\(\/\\\/home\/\)/);
+    expect(e2e).not.toMatch(/signInOnPage\(page, joiner\);\s*await page\.goto\('\/home'\)/);
+  });
 });

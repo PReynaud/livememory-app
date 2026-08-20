@@ -348,20 +348,26 @@ test('owner confirms Event delete when joiners would lose it', async ({ page }, 
     await sheet.getByRole('button', { name: 'Delete event' }).click();
     await expect(page).toHaveURL(/\/concerts/);
 
+    const joinerEvents = await fetch(
+      `${joinerSession.supabaseUrl}/rest/v1/events?id=eq.${eventId}&select=id`,
+      { headers: joinerSession.headers }
+    );
+    expect(await joinerEvents.json()).toEqual([]);
+
     await page.getByRole('link', { name: 'Profile' }).click();
     await expect(page).toHaveURL(/\/profile/);
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login/);
 
-    await page.goto('/login');
     await signInOnPage(page, joiner);
-    await page.goto('/home');
+    await expect(page).toHaveURL(/\/home/);
     await waitForNuxtHydration(page);
     await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
     await expect(page.getByTestId('home-featured-empty')).toBeVisible();
     await expect(page.getByText('Delete Event Night')).toHaveCount(0);
 
     await page.getByRole('link', { name: 'Concerts' }).click();
+    await expect(page).toHaveURL(/\/concerts/);
     await waitForNuxtHydration(page);
     await expect(page.getByText('Delete Event Night')).toHaveCount(0);
     await expect(page.getByText('Justice')).toHaveCount(0);
