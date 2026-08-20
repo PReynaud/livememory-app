@@ -187,5 +187,23 @@ export const createLiveMemoryMcpServer = (client: unknown) => {
     }
   }, async ({ eventId }) => run('attend_this_night', { eventId }, client));
 
+  server.registerTool('join_event', {
+    title: 'Join event',
+    description:
+      'Join an Event by id as the acting User. Same membership insert as opening the Event URL while signed in. The owner cannot join their own Event.',
+    inputSchema: {
+      eventId: z.string().describe('Event id')
+    }
+  }, async ({ eventId }) => run('join_event', { eventId }, client));
+
+  server.registerTool('leave_event', {
+    title: 'Leave event',
+    description:
+      'Leave a joined Event. Deletes the acting User\'s membership and their Attendance on that Event\'s Concerts. The owner cannot leave.',
+    inputSchema: {
+      eventId: z.string().describe('Event id')
+    }
+  }, async ({ eventId }) => run('leave_event', { eventId }, client));
+
   return server;
 };

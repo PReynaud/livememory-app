@@ -31,6 +31,7 @@ import {
   getOwnedEvent,
   listEventStages,
   listOwnedEvents,
+  requireEventOwnerAccess,
   updateEvent,
   type CreateEventInput,
   type DomainError,
@@ -42,7 +43,9 @@ import {
 import {
   concertMoveWouldLoseJoiners,
   eventHasJoiners,
-  JOINER_IMPACT_COPY
+  joinEvent,
+  JOINER_IMPACT_COPY,
+  leaveEvent
 } from '#shared/domain/membership';
 
 export const MCP_NEEDS_CONFIRM = 'needs_confirm' as const;
@@ -62,7 +65,9 @@ export type McpToolName
     | 'list_attendance'
     | 'set_attendance'
     | 'clear_attendance'
-    | 'attend_this_night';
+    | 'attend_this_night'
+    | 'join_event'
+    | 'leave_event';
 
 export type McpToolJson = {
   ok: boolean;
@@ -93,6 +98,9 @@ export type LogDomain = {
   attendThisNight: typeof attendThisNight;
   eventHasJoiners: typeof eventHasJoiners;
   concertMoveWouldLoseJoiners: typeof concertMoveWouldLoseJoiners;
+  joinEvent: typeof joinEvent;
+  leaveEvent: typeof leaveEvent;
+  requireEventOwnerAccess: typeof requireEventOwnerAccess;
 };
 
 export const liveMemoryLogDomain: LogDomain = {
@@ -113,7 +121,10 @@ export const liveMemoryLogDomain: LogDomain = {
   clearAttendance,
   attendThisNight,
   eventHasJoiners,
-  concertMoveWouldLoseJoiners
+  concertMoveWouldLoseJoiners,
+  joinEvent,
+  leaveEvent,
+  requireEventOwnerAccess
 };
 
 const asString = (value: unknown): string => {
@@ -370,6 +381,11 @@ export const invokeLogTool = async (
         });
       }
 
+      const ownerRefuse = await domain.requireEventOwnerAccess(eventsClient, existing.data.id);
+      if (ownerRefuse) {
+        return failJson(ownerRefuse);
+      }
+
       const concerts = await domain.listConcertsForEvent(concertsClient, existing.data.id);
       if (concerts.error) {
         return failJson(concerts.error);
@@ -429,6 +445,11 @@ export const invokeLogTool = async (
         });
       }
 
+      const ownerRefuse = await domain.requireEventOwnerAccess(eventsClient, existing.event_id);
+      if (ownerRefuse) {
+        return failJson(ownerRefuse);
+      }
+
       const impact = await domain.concertMoveWouldLoseJoiners(
         eventsClient,
         existing.event_id,
@@ -457,6 +478,11 @@ export const invokeLogTool = async (
           ruleId: CONCERT_RULE.ownership,
           message: CONCERT_RULE_MESSAGE.ownership
         });
+      }
+
+      const ownerRefuse = await domain.requireEventOwnerAccess(eventsClient, existing.event_id);
+      if (ownerRefuse) {
+        return failJson(ownerRefuse);
       }
 
       const joiners = await domain.eventHasJoiners(eventsClient, existing.event_id);
@@ -495,6 +521,12 @@ export const invokeLogTool = async (
     }
     case 'attend_this_night': {
       return fromDomain(await domain.attendThisNight(attendanceClient, asString(args.eventId)));
+    }
+    case 'join_event': {
+      return fromDomain(await domain.joinEvent(eventsClient, asString(args.eventId)));
+    }
+    case 'leave_event': {
+      return fromDomain(await domain.leaveEvent(eventsClient, asString(args.eventId)));
     }
     default: {
       return failJson({
