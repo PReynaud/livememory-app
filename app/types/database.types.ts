@@ -43,6 +43,13 @@ export type Database = {
             referencedRelation: "concerts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "shared_list_concerts"
+            referencedColumns: ["concert_id"]
+          },
         ]
       }
       concerts: {
@@ -88,6 +95,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "concerts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "shared_list_concerts"
+            referencedColumns: ["event_id"]
+          },
+          {
             foreignKeyName: "concerts_stage_id_fkey"
             columns: ["stage_id"]
             isOneToOne: false
@@ -120,6 +134,13 @@ export type Database = {
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "event_members_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "shared_list_concerts"
+            referencedColumns: ["event_id"]
+          },
         ]
       }
       event_stages: {
@@ -145,6 +166,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "events"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_stages_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "shared_list_concerts"
+            referencedColumns: ["event_id"]
           },
         ]
       }
@@ -181,20 +209,52 @@ export type Database = {
         }
         Relationships: []
       }
+      personal_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_keys_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
           id: string
+          shared_list_enabled: boolean
           username: string
         }
         Insert: {
           created_at?: string
           id: string
+          shared_list_enabled?: boolean
           username: string
         }
         Update: {
           created_at?: string
           id?: string
+          shared_list_enabled?: boolean
           username?: string
         }
         Relationships: []
@@ -223,6 +283,13 @@ export type Database = {
             referencedRelation: "concerts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "shared_list_concerts"
+            referencedColumns: ["concert_id"]
+          },
         ]
       }
       concert_notes: {
@@ -240,6 +307,49 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_list_concerts: {
+        Row: {
+          artist: string | null
+          concert_date: string | null
+          concert_id: string | null
+          concert_place: string | null
+          concert_time: string | null
+          end_date: string | null
+          event_id: string | null
+          event_kind: string | null
+          event_name: string | null
+          event_place: string | null
+          stage_id: string | null
+          stage_name: string | null
+          start_date: string | null
+          username: string | null
+          username_key: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "concerts_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "event_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shared_list_profiles: {
+        Row: {
+          username: string | null
+          username_key: string | null
+        }
+        Insert: {
+          username?: string | null
+          username_key?: never
+        }
+        Update: {
+          username?: string | null
+          username_key?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assert_event_bill_valid: {
@@ -254,6 +364,36 @@ export type Database = {
         Args: { p_date: string; p_time: string }
         Returns: boolean
       }
+      concert_move_would_lose_joiners: {
+        Args: { p_source_event_id: string; p_target_event_id: string }
+        Returns: boolean
+      }
+      event_has_joiners: { Args: { p_event_id: string }; Returns: boolean }
+      get_shared_list_concerts: {
+        Args: { requested: string }
+        Returns: {
+          artist: string
+          concert_date: string
+          concert_id: string
+          concert_place: string
+          concert_time: string
+          end_date: string
+          event_id: string
+          event_kind: string
+          event_name: string
+          event_place: string
+          stage_id: string
+          stage_name: string
+          start_date: string
+        }[]
+      }
+      get_shared_list_profile: {
+        Args: { requested: string }
+        Returns: {
+          username: string
+        }[]
+      }
+      lookup_personal_key_user: { Args: { key_hash: string }; Returns: string }
       save_event_and_concert_dates: {
         Args: {
           p_allow_place_override?: boolean

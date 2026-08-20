@@ -73,6 +73,10 @@ describe('useAuthStore contract', () => {
     expect(middleware).toContain('getSession');
     expect(middleware).toMatch(/if \(user\.value\)/);
   });
+
+  it('sends an explicit sign-out to login with Home as the next landing', () => {
+    expect(source).toMatch(/navigateTo\(\{\s*path: '\/login',\s*query: \{\s*redirect: '\/home'\s*\}\s*\}\)/);
+  });
 });
 
 describe('login form I/O', () => {

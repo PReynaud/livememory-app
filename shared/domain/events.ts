@@ -157,6 +157,32 @@ type TableApi<T> = {
   };
 };
 
+type SaveEventAndConcertDatesArgs = {
+  p_event_id: string;
+  p_start_date: string;
+  p_end_date: string;
+  p_concert_dates: Array<{ id: string; date?: string; stage_id?: string | null }> | null;
+  p_name?: string;
+  p_place?: string;
+  p_allow_place_override?: boolean;
+  p_stages?: Array<{ id: string; name: string }> | null;
+};
+
+type EventsRpc = {
+  (
+    fn: 'save_event_and_concert_dates',
+    args: SaveEventAndConcertDatesArgs
+  ): Promise<QueryResult<EventRecord>>;
+  (
+    fn: 'event_has_joiners',
+    args: { p_event_id: string }
+  ): Promise<QueryResult<boolean>>;
+  (
+    fn: 'concert_move_would_lose_joiners',
+    args: { p_source_event_id: string; p_target_event_id: string }
+  ): Promise<QueryResult<boolean>>;
+};
+
 export type EventsClient = {
   from: {
     (relation: 'events'): TableApi<EventRecord>;
@@ -164,19 +190,7 @@ export type EventsClient = {
     (relation: 'concerts'): TableApi<EventBillConcert>;
     (relation: 'event_members'): TableApi<EventMemberRecord>;
   };
-  rpc: (
-    fn: 'save_event_and_concert_dates',
-    args: {
-      p_event_id: string;
-      p_start_date: string;
-      p_end_date: string;
-      p_concert_dates: Array<{ id: string; date?: string; stage_id?: string | null }> | null;
-      p_name?: string;
-      p_place?: string;
-      p_allow_place_override?: boolean;
-      p_stages?: Array<{ id: string; name: string }> | null;
-    }
-  ) => Promise<QueryResult<EventRecord>>;
+  rpc: EventsRpc;
 };
 
 const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;

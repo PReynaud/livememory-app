@@ -67,6 +67,7 @@ export type ConcertRecord = {
   place: string;
   notes?: string | null;
   stage_id?: string | null;
+  stage_name?: string | null;
 };
 
 /** Columns `authenticated` may SELECT on `concerts` after notes moved to `concert_notes`. */

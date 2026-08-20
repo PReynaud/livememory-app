@@ -16,5 +16,10 @@ export const surfaceNameForRoute = (path: string, eventName?: string | null): st
     return name ? `Event: ${name}` : '';
   }
 
+  if (path.startsWith('/u/')) {
+    const handle = path.slice(3).split('/').filter(Boolean)[0] ?? '';
+    return handle ? `Shared list for ${handle}` : '';
+  }
+
   return '';
 };

@@ -25,6 +25,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     public: {
       appName: 'LiveMemory App'
     }
@@ -50,7 +51,7 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      exclude: ['/', '/login', '/confirm']
+      exclude: ['/', '/login', '/confirm', '/u/**']
     }
   }
 });

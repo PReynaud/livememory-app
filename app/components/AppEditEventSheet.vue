@@ -6,6 +6,7 @@ import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEventsStore } from '@/stores/events';
 import { eventAllowsPlaceOverride, newStageId } from '#shared/domain/events';
+import { JOINER_IMPACT_COPY } from '#shared/domain/membership';
 
 type StageDraft = { id?: string; name: string };
 
@@ -26,6 +27,7 @@ const concertStages = ref<Record<string, string>>({});
 const formError = ref('');
 const saving = ref(false);
 const confirmDelete = ref(false);
+const deleteHasJoiners = ref(false);
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -44,6 +46,17 @@ watch(() => sheet.open, (isOpen) => {
 
 const isFestival = computed(() => currentEvent.value?.kind === 'festival');
 const hasConcerts = computed(() => currentConcerts.value.length > 0);
+const eventDeleteCopy = computed(() => {
+  if (deleteHasJoiners.value && hasConcerts.value) {
+    return JOINER_IMPACT_COPY.deleteEvent;
+  }
+
+  if (deleteHasJoiners.value) {
+    return JOINER_IMPACT_COPY.deleteEmptyEvent;
+  }
+
+  return 'This Event and all its Concerts will be deleted.';
+});
 const namedStages = computed(() => stages.value.filter(stage => stage.name.trim() && stage.id));
 const showConcertStages = computed(() => hasConcerts.value && namedStages.value.length > 0);
 const stageItems = computed(() => namedStages.value.map(stage => ({
@@ -71,6 +84,7 @@ const fillFromEvent = () => {
   );
   formError.value = '';
   confirmDelete.value = false;
+  deleteHasJoiners.value = false;
 };
 
 watch(() => sheet.open, async (isOpen) => {
@@ -156,8 +170,19 @@ const persist = async () => {
   }
 };
 
-const requestDelete = () => {
-  if (!hasConcerts.value) {
+const requestDelete = async () => {
+  if (!sheet.eventId || saving.value) {
+    return;
+  }
+
+  const joiners = await eventsStore.eventHasJoiners(sheet.eventId);
+  if (joiners.error) {
+    formError.value = joiners.error;
+    return;
+  }
+
+  deleteHasJoiners.value = Boolean(joiners.data);
+  if (!hasConcerts.value && !deleteHasJoiners.value) {
     void removeEvent();
     return;
   }
@@ -392,7 +417,7 @@ const slideoverUi = {
             class="flex items-center gap-4"
           >
             <p class="flex-1 text-[15px] text-muted">
-              This Event and all its Concerts will be deleted.
+              {{ eventDeleteCopy }}
             </p>
             <UButton
               type="button"

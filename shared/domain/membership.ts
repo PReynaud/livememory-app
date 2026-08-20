@@ -4,11 +4,19 @@ export type { EventMemberRecord };
 
 export const MEMBERSHIP_RULE = {
   ownerCannotLeave: 'owner_cannot_leave',
-  leaveFailed: 'leave_failed'
+  leaveFailed: 'leave_failed',
+  joinerImpactLookupFailed: 'joiner_impact_lookup_failed'
 } as const;
 
 export const MEMBERSHIP_RULE_MESSAGE = {
   ownerCannotLeave: 'You cannot leave an Event you own.'
+} as const;
+
+export const JOINER_IMPACT_COPY = {
+  deleteConcert: 'Joiners will lose this Concert and their Attendance on it.',
+  moveConcert: 'Joiners of this Event who have not joined the target will lose this Concert from their Bill. They will not be added to the target Event.',
+  deleteEvent: 'Joiners will lose this Event, its Concerts, and their Attendance.',
+  deleteEmptyEvent: 'Joiners will lose this Event.'
 } as const;
 
 type QueryError = {
@@ -132,4 +140,55 @@ export const leaveEvent = async (
   }
 
   return { data: true, error: null };
+};
+
+export const eventHasJoiners = async (
+  client: EventsClient,
+  eventId: string
+): Promise<DomainResult<boolean>> => {
+  const id = trim(eventId);
+  if (!id) {
+    return { data: false, error: null };
+  }
+
+  const { data, error } = await client.rpc('event_has_joiners', { p_event_id: id });
+  if (error) {
+    return {
+      data: null,
+      error: {
+        ruleId: MEMBERSHIP_RULE.joinerImpactLookupFailed,
+        message: error.message
+      }
+    };
+  }
+
+  return { data: Boolean(data), error: null };
+};
+
+export const concertMoveWouldLoseJoiners = async (
+  client: EventsClient,
+  sourceEventId: string,
+  targetEventId: string
+): Promise<DomainResult<boolean>> => {
+  const sourceId = trim(sourceEventId);
+  const targetId = trim(targetEventId);
+  if (!sourceId || !targetId) {
+    return { data: false, error: null };
+  }
+
+  const { data, error } = await client.rpc('concert_move_would_lose_joiners', {
+    p_source_event_id: sourceId,
+    p_target_event_id: targetId
+  });
+  if (error) {
+    return {
+      data: null,
+      error: {
+        ruleId: MEMBERSHIP_RULE.joinerImpactLookupFailed,
+        message: error.message
+      }
+    };
+  }
+
+  return { data: Boolean(data), error: null };
 };
