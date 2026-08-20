@@ -1,6 +1,15 @@
-import type { DomainResult, EventMemberRecord, EventsClient } from './events';
+import { getOwnedEvent, type DomainResult, type EventMemberRecord, type EventsClient } from './events';
 
 export type { EventMemberRecord };
+
+export const MEMBERSHIP_RULE = {
+  ownerCannotLeave: 'owner_cannot_leave',
+  leaveFailed: 'leave_failed'
+} as const;
+
+export const MEMBERSHIP_RULE_MESSAGE = {
+  ownerCannotLeave: 'You cannot leave an Event you own.'
+} as const;
 
 type QueryError = {
   message: string;
@@ -65,4 +74,62 @@ export const joinEvent = async (
   }
 
   return { data, error: null };
+};
+
+export const leaveEvent = async (
+  client: EventsClient,
+  eventId: string
+): Promise<DomainResult<true>> => {
+  const id = trim(eventId);
+  if (!id) {
+    return { data: null, error: null };
+  }
+
+  const event = await getOwnedEvent(client, id);
+  if (event.error) {
+    return { data: null, error: event.error };
+  }
+
+  if (!event.data) {
+    return { data: null, error: null };
+  }
+
+  const membership = await client
+    .from('event_members')
+    .select('*')
+    .eq('event_id', id)
+    .maybeSingle();
+
+  if (membership.error) {
+    return {
+      data: null,
+      error: {
+        ruleId: MEMBERSHIP_RULE.leaveFailed,
+        message: membership.error.message
+      }
+    };
+  }
+
+  if (!membership.data) {
+    return {
+      data: null,
+      error: {
+        ruleId: MEMBERSHIP_RULE.ownerCannotLeave,
+        message: MEMBERSHIP_RULE_MESSAGE.ownerCannotLeave
+      }
+    };
+  }
+
+  const { error } = await client.from('event_members').delete().eq('event_id', id);
+  if (error) {
+    return {
+      data: null,
+      error: {
+        ruleId: MEMBERSHIP_RULE.leaveFailed,
+        message: error.message
+      }
+    };
+  }
+
+  return { data: true, error: null };
 };

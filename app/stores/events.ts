@@ -20,7 +20,7 @@ import {
   type EventsClient,
   type UpdateEventInput
 } from '#shared/domain/events';
-import { joinEvent } from '#shared/domain/membership';
+import { joinEvent, leaveEvent } from '#shared/domain/membership';
 import { souvenirStats } from '#shared/domain/home';
 import {
   createConcert,
@@ -686,6 +686,41 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const leaveJoinedEvent = async (eventId: string) => {
+    const offline = offlineWriteError();
+    if (offline) {
+      return { data: null, error: offline };
+    }
+
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const result = await leaveEvent(eventsClient(), eventId);
+
+      if (result.error) {
+        error.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      if (currentEvent.value?.id === eventId) {
+        currentEvent.value = null;
+        isOwner.value = false;
+        currentConcerts.value = [];
+        currentStages.value = [];
+      }
+
+      await reloadOwnedConcertState();
+      return { data: result.data, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to leave event');
+      error.value = errorMessage;
+      return { data: null, error: errorMessage };
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const cycleAttendance = async (concert: ConcertRecord) => {
     const offline = offlineWriteError();
     if (offline) {
@@ -806,6 +841,7 @@ export const useEventsStore = defineStore('events', () => {
     createOwnedEvent,
     updateOwnedEvent,
     deleteOwnedEvent,
+    leaveJoinedEvent,
     createOwnedConcert,
     updateOwnedConcert,
     moveOwnedConcert,

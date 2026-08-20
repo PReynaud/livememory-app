@@ -135,7 +135,6 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
     await expect(page.getByRole('button', { name: 'Delete event' })).toHaveCount(0);
     await expect(page.getByText('Back of the room.')).toHaveCount(0);
     await expect(page.getByLabel('Notes')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Leave Event' })).toHaveCount(0);
 
     const justiceChip = chipFor(page, 'Justice');
     const fontainesChip = chipFor(page, 'Fontaines D.C.');
