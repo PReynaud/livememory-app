@@ -24,12 +24,15 @@
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.117",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@nuxt/ui": "^4.10.0",
     "@nuxtjs/supabase": "2.0.9",
     "@pinia/nuxt": "^0.11.3",
+    "@supabase/supabase-js": "^2.112.3",
     "nuxt": "^4.4.8",
     "pinia": "^3.0.4",
-    "tailwindcss": "^4.3.2"
+    "tailwindcss": "^4.3.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.16.0",

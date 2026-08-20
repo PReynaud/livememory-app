@@ -203,6 +203,7 @@ describe('personal key surfaces', () => {
   it('Nitro exchange verifies the hash, mints via Auth admin, and never touches domain tables with service_role', () => {
     const exchange = read('server/utils/personal-key-exchange.ts');
     const route = read('server/api/mcp/exchange.post.ts');
+    const runtime = read('server/utils/mcp-runtime.ts');
     const config = read('nuxt.config.ts');
 
     expect(exchange).toMatch(/lookup_personal_key_user/);
@@ -220,8 +221,9 @@ describe('personal key surfaces', () => {
     expect(exchange).not.toMatch(/\/rest\/v1\/concerts/);
 
     expect(route).toMatch(/exchangePersonalKey/);
-    expect(route).toMatch(/useRuntimeConfig/);
-    expect(route).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    expect(route).toMatch(/readMcpSupabaseEnv/);
+    expect(runtime).toMatch(/useRuntimeConfig/);
+    expect(runtime).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
 
     expect(config).toMatch(/supabaseServiceRoleKey/);
     expect(config).toMatch(/'\/': \{ prerender: true \}/);
