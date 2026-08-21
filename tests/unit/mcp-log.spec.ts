@@ -66,8 +66,9 @@ const domainStub = (overrides: Partial<LogDomain>): LogDomain => ({
 });
 
 describe('MCP personal key headers', () => {
-  it('reads Authorization Bearer or x-livememory-key', () => {
+  it('reads Authorization Bearer, raw lm_ key, or x-livememory-key', () => {
     expect(readPersonalKeyFromHeaders('Bearer lm_secret', undefined)).toBe('lm_secret');
+    expect(readPersonalKeyFromHeaders('lm_raw_only', undefined)).toBe('lm_raw_only');
     expect(readPersonalKeyFromHeaders(undefined, 'lm_header')).toBe('lm_header');
     expect(readPersonalKeyFromHeaders('Bearer lm_secret', 'lm_header')).toBe('lm_header');
     expect(readPersonalKeyFromHeaders('Basic nope', undefined)).toBe('');
