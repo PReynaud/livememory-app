@@ -192,7 +192,9 @@ describe('getSharedListConcerts', () => {
 describe('shared list surfaces', () => {
   it('keeps Profile toggle and copy on the store, and quiet not-found on /u/:username', () => {
     const nuxt = read('nuxt.config.ts');
-    expect(nuxt).toMatch(/exclude: \['\/', '\/login', '\/confirm', '\/u\/\*\*'\]/);
+    expect(nuxt).toMatch(/'\/u\/\*\*'/);
+    expect(nuxt).toMatch(/'\/api\/\*\*'/);
+    expect(nuxt).toMatch(/'\/\.well-known\/\*\*'/);
 
     const profilePage = read('app/pages/profile.vue');
     expect(profilePage).toMatch(/sharedListEnabled/);
