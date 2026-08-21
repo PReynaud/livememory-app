@@ -51,7 +51,8 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      exclude: ['/', '/login', '/confirm', '/u/**']
+      // Keep MCP + OAuth discovery probes off the auth redirect (Cursor needs 404, not /login).
+      exclude: ['/', '/login', '/confirm', '/u/**', '/api/**', '/.well-known/**']
     }
   }
 });

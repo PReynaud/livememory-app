@@ -212,6 +212,7 @@ describe('personal key surfaces', () => {
     expect(exchange).toMatch(/auth\/v1\/verify/);
     expect(exchange).toMatch(/profiles\?id=eq/);
     expect(exchange).toMatch(/Authorization: `Bearer \$\{accessToken\}`/);
+    expect(exchange).toMatch(/SUPABASE_SERVICE_ROLE_KEY on the server/);
     expect(exchange).not.toMatch(/from\('events'\)/);
     expect(exchange).not.toMatch(/from\('concerts'\)/);
     expect(exchange).not.toMatch(/from\('attendance'\)/);

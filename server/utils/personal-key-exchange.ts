@@ -155,7 +155,8 @@ export const exchangePersonalKey = async (
   if (!env.supabaseUrl || !env.anonKey || !env.serviceRoleKey) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Personal key exchange is not configured'
+      statusMessage:
+        'Personal key exchange is not configured. Set SUPABASE_SERVICE_ROLE_KEY on the server.'
     });
   }
 

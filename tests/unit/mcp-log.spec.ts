@@ -537,6 +537,18 @@ describe('MCP adapter wiring', () => {
   });
 });
 
+describe('MCP Cursor OAuth discovery probes', () => {
+  it('returns 404 for OAuth well-known paths so Cursor uses Authorization headers', () => {
+    const middleware = read('server/middleware/00-no-oauth-discovery.ts');
+    const config = read('nuxt.config.ts');
+
+    expect(middleware).toMatch(/\.well-known\/oauth/);
+    expect(middleware).toMatch(/setResponseStatus\(event, 404\)/);
+    expect(config).toMatch(/'\/\.well-known\/\*\*'/);
+    expect(config).toMatch(/'\/api\/\*\*'/);
+  });
+});
+
 describe('MCP tool JSON envelope', () => {
   it('does not mark needs_choice as a generic tool error', () => {
     const json: McpToolJson = {
