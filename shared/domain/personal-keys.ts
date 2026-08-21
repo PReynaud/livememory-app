@@ -42,7 +42,7 @@ export type PersonalKeysClient = {
 };
 
 export const PERSONAL_KEY_HELPER
-  = 'Create a key so an agent can act as you. It is shown once. There is no expiry — revoke it if it leaks.';
+  = 'Create a key so an agent can act as you. In Cursor MCP headers use Authorization = Bearer <key> (or paste the raw lm_ key). It is shown once. There is no expiry — revoke it if it leaks.';
 export const PERSONAL_KEY_COPY_NOW = 'Copy this key now. You will not see it again.';
 export const PERSONAL_KEY_ACTIVE = 'A personal key is active.';
 export const COPY_KEY_FAILED = 'Couldn\'t copy the key.';
