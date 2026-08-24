@@ -10,6 +10,19 @@ export const readPersonalKeyFromHeaders = (
   }
 
   const auth = (authorization ?? '').trim();
-  const match = /^Bearer\s+(\S+)/i.exec(auth);
-  return match?.[1]?.trim() ?? '';
+  if (!auth) {
+    return '';
+  }
+
+  const bearer = /^Bearer\s+(\S+)/i.exec(auth);
+  if (bearer?.[1]) {
+    return bearer[1].trim();
+  }
+
+  // Cursor Cloud MCP UI often stores the raw personal key as the Authorization value.
+  if (auth.startsWith('lm_')) {
+    return auth;
+  }
+
+  return '';
 };
