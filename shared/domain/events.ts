@@ -536,26 +536,14 @@ const evaluateConcert = (
     };
   }
 
-  if (stageIds.size > 0) {
-    if (!concert.stage_id) {
-      return {
-        concertId: concert.id,
-        artist: concert.artist,
-        date: concert.date,
-        ruleId: EVENT_RULE.requiredStage,
-        message: EVENT_RULE_MESSAGE.requiredStage
-      };
-    }
-
-    if (!stageIds.has(concert.stage_id)) {
-      return {
-        concertId: concert.id,
-        artist: concert.artist,
-        date: concert.date,
-        ruleId: EVENT_RULE.stageNotOnEvent,
-        message: EVENT_RULE_MESSAGE.stageNotOnEvent
-      };
-    }
+  if (stageIds.size > 0 && concert.stage_id && !stageIds.has(concert.stage_id)) {
+    return {
+      concertId: concert.id,
+      artist: concert.artist,
+      date: concert.date,
+      ruleId: EVENT_RULE.stageNotOnEvent,
+      message: EVENT_RULE_MESSAGE.stageNotOnEvent
+    };
   }
 
   return null;

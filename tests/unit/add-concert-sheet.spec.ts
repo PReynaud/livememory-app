@@ -78,16 +78,22 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/pendingChoice/);
     expect(sheet).toMatch(/label="Cancel"|label='Cancel'/);
     expect(sheet).toMatch(/pendingChoice\.value = false/);
+    expect(sheet).toMatch(/onDocumentKeydown/);
     expect(sheet).not.toMatch(/dismissChoice[\s\S]{0,80}closeSheet/);
   });
 
-  it('saves without an Event by sending Place and omitting eventId', () => {
+  it('requires an Event on nav Add and no longer has a naked transparent path', () => {
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
-    expect(sheet).toMatch(/isTransparent/);
-    expect(sheet).toMatch(/v-if="isTransparent"/);
-    expect(sheet).toMatch(/place: place\.value/);
-    expect(sheet).toMatch(/if \(!picker\.value\)/);
-    expect(sheet).toMatch(/if \(!sheet\.eventId\)/);
+    expect(sheet).not.toMatch(/isTransparent/);
+    expect(sheet).toMatch(/requiredEvent/);
+    expect(sheet).toMatch(/What is an Event\?/);
+    expect(sheet).toMatch(/Add another artist/);
+    expect(sheet).toMatch(/transparentSingleNightName/);
+    expect(sheet).toMatch(/picker\.value = sheet\.eventId/);
+    expect(sheet).toMatch(/if \(!picker\.value && !sheet\.eventId\)/);
+    expect(sheet).toMatch(/createdEventId/);
+    expect(sheet).toMatch(/eventId: createdEventId/);
+    expect(sheet).not.toMatch(/mode: 'save' \| 'another'/);
   });
 
   it('reuses the glass sheet for edit, notes, and joiner-aware delete copy', () => {
@@ -132,11 +138,13 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/confirmMove/);
   });
 
-  it('asks for Stage or Scene when the Event has rows and unlocks Place only when override is on', () => {
+  it('always shows Stage or Scene, city Place helper, and unlocks Place only when override is on', () => {
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
     expect(sheet).toMatch(/Stage or Scene/);
+    expect(sheet).toMatch(/Venue or stage/);
+    expect(sheet).toMatch(/City/);
     expect(sheet).toMatch(/eventAllowsPlaceOverride/);
-    expect(sheet).toMatch(/stageId/);
-    expect(sheet).toMatch(/showStageSelect/);
+    expect(sheet).toMatch(/stageName/);
+    expect(sheet).not.toMatch(/showStageSelect/);
   });
 });

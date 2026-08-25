@@ -368,7 +368,8 @@ const createMockConcertsClient = (options?: {
                   time: row.time == null || row.time === '' ? null : String(row.time),
                   place: String(row.place),
                   notes: row.notes == null || row.notes === '' ? null : String(row.notes),
-                  stage_id: row.stage_id == null || row.stage_id === '' ? null : String(row.stage_id)
+                  stage_id: row.stage_id == null || row.stage_id === '' ? null : String(row.stage_id),
+                  stage_name: row.stage_name == null || row.stage_name === '' ? null : String(row.stage_name)
                 };
                 concerts.push(created);
                 return { data: created, error: null };
@@ -449,7 +450,10 @@ const createMockConcertsClient = (options?: {
                       : (row.notes == null || row.notes === '' ? null : String(row.notes)),
                     stage_id: row.stage_id === undefined
                       ? current.stage_id
-                      : (row.stage_id == null || row.stage_id === '' ? null : String(row.stage_id))
+                      : (row.stage_id == null || row.stage_id === '' ? null : String(row.stage_id)),
+                    stage_name: row.stage_name === undefined
+                      ? current.stage_name
+                      : (row.stage_name == null || row.stage_name === '' ? null : String(row.stage_name))
                   };
                   concerts[index] = updated;
                   return { data: updated, error: null };
@@ -579,6 +583,24 @@ describe('concerts migration kernel', () => {
     expect(sql).toMatch(/Concert identity cannot be changed/);
     expect(sql).not.toMatch(/service_role/);
     expect(sql).not.toMatch(/joiner/i);
+  });
+
+  it('adds a shared name catalog and unique-guards timed identity with stage_name', () => {
+    const migration = readMigrations().find(file => file.name.includes('add_sheet_catalog_stage_identity'));
+    expect(migration).toBeTruthy();
+    const sql = migration?.sql ?? '';
+
+    expect(sql).toMatch(/create table public\.name_catalog/);
+    expect(sql).toMatch(/kind in \('artist', 'place', 'stage'\)/);
+    expect(sql).toMatch(/concerts_owner_artist_date_time_stage_idx/);
+    expect(sql).toMatch(/add column stage_name text/);
+    expect(sql).toMatch(/grant select \(\s*stage_name\s*\) on table public\.concerts to authenticated/);
+    expect(sql).toMatch(/concerts\.stage_id is null/);
+    expect(sql).toMatch(/drop policy if exists "Authenticated users can insert own concerts"/);
+    expect(sql).toMatch(/if tg_op = 'DELETE' then/);
+    expect(sql).toMatch(/Authenticated users can select name catalog/);
+    expect(sql).not.toMatch(/Stage or Scene is required/);
+    expect(sql).not.toMatch(/service_role/);
   });
 });
 
@@ -773,6 +795,29 @@ describe('createConcert', () => {
     expect(result.data?.id).toBe(timedJustice.id);
     expect(result.data?.event_id).toBe(nightRow.id);
     expect(concertInserts).toHaveLength(0);
+  });
+
+  it('creates a second Concert when the timed match is at a different Stage or Scene', async () => {
+    const { client, concertInserts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [{ ...timedJustice, stage_name: 'Olympia' }]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: 'Bataclan'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.created);
+    expect(concertInserts).toHaveLength(1);
+    expect(concertInserts[0]).toMatchObject({
+      artist: 'Justice',
+      stage_name: 'Bataclan'
+    });
   });
 
   it('refuses a timed match at a different Place', async () => {
@@ -1076,7 +1121,7 @@ describe('createConcert', () => {
       date: '2026-08-10',
       place: 'Berlin'
     });
-    expect(attendanceInserts).toHaveLength(0);
+    expect(attendanceInserts).toHaveLength(1);
   });
 
   it('rejects a newEvent Concert date outside the Event range without persisting the Event', async () => {
@@ -1127,8 +1172,8 @@ describe('createConcert', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('still applies Event rules when creating a night from the sheet', async () => {
-    const { client, concertInserts } = createMockConcertsClient();
+  it('auto-names a New night when the Event name is blank', async () => {
+    const { client, concertInserts, eventInserts } = createMockConcertsClient();
 
     const result = await createConcert(client, {
       artist: 'Justice',
@@ -1141,9 +1186,33 @@ describe('createConcert', () => {
       }
     });
 
-    expect(result.data).toBeNull();
-    expect(result.error?.message).toBe('Name is required.');
-    expect(concertInserts).toHaveLength(0);
+    expect(result.error).toBeNull();
+    expect(result.data?.place).toBe('Berlin');
+    expect(eventInserts[0]).toMatchObject({
+      name: 'Concerts on 10/08/2026 at Berlin'
+    });
+    expect(concertInserts).toHaveLength(1);
+  });
+
+  it('auto-names a New night with venue then city when Stage is filled', async () => {
+    const { client, eventInserts } = createMockConcertsClient();
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-21',
+      stageName: 'Olympia',
+      newEvent: {
+        kind: 'single_night',
+        name: '',
+        startDate: '2026-08-21',
+        place: 'Paris'
+      }
+    });
+
+    expect(result.error).toBeNull();
+    expect(eventInserts[0]).toMatchObject({
+      name: 'Concerts on 21/08/2026 at Olympia, Paris'
+    });
   });
 
   it('returns persist_failed when concert insert fails and keeps an existing Event', async () => {
@@ -1191,9 +1260,12 @@ describe('createConcert', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('names a transparent single_night from the Concert date and Place', () => {
+  it('names a transparent single_night from the Concert date, optional venue, and city', () => {
     expect(transparentSingleNightName('2026-08-18', 'Berlin')).toBe(
       'Concerts on 18/08/2026 at Berlin'
+    );
+    expect(transparentSingleNightName('2026-08-18', 'Paris', 'Olympia')).toBe(
+      'Concerts on 18/08/2026 at Olympia, Paris'
     );
   });
 
@@ -1305,6 +1377,22 @@ describe('createConcert', () => {
 });
 
 describe('updateConcert and deleteConcert', () => {
+  const olympia: EventStageRecord = {
+    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    event_id: nightRow.id,
+    name: 'Olympia'
+  };
+  const valley: EventStageRecord = {
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    event_id: nightRow.id,
+    name: 'Valley'
+  };
+  const stagedJustice: ConcertRecord = {
+    ...timedJustice,
+    stage_id: olympia.id,
+    stage_name: 'Olympia'
+  };
+
   it('saves owner notes and never writes event_id', async () => {
     const existing: ConcertRecord = {
       ...timedJustice,
@@ -1335,6 +1423,190 @@ describe('updateConcert and deleteConcert', () => {
     });
     expect(concertUpdates[0]).not.toHaveProperty('event_id');
     expect(events).toHaveLength(1);
+  });
+
+  it('keeps Stage or Scene when the edit omits both stage fields', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      notes: 'Back of the room.'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_id).toBe(olympia.id);
+    expect(result.data?.stage_name).toBe('Olympia');
+    expect(concertUpdates[0]).toMatchObject({
+      stage_id: olympia.id,
+      stage_name: 'Olympia'
+    });
+  });
+
+  it('keeps the same stage_id when the sheet resubmits the current Stage or Scene name', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      notes: 'Back of the room.',
+      stageName: 'Olympia'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_id).toBe(olympia.id);
+    expect(result.data?.stage_name).toBe('Olympia');
+    expect(concertUpdates[0]).toMatchObject({
+      stage_id: olympia.id,
+      stage_name: 'Olympia'
+    });
+  });
+
+  it('renames Stage or Scene from a typed name even when the Concert already has stage_id', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: 'Bataclan'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_name).toBe('Bataclan');
+    expect(result.data?.stage_id).toBeTruthy();
+    expect(result.data?.stage_id).not.toBe(olympia.id);
+    expect(concertUpdates[0]).toMatchObject({ stage_name: 'Bataclan' });
+    expect(concertUpdates[0]?.stage_id).not.toBe(olympia.id);
+  });
+
+  it('clears Stage or Scene when the sheet submits an empty name', async () => {
+    const clearedSetup = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const cleared = await updateConcert(clearedSetup.client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: null
+    });
+
+    expect(cleared.error).toBeNull();
+    expect(cleared.data?.stage_id).toBeNull();
+    expect(cleared.data?.stage_name).toBeNull();
+    expect(clearedSetup.concertUpdates[0]).toMatchObject({
+      stage_id: null,
+      stage_name: null
+    });
+
+    const blankedSetup = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+    const blanked = await updateConcert(blankedSetup.client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: '  '
+    });
+
+    expect(blanked.error).toBeNull();
+    expect(blanked.data?.stage_id).toBeNull();
+    expect(blanked.data?.stage_name).toBeNull();
+  });
+
+  it('clears or changes Stage or Scene from an explicit stageId without a typed name', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia, valley]
+    });
+
+    const moved = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageId: valley.id
+    });
+
+    expect(moved.error).toBeNull();
+    expect(moved.data?.stage_id).toBe(valley.id);
+    expect(moved.data?.stage_name).toBe('Valley');
+
+    const cleared = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageId: null
+    });
+
+    expect(cleared.error).toBeNull();
+    expect(cleared.data?.stage_id).toBeNull();
+    expect(cleared.data?.stage_name).toBeNull();
+    expect(concertUpdates[1]).toMatchObject({
+      stage_id: null,
+      stage_name: null
+    });
+  });
+
+  it('uses the submitted Stage or Scene for identity, not the inherited stage_id', async () => {
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      artist: 'Local Band',
+      stage_id: valley.id,
+      stage_name: 'Valley'
+    };
+    const { client, concertUpdates, concerts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice, other],
+      stages: [olympia, valley]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: 'Olympia'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.data?.id).toBe(stagedJustice.id);
+    expect(result.data?.stage_id).toBe(olympia.id);
+    expect(result.data?.stage_name).toBe('Olympia');
+    expect(concertUpdates).toHaveLength(0);
+    expect(concerts.find(concert => concert.id === other.id)).toMatchObject({
+      artist: 'Local Band',
+      stage_id: valley.id,
+      stage_name: 'Valley'
+    });
   });
 
   it('saves notes on a duplicate untimed Concert without treating self as a collision', async () => {
@@ -1881,7 +2153,7 @@ describe('moveConcert', () => {
     expect(concertUpdates).toHaveLength(0);
   });
 
-  it('blocks a missing or foreign Stage on the target Event', async () => {
+  it('allows a move onto a festival without a Stage and still rejects a foreign Stage id', async () => {
     const mainStage = {
       id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       event_id: festivalRow.id,
@@ -1903,12 +2175,18 @@ describe('moveConcert', () => {
       targetEventId: festivalRow.id
     });
 
-    expect(missing.data).toBeNull();
-    expect(missing.error?.ruleId).toBe(CONCERT_RULE.requiredStage);
-    expect(missing.error?.message).toBe(CONCERT_RULE_MESSAGE.requiredStage);
-    expect(concertUpdates).toHaveLength(0);
+    expect(missing.error).toBeNull();
+    expect(missing.data?.event_id).toBe(festivalRow.id);
+    expect(missing.data?.stage_id).toBeNull();
+    expect(concertUpdates).toHaveLength(1);
 
-    const foreign = await moveConcert(client, {
+    const { client: foreignClient, concertUpdates: foreignUpdates } = createMockConcertsClient({
+      events: [{ ...festivalRow, place: 'Paris' }, { ...otherNightRow, start_date: '2026-08-20', end_date: '2026-08-20', place: 'Paris' }],
+      concerts: [{ ...inRange, event_id: otherNightRow.id }],
+      stages: [mainStage]
+    });
+
+    const foreign = await moveConcert(foreignClient, {
       concertId: inRange.id,
       targetEventId: festivalRow.id,
       stageId: 'not-on-target'
@@ -1917,9 +2195,15 @@ describe('moveConcert', () => {
     expect(foreign.data).toBeNull();
     expect(foreign.error?.ruleId).toBe(CONCERT_RULE.stageNotOnEvent);
     expect(foreign.error?.message).toBe(CONCERT_RULE_MESSAGE.stageNotOnEvent);
-    expect(concertUpdates).toHaveLength(0);
+    expect(foreignUpdates).toHaveLength(0);
 
-    const okMove = await moveConcert(client, {
+    const { client: okClient } = createMockConcertsClient({
+      events: [{ ...festivalRow, place: 'Paris' }, { ...otherNightRow, start_date: '2026-08-20', end_date: '2026-08-20', place: 'Paris' }],
+      concerts: [{ ...inRange, event_id: otherNightRow.id }],
+      stages: [mainStage]
+    });
+
+    const okMove = await moveConcert(okClient, {
       concertId: inRange.id,
       targetEventId: festivalRow.id,
       stageId: mainStage.id
@@ -1998,6 +2282,7 @@ describe('concert date grouping', () => {
     expect(isCompactBill([friday, fridayTwo])).toBe(false);
     expect(isCompactBill([])).toBe(false);
     expect(formatConcertMetaLine(friday)).toBe('20/08/2026 · Paris · 20:15');
+    expect(formatConcertMetaLine(friday, 'Olympia')).toBe('20/08/2026 · Olympia · Paris · 20:15');
     expect(formatConcertMetaLine(saturday)).toBe('22/08/2026 · Paris');
     expect(eventNameDiffersFromArtist('Concerts on 20/08/2026 at Paris', 'The Last Dinner Party')).toBe(true);
     expect(eventNameDiffersFromArtist('Justice', 'justice')).toBe(false);
@@ -2160,7 +2445,7 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(sheet).toMatch(/Add concert/);
     expect(sheet).toMatch(/Edit concert/);
     expect(sheet).toMatch(/Private\. Never on your public profile\./);
-    expect(sheet).toMatch(/Add another/);
+    expect(sheet).toMatch(/Add another artist/);
     expect(sheet).toMatch(/isEdit/);
     expect(sheet).toMatch(/deleteOwnedConcert|confirmDelete/);
     expect(sheet).toMatch(/navigateTo\('\/e\/' \+/);
@@ -2168,7 +2453,7 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(sheet).toMatch(/needs_choice|pendingChoice/);
     expect(sheet).toMatch(/:disabled="pendingChoice"/);
     expect(sheet).toMatch(/label="Cancel"|label='Cancel'/);
-    expect(sheet).toMatch(/isTransparent/);
+    expect(sheet).toMatch(/requiredEvent/);
     expect(sheet).toMatch(/place: place\.value/);
 
     const app = readFileSync(resolve(process.cwd(), 'app/app.vue'), 'utf8');
@@ -2257,7 +2542,7 @@ describe('concert Event rules', () => {
     name: 'Main'
   };
 
-  it('requires stage_id when the Event has Stage/Scene rows and stores the id not a name', async () => {
+  it('lets a Concert omit Stage or Scene even when the Event already has rows, and creates a typed name', async () => {
     const { client, concertInserts } = createMockConcertsClient({
       events: [festivalRow],
       stages: [mainStage]
@@ -2269,25 +2554,20 @@ describe('concert Event rules', () => {
       eventId: festivalRow.id
     });
 
-    expect(missing.data).toBeNull();
-    expect(missing.error?.ruleId).toBe(CONCERT_RULE.requiredStage);
-    expect(missing.error?.message).toBe(CONCERT_RULE_MESSAGE.requiredStage);
-    expect(concertInserts).toHaveLength(0);
+    expect(missing.error).toBeNull();
+    expect(missing.data?.stage_id).toBeNull();
+    expect(concertInserts).toHaveLength(1);
 
     const created = await createConcert(client, {
-      artist: 'Justice',
-      date: '2026-08-20',
+      artist: 'Phoenix',
+      date: '2026-08-21',
       eventId: festivalRow.id,
-      stageId: mainStage.id
+      stageName: 'Valley'
     });
 
     expect(created.error).toBeNull();
-    expect(created.data?.stage_id).toBe(mainStage.id);
-    expect(created.data?.stage_id).not.toBe('Main');
-    expect(concertInserts[0]).toMatchObject({
-      stage_id: mainStage.id,
-      place: 'Paris'
-    });
+    expect(created.data?.stage_id).toBeTruthy();
+    expect(created.data?.stage_name).toBe('Valley');
   });
 
   it('does not require a Stage when the Event list is empty', async () => {

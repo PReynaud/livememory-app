@@ -72,7 +72,7 @@ export type ConcertRecord = {
 
 /** Columns `authenticated` may SELECT on `concerts` after notes moved to `concert_notes`. */
 export const CONCERT_VISIBLE_COLUMNS
-  = 'id,event_id,owner_id,artist,date,time,place,stage_id' as const;
+  = 'id,event_id,owner_id,artist,date,time,place,stage_id,stage_name' as const;
 
 export type CreateConcertResult = DomainResult<ConcertRecord> & {
   outcome: ConcertCreateOutcome | null;
@@ -84,6 +84,7 @@ export type CreateConcertInput = {
   time?: string | null;
   place?: string;
   stageId?: string | null;
+  stageName?: string | null;
   eventId?: string;
   newEvent?: CreateEventInput;
   confirm?: ConcertIdentityConfirm;
@@ -98,6 +99,7 @@ export type UpdateConcertInput = {
   confirm?: ConcertIdentityConfirm;
   place?: string;
   stageId?: string | null;
+  stageName?: string | null;
   eventId?: string;
 };
 
@@ -201,7 +203,16 @@ const toDisplayDate = (iso: string): string => {
   return `${day}/${month}/${year}`;
 };
 
-export const transparentSingleNightName = (date: string, place: string): string => {
+export const transparentSingleNightName = (
+  date: string,
+  place: string,
+  stage?: string | null
+): string => {
+  const venue = trim(stage);
+  if (venue) {
+    return `Concerts on ${toDisplayDate(date)} at ${venue}, ${place}`;
+  }
+
   return `Concerts on ${toDisplayDate(date)} at ${place}`;
 };
 
@@ -361,8 +372,8 @@ const listStagesForEvent = async (
 const resolvePlaceAndStage = (
   event: EventRecord,
   stages: EventStageRecord[],
-  input: { place?: string; stageId?: string | null }
-): DomainResult<{ place: string; stageId: string | null }> => {
+  input: { place?: string; stageId?: string | null; stageName?: string | null }
+): DomainResult<{ place: string; stageId: string | null; stageName: string | null }> => {
   const submittedPlace = trim(input.place);
   const inheritedPlace = trim(event.place);
   const allowsOverride = eventAllowsPlaceOverride(event);
@@ -373,24 +384,73 @@ const resolvePlaceAndStage = (
 
   const place = allowsOverride && submittedPlace ? submittedPlace : inheritedPlace;
   const stageId = trim(input.stageId) || null;
+  const stageName = trim(input.stageName);
 
-  if (stages.length > 0) {
-    if (!stageId) {
-      return fail(CONCERT_RULE.requiredStage, CONCERT_RULE_MESSAGE.requiredStage);
-    }
-
-    if (!stages.some(stage => stage.id === stageId)) {
+  if (stageId) {
+    const named = stages.find(stage => stage.id === stageId);
+    if (!named) {
       return fail(CONCERT_RULE.stageNotOnEvent, CONCERT_RULE_MESSAGE.stageNotOnEvent);
     }
 
-    return ok({ place, stageId });
+    return ok({ place, stageId, stageName: named.name });
   }
 
+  if (stageName) {
+    const named = stages.find(
+      stage => trim(stage.name).toLowerCase() === stageName.toLowerCase()
+    );
+    if (named) {
+      return ok({ place, stageId: named.id, stageName: named.name });
+    }
+
+    return ok({ place, stageId: null, stageName });
+  }
+
+  return ok({ place, stageId: null, stageName: null });
+};
+
+const ensureEventStage = async (
+  client: ConcertsClient,
+  eventId: string,
+  stages: EventStageRecord[],
+  stageId: string | null,
+  stageName: string | null
+): Promise<DomainResult<{ stageId: string | null; stageName: string | null }>> => {
   if (stageId) {
-    return fail(CONCERT_RULE.stageNotOnEvent, CONCERT_RULE_MESSAGE.stageNotOnEvent);
+    const named = stages.find(stage => stage.id === stageId);
+    if (!named) {
+      return fail(CONCERT_RULE.stageNotOnEvent, CONCERT_RULE_MESSAGE.stageNotOnEvent);
+    }
+
+    return ok({ stageId, stageName: named.name });
   }
 
-  return ok({ place, stageId: null });
+  const name = trim(stageName);
+  if (!name) {
+    return ok({ stageId: null, stageName: null });
+  }
+
+  const existing = stages.find(
+    stage => trim(stage.name).toLowerCase() === name.toLowerCase()
+  );
+  if (existing) {
+    return ok({ stageId: existing.id, stageName: existing.name });
+  }
+
+  const { data, error } = await client
+    .from('event_stages')
+    .insert({ event_id: eventId, name })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    return {
+      data: null,
+      error: persistFailed(error ?? { message: 'Failed to save Stage or Scene' })
+    };
+  }
+
+  return ok({ stageId: data.id, stageName: data.name });
 };
 
 const mapConcertKernelError = (error: QueryError): DomainError => {
@@ -479,6 +539,43 @@ const samePlace = (left: string, right: string) => {
   return trim(left) === trim(right);
 };
 
+const sameStageName = (left: string | null | undefined, right: string | null | undefined) => {
+  return trim(left).toLowerCase() === trim(right).toLowerCase();
+};
+
+/** Keep `stage_id` only when both stage fields are omitted. A submitted `stageName` (including null) wins. */
+const inheritStageId = (
+  input: { stageId?: string | null; stageName?: string | null },
+  existingStageId: string | null | undefined
+): string | null | undefined => {
+  if (input.stageId !== undefined) {
+    return input.stageId;
+  }
+
+  if (input.stageName !== undefined) {
+    return null;
+  }
+
+  return existingStageId;
+};
+
+const draftStageLabel = (
+  input: { stageId?: string | null; stageName?: string | null },
+  stages: EventStageRecord[]
+): string | null => {
+  const named = trim(input.stageName);
+  if (named) {
+    return named;
+  }
+
+  const stageId = trim(input.stageId);
+  if (!stageId) {
+    return null;
+  }
+
+  return stages.find(stage => stage.id === stageId)?.name ?? null;
+};
+
 const concludeTimedMatch = (
   existing: ConcertRecord,
   targetPlace: string
@@ -516,7 +613,8 @@ const listIdentityCandidates = async (
 
 const timedMatch = (
   candidates: ConcertRecord[],
-  draftTime: string | null
+  draftTime: string | null,
+  draftStageName: string | null
 ): ConcertRecord | null => {
   if (!draftTime) {
     return null;
@@ -525,18 +623,22 @@ const timedMatch = (
   return (
     candidates.find((concert) => {
       const existingTime = normalizeClock(concert.time);
-      return existingTime !== null && existingTime === draftTime;
+      return existingTime !== null
+        && existingTime === draftTime
+        && sameStageName(concert.stage_name, draftStageName);
     }) ?? null
   );
 };
 
 const untimedOverlap = (
   candidates: ConcertRecord[],
-  draftTime: string | null
+  draftTime: string | null,
+  draftStageName: string | null
 ): ConcertRecord[] => {
   return candidates.filter((concert) => {
     const existingTime = normalizeClock(concert.time);
-    return draftTime === null || existingTime === null;
+    const timeOverlaps = draftTime === null || existingTime === null;
+    return timeOverlaps && sameStageName(concert.stage_name, draftStageName);
   });
 };
 
@@ -564,14 +666,15 @@ const decideIdentity = (
   candidates: ConcertRecord[],
   draftTime: string | null,
   targetPlace: string,
+  draftStageName: string | null,
   confirm?: ConcertIdentityConfirm
 ): IdentityDecision => {
-  const exactTimed = timedMatch(candidates, draftTime);
+  const exactTimed = timedMatch(candidates, draftTime, draftStageName);
   if (exactTimed) {
     return { kind: 'return', result: concludeTimedMatch(exactTimed, targetPlace) };
   }
 
-  const overlap = untimedOverlap(candidates, draftTime);
+  const overlap = untimedOverlap(candidates, draftTime, draftStageName);
   if (overlap.length > 0 && confirm !== 'create') {
     const existing = pickAttachTarget(overlap, draftTime);
     if (existing && confirm === 'attach') {
@@ -623,7 +726,7 @@ const writeAttachTime = async (
       };
     }
 
-    const raced = timedMatch(retry.data ?? [], draftTime);
+    const raced = timedMatch(retry.data ?? [], draftTime, existing.stage_name ?? null);
     if (raced) {
       return concludeTimedMatch(raced, targetPlace);
     }
@@ -726,7 +829,7 @@ export const createConcert = async (
       ...input,
       newEvent: {
         kind: 'single_night',
-        name: transparentSingleNightName(date, place),
+        name: transparentSingleNightName(date, place, input.stageName),
         startDate: date,
         place
       }
@@ -741,6 +844,23 @@ export const createConcert = async (
         dateOutsideEventMessage(plannedRange)
       );
     }
+  }
+
+  if (
+    request.newEvent?.kind === 'single_night'
+    && !trim(request.newEvent.name)
+  ) {
+    request = {
+      ...request,
+      newEvent: {
+        ...request.newEvent,
+        name: transparentSingleNightName(
+          request.newEvent.startDate,
+          request.newEvent.place,
+          request.stageName
+        )
+      }
+    };
   }
 
   const draftTime = normalizeClock(request.time);
@@ -764,6 +884,19 @@ export const createConcert = async (
     }
   }
 
+  const earlyStages = target.data.event
+    ? await listStagesForEvent(client, target.data.event.id)
+    : ok([] as EventStageRecord[]);
+  if (earlyStages.error) {
+    return {
+      data: null,
+      error: earlyStages.error,
+      outcome: null
+    };
+  }
+
+  const draftStageName = draftStageLabel(request, earlyStages.data ?? []);
+
   const candidatesResult = await listIdentityCandidates(
     client,
     artist,
@@ -779,7 +912,13 @@ export const createConcert = async (
   }
 
   const candidates = candidatesResult.data ?? [];
-  const decision = decideIdentity(candidates, draftTime, target.data.place, request.confirm);
+  const decision = decideIdentity(
+    candidates,
+    draftTime,
+    target.data.place,
+    draftStageName,
+    request.confirm
+  );
   if (decision.kind === 'return') {
     return decision.result;
   }
@@ -826,7 +965,8 @@ export const createConcert = async (
 
   const placement = resolvePlaceAndStage(event, stagesResult.data ?? [], {
     place: request.place,
-    stageId: request.stageId
+    stageId: request.stageId,
+    stageName: request.stageName
   });
   if (placement.error || !placement.data) {
     await rollbackNewEvent(client, createdEventId);
@@ -836,13 +976,29 @@ export const createConcert = async (
     );
   }
 
+  const stageRow = await ensureEventStage(
+    client,
+    event.id,
+    stagesResult.data ?? [],
+    placement.data.stageId,
+    placement.data.stageName
+  );
+  if (stageRow.error || !stageRow.data) {
+    await rollbackNewEvent(client, createdEventId);
+    return failCreate(
+      stageRow.error?.ruleId ?? 'persist_failed',
+      stageRow.error?.message ?? 'Failed to save Stage or Scene'
+    );
+  }
+
   const payload = {
     event_id: event.id,
     artist,
     date,
     time: draftTime,
     place: placement.data.place,
-    stage_id: placement.data.stageId
+    stage_id: stageRow.data.stageId,
+    stage_name: stageRow.data.stageName
   };
 
   const { data, error } = await client.from('concerts').insert(payload).select(CONCERT_VISIBLE_COLUMNS).single();
@@ -860,7 +1016,7 @@ export const createConcert = async (
         };
       }
 
-      const raced = timedMatch(retry.data ?? [], draftTime);
+      const raced = timedMatch(retry.data ?? [], draftTime, draftStageName);
       if (raced) {
         return concludeTimedMatch(raced, event.place);
       }
@@ -883,7 +1039,7 @@ export const createConcert = async (
     return failCreate('persist_failed', 'Failed to create concert');
   }
 
-  if (isTransparent) {
+  if (createdEventId && request.newEvent?.kind === 'single_night') {
     const attendanceError = await applyOwnerAttendanceDefault(client, data);
     if (attendanceError) {
       await rollbackNewConcert(client, data.id);
@@ -989,11 +1145,27 @@ export const updateConcert = async (
     return failCreate(CONCERT_RULE.dateOutsideEvent, dateOutsideEventMessage(eventResult.data));
   }
 
+  const stagesResult = await listStagesForEvent(client, eventResult.data.id);
+  if (stagesResult.error) {
+    return { data: null, error: stagesResult.error, outcome: null };
+  }
+
   const draftTime = normalizeClock(input.time);
+  const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
+    place: input.place,
+    stageId: inheritStageId(input, current.stage_id),
+    stageName: input.stageName
+  });
+  if (placement.error || !placement.data) {
+    return { data: null, error: placement.error, outcome: null };
+  }
+
+  const nextStageName = placement.data.stageName;
   const identityUnchanged
     = sameArtist(current.artist, artist)
       && current.date === date
-      && normalizeClock(current.time) === draftTime;
+      && normalizeClock(current.time) === draftTime
+      && sameStageName(current.stage_name, nextStageName);
 
   if (!identityUnchanged) {
     const candidatesResult = await listIdentityCandidates(
@@ -1017,6 +1189,7 @@ export const updateConcert = async (
       candidates,
       draftTime,
       eventResult.data.place,
+      nextStageName,
       input.confirm
     );
     if (decision.kind === 'return') {
@@ -1028,17 +1201,15 @@ export const updateConcert = async (
     }
   }
 
-  const stagesResult = await listStagesForEvent(client, eventResult.data.id);
-  if (stagesResult.error) {
-    return { data: null, error: stagesResult.error, outcome: null };
-  }
-
-  const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
-    place: input.place,
-    stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId
-  });
-  if (placement.error || !placement.data) {
-    return { data: null, error: placement.error, outcome: null };
+  const stageRow = await ensureEventStage(
+    client,
+    eventResult.data.id,
+    stagesResult.data ?? [],
+    placement.data.stageId,
+    placement.data.stageName
+  );
+  if (stageRow.error || !stageRow.data) {
+    return { data: null, error: stageRow.error, outcome: null };
   }
 
   const payload = {
@@ -1046,7 +1217,8 @@ export const updateConcert = async (
     date,
     time: draftTime,
     place: placement.data.place,
-    stage_id: placement.data.stageId,
+    stage_id: stageRow.data.stageId,
+    stage_name: stageRow.data.stageName,
     notes: optionalNotes(input.notes),
     ...(eventResult.data.id !== current.event_id ? { event_id: eventResult.data.id } : {})
   };
@@ -1076,7 +1248,8 @@ export const updateConcert = async (
 
       const raced = timedMatch(
         (retry.data ?? []).filter(concert => concert.id !== current.id),
-        draftTime
+        draftTime,
+        nextStageName
       );
       if (raced) {
         return concludeTimedMatch(raced, eventResult.data.place);
@@ -1156,16 +1329,29 @@ export const moveConcert = async (
 
   const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
     place: input.place === undefined ? existing.data.place : input.place,
-    stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId
+    stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId,
+    stageName: existing.data.stage_name
   });
   if (placement.error || !placement.data) {
     return { data: null, error: placement.error };
   }
 
+  const stageRow = await ensureEventStage(
+    client,
+    eventResult.data.id,
+    stagesResult.data ?? [],
+    placement.data.stageId,
+    placement.data.stageName
+  );
+  if (stageRow.error || !stageRow.data) {
+    return { data: null, error: stageRow.error };
+  }
+
   const payload = {
     event_id: eventResult.data.id,
     place: placement.data.place,
-    stage_id: placement.data.stageId
+    stage_id: stageRow.data.stageId,
+    stage_name: stageRow.data.stageName
   };
 
   const { data, error } = await client

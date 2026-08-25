@@ -100,11 +100,11 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Component | Use | Behavioral rules |
 |---|---|---|
 | Event group | Concerts, Shared List, Event bill | **2+ Concerts.** Header opens Event (on Shared List that is the join path). Body lists Concerts by day. Same-day rows: spacing only, **no** hairline. Hairline **above the next day header**. First day under the header: no extra divider. Do not also list those Concerts as standalone rows. |
-| Compact Event | Concerts, Shared List, Home featured when Bill has 1 Concert | Artist once (`{typography.title}`; `{typography.display-sm}` on Home featured). Meta: date · Place · time · Stage if any. If Event name ≠ artist, Event name is a second muted line. Chip on the right (not on Shared List). Whole card opens Event. Empty Bills stay a header-only Event group. |
+| Compact Event | Concerts, Shared List, Home featured when Bill has 1 Concert | Artist once (`{typography.title}`; `{typography.display-sm}` on Home featured). Meta: date · Stage/Scene if any · Place (city) · time. If Event name ≠ artist, Event name is a second muted line. Chip on the right (not on Shared List). Whole card opens Event. Empty Bills stay a header-only Event group. |
 | Featured Event | Home, top | Next 1–3 upcoming Events, larger than a group. **2+ Concerts:** Event name + day-grouped rows (same day-break rule). **1 Concert:** compact anatomy, artist as the featured title. Same tap → Event. Not a "for you" feed. Not followed by the rest of the log. |
 | Concert row | Event, multi-concert groups | Owner: tap row → Edit Concert. Attendance chip cycles **that User's** `going` ↔ clear (future) or `attended` ↔ clear (past). Joiner: chip only — no edit, no notes. Shared List visitor: no chips that look like controls; tap the grouping/card to open Event. |
-| Add sheet | Add Concert, Edit Concert (owner) | Bottom-anchored **glass** panel (`{components.add-sheet}`). Partial height: the Event or list remains visible through the frost. Field order: **Artist** (focused) → Event (picker or "New night") → date → Place → optional time, Stage or Scene, notes. From an owned Event: date/Place/Event locked-prefilled per **FR-7**; festival still asks for **day**. Festival day chips: unselected stay dark; **selected** is filled `{colors.going}` + black label (`{components.choice-chip-selected}`) — selected choice, not a CTA. Place is a field in v1, not a chip. After save: toast + **Add another** with the same Event prefill. Dismiss: swipe down, tap scrim, or Esc. Virtual keyboard docks the sheet above it. Picker lists **owned** Events only. |
-| Event picker | Add sheet | Search **owned** Events; "New night" collects name, date, Place and creates `single_night`. "New festival" is a second explicit choice in the picker, not a toggle buried in settings. Joined Events do not appear. |
+| Add sheet | Add Concert, Edit Concert (owner) | Bottom-anchored **glass** panel (`{components.add-sheet}`). Partial height: the Event or list remains visible through the frost. Field order: **Event** (picker, required; helper "The night or festival this concert belongs to." plus an info popover with Night vs Festival examples) → **Artist** (required; shared-name autocomplete after 3 characters) → **Date** (required) and **Time** (optional) on one row → **Place** (required; helper "City"; prefilled from Event; shared-name autocomplete after 3 characters) → **Stage or Scene** (optional; helper "Venue or stage"; always visible; type a new name immediately) → notes on edit. Required fields show an asterisk. After the first Artist is filled, **Add another artist** adds extra artist rows sharing Event/date/time/Place/Stage; one Save creates them. From an owned Event: date/Place/Event locked-prefilled per **FR-7**; festival still asks for **day**. Festival day chips: unselected stay dark; **selected** is filled `{colors.going}` + black label (`{components.choice-chip-selected}`) — selected choice, not a CTA. Place is a city field in v1, not a chip. After save: toast. Dismiss: swipe down, tap scrim, or Esc. Virtual keyboard docks the sheet above it. Picker lists **owned** Events only. |
+| Event picker | Add sheet | Search **owned** Events; "New night" collects optional name, date, city Place and creates `single_night` (blank name uses `Concerts on {DD/MM/YYYY} at {Stage}, {Place}` or `… at {Place}`). "New festival" is a second explicit choice in the picker, not a toggle buried in settings. Joined Events do not appear. Info popover: Night = one date, one city (club show, multi-artist soirée); Festival = several days, often several stages. Nav Add cannot Save with Event empty. |
 | Attend this night | Event (`single_night` only) | Owner **or** joiner. One-shot: sets **that User's** Attendance on Concerts currently on the Bill (`going` before Europe/Paris boundary, `attended` after). Concerts added later start unset. Hidden on `festival` — per Concert only. |
 | Attendance chip | Owner and joiner Event, lists | Confirmed `Going` hollow neon. Confirmed `Attended` solid muted outline. **Unset:** dashed muted ghost of the **next state** — visible **Going** if upcoming, **Attended** if past (`{components.attendance-unset}`). Tap confirms that state. Accessible name "Mark as going" / "Mark as attended". Never "Set", "On the bill", Skipped, +/−, or a third chroma. Never shows another User's Attendance. Shared List: confirmed Going/Attended only (hides ghosts). |
 | Glass nav | Mobile `< lg` | Four targets: Home, Concerts, Add, Profile. Frosted `{components.glass-nav}`. Active = selected choice (filled going icon pill). Add is the white launcher: opens Add sheet for a **new** Event/Concert flow (picker). Never adds a Concert to a joined Event. Hit target ≥ 44px. Not a fifth list. |
@@ -116,7 +116,7 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 | Event link | Event (owner) page URL | The Event URL **is** the unguessable link (FR-18). Giving that URL is the share. Optional quiet copy; **no** share sheet, invite modal, or directory. Public-profile off does not disable it. |
 | Stat count | Home, inside `{components.stats-block}` under featured | Three numbers: all-time attended Concerts, all-time Events (owned + joined), current going Concerts. One card, one horizontal row. Not tappable, not charts, not year-over-year, not duplicated on Profile. |
 | Sharing controls | Profile | Toggle enables username URL. Copy link. Helper: "Friends see Going and Attended. They can open an Event to join — they never edit your bill or see notes." |
-| Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Concert identity (FR-13): timed match attaches and navigates to the existing Concert (including another owned Event or another Stage/Scene — those are not identity keys); different Place is a named refuse; missing time asks attach vs create. |
+| Validation alert | Forms | `UAlert` names the failed rule and, on Event updates, lists affected Concerts. Concert identity (FR-13): timed match at the same Stage/Scene attaches and navigates to the existing Concert (including another owned Event). A different Stage/Scene creates. Different Place (city) is a named refuse; missing time asks attach vs create. |
 
 ## State Patterns
 
@@ -149,11 +149,11 @@ Behavioral. Visual specs: `DESIGN.md.Components`.
 
 ## Interaction Primitives
 
-**Mobile-first add.** Thumb: Add in glass nav → a frosted panel unfolds from the bottom (same material as the nav, larger). Artist keyboard open. Save and Add another without returning to the list. The night behind the glass is still there — context for prefill, not a dead modal.
+**Mobile-first add.** Thumb: Add in glass nav → a frosted panel unfolds from the bottom (same material as the nav, larger). Event picker first so date and city prefill. Save several artists in one submit when extra artist rows are present. The night behind the glass is still there — context for prefill, not a dead modal.
 
-**Prefill.** Adding from Event never re-asks what the Event already knows (`single_night`: date + Place; `festival`: Place + day picker in range + Stage or Scene if the list exists).
+**Prefill.** Adding from Event never re-asks what the Event already knows (`single_night`: date + city Place; `festival`: Place + day picker in range). Stage or Scene stays editable.
 
-**Multi-artist night.** One flow, several steps: stay on the Add sheet with the same Event. Not a spreadsheet paste, not the later running-order scan.
+**Multi-artist night.** Extra artist rows appear after the first Artist is filled. One Save. Not a spreadsheet paste, not the later running-order scan.
 
 **Banned in v1:** hover-only actions on `< md`, drag-and-drop line-up, infinite scroll (lists paginate or window if needed to hit the 1,000-Concert NFR), modal stacks deeper than one, a separate "skip" Attendance value, public search of users.
 
@@ -206,17 +206,17 @@ Phone and desktop are both first-class for **reading**. **Writing a Concert** is
 ### Flow 1 — UJ-1. Pierre logs a one-performer show (transparent Event)
 
 1. Pierre is signed in on his phone (FR-1 already done). **Home**. He hits **Add**.
-2. Add sheet: artist focused. He does **not** pick an Event. He enters artist, date, Place.
-3. Save transparently creates a `single_night` Event he owns, with that Concert. Past date → Attendance `attended`.
+2. Add sheet: Event first. He chooses **New night**, enters artist, date, city Place (optional venue).
+3. Save creates a `single_night` Event he owns, with that Concert. Past date → Attendance `attended`.
 4. **Climax:** **Concerts** shows one **compact Event** card with that artist once — not Event name then the same artist again. Same data model as Event-first create.
 
-Failure: missing artist/date/Place → named required-field alert, sheet stays open.
+Failure: missing Event/artist/date/Place → named required-field alert, sheet stays open.
 
 ### Flow 2 — UJ-2. Pierre, phone, after a soirée (add the whole bill)
 
 1. Pierre opens LiveMemory on his phone. **Home** shows featured upcoming (or the empty upcoming line) and stats underneath; he hits **Add**.
-2. Add sheet: artist focused. He chooses **New night**, names it, date and Place once.
-3. He types the first artist, saves. The sheet stays; Event is prefilled. He adds the next artists the same way.
+2. Add sheet: Event first. He chooses **New night**, names it, date and city Place once.
+3. He types the first artist. **Add another artist** appears; he adds the rest. One Save.
 4. On Event, he hits **Attend this night** — past date, every Concert becomes `attended`.
 5. **Climax:** **Concerts** now shows one Event group with every artist of that night. He did not create standalone Concerts and did not retype Place.
 

@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures/auth.fixture';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
+import { selectAddSheetEvent } from './helpers/add-concert-sheet';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 import type { E2EAccount } from './helpers/e2e-account';
 
@@ -116,6 +117,7 @@ test('blocks an offline Concert write with a toast and does not create the night
   await authenticatedPage.locator('main').getByRole('button', { name: 'Add concert' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet).toBeVisible();
+  await selectAddSheetEvent(authenticatedPage, sheet, 'New night');
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Date').fill('2026-12-01');
   await sheet.getByLabel('Place').fill('Paris');

@@ -101,7 +101,8 @@ describe('event_members kernel', () => {
       'date',
       'time',
       'place',
-      'stage_id'
+      'stage_id',
+      'stage_name'
     ]);
     expect(CONCERT_VISIBLE_COLUMNS).not.toMatch(/notes/);
   });

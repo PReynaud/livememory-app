@@ -20,19 +20,19 @@ The signed-in User's full Event log: Events they own (including empty) and Event
 
 ## Concert
 
-One artist or group performing on a date, with an optional time. Belongs to exactly one Event. Optional Stage/Scene. Attendance is per User. Notes are Event-owner-only in v1. On create, identity is the Event owner's journal (artist case-insensitive + date + clock time). Event and Stage/Scene are not part of that key. An exact timed match attaches to the existing Concert (including on another owned Event or another stage; attach does not reparent); the same identity at a different effective Place is refused; missing time on either side asks attach (may then set time) or create a second Concert.
+One artist or group performing on a date, with an optional time. Belongs to exactly one Event. Optional Stage/Scene (venue or stage name). Attendance is per User. Notes are Event-owner-only in v1. On create, identity is the Event owner's journal (artist case-insensitive + date + clock time + Stage/Scene name case-insensitive when filled). Event is not part of that key. An exact timed match at the same Stage/Scene (or both empty) attaches to the existing Concert (including on another owned Event; attach does not reparent). A timed match at a different Stage/Scene creates a second Concert. The same identity at a different effective Place (city) is refused. Missing time on either side with the same Stage/Scene asks attach (may then set time) or create a second Concert.
 
 ## Event
 
-A grouping of related Concerts: `single_night` or `festival`. One shared record. Has a name, date or date range, Place, optional Stage/Scene list, optional per-Concert Place override, and an unguessable Event URL. May exist with zero Concerts. A one-performer show is an Event with one Concert. Festivals span days; single-night Events use the same start and end date. Transparent create defaults the name to `Concerts on {DD/MM/YYYY} at {Place}`.
+A grouping of related Concerts: `single_night` or `festival`. One shared record. Has a name, date or date range, Place (city), optional Stage/Scene list, optional per-Concert Place override, and an unguessable Event URL. May exist with zero Concerts. A one-performer show is an Event with one Concert. Festivals span days; single-night Events use the same start and end date. New-night create without a custom name defaults to `Concerts on {DD/MM/YYYY} at {Stage}, {Place}` when Stage/Scene is filled, otherwise `Concerts on {DD/MM/YYYY} at {Place}`.
 
 ## Place
 
-Where an Event or Concert happened (venue, city, festival site, or combination). Inherited from the Event unless that Event allows overrides. Effective Place is that resolved Concert location (Event Place, or the Concert override when allowed).
+The **city** where an Event or Concert happened — not the venue. Inherited from the Event unless that Event allows overrides. Effective Place is that resolved Concert city (Event Place, or the Concert override when allowed).
 
 ## Stage or Scene
 
-A named performance area on an Event, mainly for festivals. An empty list means Stage/Scene is not required.
+The **venue or stage** name (room, hall, or festival stage). Optional on a Concert; strongly recommended. The User may type a new name when adding a Concert; that name is added to the Event's list. A defined list is a suggestion set, not a closed required enum.
 
 ## Attendance
 

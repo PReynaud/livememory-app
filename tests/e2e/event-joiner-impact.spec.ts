@@ -5,6 +5,7 @@ import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
 import type { E2EAccount } from './helpers/e2e-account';
 import { JOINER_IMPACT_COPY } from '../../shared/domain/membership';
+import { addSheetEventControl } from './helpers/add-concert-sheet';
 
 const restHeaders = (accessToken: string, anonKey: string) => ({
   'apikey': anonKey,
@@ -275,7 +276,7 @@ test('owner confirms Concert move when source joiners would lose the Bill', asyn
     await page.getByRole('button', { name: 'Edit Justice' }).click();
     const sheet = page.getByRole('dialog');
     await expect(sheet.getByRole('heading', { name: 'Edit concert' })).toBeVisible();
-    await sheet.getByLabel('Event').click();
+    await addSheetEventControl(sheet).click();
     await page.getByRole('option', { name: 'Move Target' }).click();
     await expect(sheet.getByText(JOINER_IMPACT_COPY.moveConcert)).toHaveCount(0);
     await sheet.getByRole('button', { name: 'Save' }).click();
