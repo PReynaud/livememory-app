@@ -26,6 +26,14 @@ Add `http://localhost:3000/confirm` to the local Supabase Auth redirect URLs.
 
 Production URL: https://livememory.pierre-reynaud.fr
 
+## Production migrations
+
+On push to `main` (paths under `supabase/migrations/**`), `.github/workflows/deploy-migrations.yml` runs `supabase db push --db-url`. Set the repo secret `SUPABASE_DB_URL` to the direct Postgres URI:
+
+`postgresql://postgres:{password}@db.{project_ref}.supabase.co:5432/postgres`
+
+(`factory-new-app` sets this during bootstrap. This app was spawned earlier: set the secret before the first deploy job.) Never commit the URI. Do not push `seed.sql` to production.
+
 ## Tests
 
 ```bash

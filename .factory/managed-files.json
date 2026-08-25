@@ -12,7 +12,8 @@
     "app/pages/index.vue",
     "README.md",
     "supabase/config.toml",
-    ".factory-version"
+    ".factory-version",
+    ".github/workflows/deploy-migrations.yml"
   ],
   "pwa": []
 }
