@@ -58,6 +58,9 @@ jobs:
       - name: Start local Supabase
         run: supabase start
 
+      - name: Apply latest migration on existing rows
+        run: pnpm db:check-latest-migration
+
       - name: Reset database from migrations
         run: supabase db reset
 

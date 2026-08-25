@@ -47,6 +47,8 @@ pnpm test:unit
 pnpm test:e2e
 ```
 
+CI applies the latest migration on existing Event/Concert rows (`pnpm db:check-latest-migration`) before a full `db reset` for Playwright. `pnpm db:reset` alone still migrates an empty database, then seed.
+
 A pre-commit hook runs `eslint --fix` on staged JS/TS/Vue files. Do not skip it with `--no-verify`.
 
 Playwright refuses non-local Supabase URLs. Create accounts per test; they are deleted afterwards.
