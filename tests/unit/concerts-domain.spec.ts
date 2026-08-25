@@ -122,6 +122,7 @@ const createMockConcertsClient = (options?: {
   const concertDeletes: { column: string; value: string }[] = [];
   const eventInserts: Record<string, unknown>[] = [];
   const eventDeletes: { column: string; value: string }[] = [];
+  const stageInserts: Record<string, unknown>[] = [];
   const attendanceRows: AttendanceRecord[] = [];
   const attendanceInserts: Record<string, unknown>[] = [];
   let identityLookups = 0;
@@ -162,6 +163,7 @@ const createMockConcertsClient = (options?: {
       if (table === 'event_stages') {
         return {
           insert: (row: Record<string, unknown>) => {
+            stageInserts.push(row);
             const created: EventStageRecord = {
               id: String(row.id ?? `stage-${stages.length + 1}`),
               event_id: String(row.event_id),
@@ -494,6 +496,8 @@ const createMockConcertsClient = (options?: {
     concertDeletes,
     eventInserts,
     eventDeletes,
+    stageInserts,
+    stages,
     attendanceInserts,
     attendanceRows
   };
@@ -2572,6 +2576,31 @@ describe('concert Event rules', () => {
     expect(created.error).toBeNull();
     expect(created.data?.stage_id).toBeTruthy();
     expect(created.data?.stage_name).toBe('Valley');
+  });
+
+  it('does not invent a Stage when creating a festival with a typed stageName', async () => {
+    const { client, concertInserts, eventInserts, stageInserts } = createMockConcertsClient();
+
+    const created = await createConcert(client, {
+      artist: 'Justice',
+      date: '2026-08-20',
+      stageName: 'test',
+      newEvent: {
+        kind: 'festival',
+        name: 'Rock Week',
+        startDate: '2026-08-20',
+        endDate: '2026-08-22',
+        place: 'Paris'
+      }
+    });
+
+    expect(created.error).toBeNull();
+    expect(created.data?.stage_id).toBeNull();
+    expect(created.data?.stage_name).toBeNull();
+    expect(eventInserts).toHaveLength(1);
+    expect(concertInserts).toHaveLength(1);
+    expect(concertInserts[0]).toMatchObject({ stage_id: null, stage_name: null });
+    expect(stageInserts).toHaveLength(0);
   });
 
   it('does not require a Stage when the Event list is empty', async () => {
