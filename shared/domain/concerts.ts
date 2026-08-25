@@ -895,7 +895,9 @@ export const createConcert = async (
     };
   }
 
-  const draftStageName = draftStageLabel(request, earlyStages.data ?? []);
+  const draftStageName = request.newEvent?.kind === 'festival'
+    ? null
+    : draftStageLabel(request, earlyStages.data ?? []);
 
   const candidatesResult = await listIdentityCandidates(
     client,
@@ -976,13 +978,15 @@ export const createConcert = async (
     );
   }
 
-  const stageRow = await ensureEventStage(
-    client,
-    event.id,
-    stagesResult.data ?? [],
-    placement.data.stageId,
-    placement.data.stageName
-  );
+  const stageRow = request.newEvent?.kind === 'festival'
+    ? ok({ stageId: null, stageName: null })
+    : await ensureEventStage(
+        client,
+        event.id,
+        stagesResult.data ?? [],
+        placement.data.stageId,
+        placement.data.stageName
+      );
   if (stageRow.error || !stageRow.data) {
     await rollbackNewEvent(client, createdEventId);
     return failCreate(
