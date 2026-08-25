@@ -1377,6 +1377,22 @@ describe('createConcert', () => {
 });
 
 describe('updateConcert and deleteConcert', () => {
+  const olympia: EventStageRecord = {
+    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    event_id: nightRow.id,
+    name: 'Olympia'
+  };
+  const valley: EventStageRecord = {
+    id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    event_id: nightRow.id,
+    name: 'Valley'
+  };
+  const stagedJustice: ConcertRecord = {
+    ...timedJustice,
+    stage_id: olympia.id,
+    stage_name: 'Olympia'
+  };
+
   it('saves owner notes and never writes event_id', async () => {
     const existing: ConcertRecord = {
       ...timedJustice,
@@ -1407,6 +1423,190 @@ describe('updateConcert and deleteConcert', () => {
     });
     expect(concertUpdates[0]).not.toHaveProperty('event_id');
     expect(events).toHaveLength(1);
+  });
+
+  it('keeps Stage or Scene when the edit omits both stage fields', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      notes: 'Back of the room.'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_id).toBe(olympia.id);
+    expect(result.data?.stage_name).toBe('Olympia');
+    expect(concertUpdates[0]).toMatchObject({
+      stage_id: olympia.id,
+      stage_name: 'Olympia'
+    });
+  });
+
+  it('keeps the same stage_id when the sheet resubmits the current Stage or Scene name', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      notes: 'Back of the room.',
+      stageName: 'Olympia'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_id).toBe(olympia.id);
+    expect(result.data?.stage_name).toBe('Olympia');
+    expect(concertUpdates[0]).toMatchObject({
+      stage_id: olympia.id,
+      stage_name: 'Olympia'
+    });
+  });
+
+  it('renames Stage or Scene from a typed name even when the Concert already has stage_id', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: 'Bataclan'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_name).toBe('Bataclan');
+    expect(result.data?.stage_id).toBeTruthy();
+    expect(result.data?.stage_id).not.toBe(olympia.id);
+    expect(concertUpdates[0]).toMatchObject({ stage_name: 'Bataclan' });
+    expect(concertUpdates[0]?.stage_id).not.toBe(olympia.id);
+  });
+
+  it('clears Stage or Scene when the sheet submits an empty name', async () => {
+    const clearedSetup = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+
+    const cleared = await updateConcert(clearedSetup.client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: null
+    });
+
+    expect(cleared.error).toBeNull();
+    expect(cleared.data?.stage_id).toBeNull();
+    expect(cleared.data?.stage_name).toBeNull();
+    expect(clearedSetup.concertUpdates[0]).toMatchObject({
+      stage_id: null,
+      stage_name: null
+    });
+
+    const blankedSetup = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia]
+    });
+    const blanked = await updateConcert(blankedSetup.client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: '  '
+    });
+
+    expect(blanked.error).toBeNull();
+    expect(blanked.data?.stage_id).toBeNull();
+    expect(blanked.data?.stage_name).toBeNull();
+  });
+
+  it('clears or changes Stage or Scene from an explicit stageId without a typed name', async () => {
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice],
+      stages: [olympia, valley]
+    });
+
+    const moved = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageId: valley.id
+    });
+
+    expect(moved.error).toBeNull();
+    expect(moved.data?.stage_id).toBe(valley.id);
+    expect(moved.data?.stage_name).toBe('Valley');
+
+    const cleared = await updateConcert(client, {
+      concertId: stagedJustice.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageId: null
+    });
+
+    expect(cleared.error).toBeNull();
+    expect(cleared.data?.stage_id).toBeNull();
+    expect(cleared.data?.stage_name).toBeNull();
+    expect(concertUpdates[1]).toMatchObject({
+      stage_id: null,
+      stage_name: null
+    });
+  });
+
+  it('uses the submitted Stage or Scene for identity, not the inherited stage_id', async () => {
+    const other: ConcertRecord = {
+      ...timedJustice,
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      artist: 'Local Band',
+      stage_id: valley.id,
+      stage_name: 'Valley'
+    };
+    const { client, concertUpdates, concerts } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [stagedJustice, other],
+      stages: [olympia, valley]
+    });
+
+    const result = await updateConcert(client, {
+      concertId: other.id,
+      artist: 'Justice',
+      date: '2026-08-18',
+      time: '20:15',
+      stageName: 'Olympia'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.outcome).toBe(CONCERT_IDENTITY.attached);
+    expect(result.data?.id).toBe(stagedJustice.id);
+    expect(result.data?.stage_id).toBe(olympia.id);
+    expect(result.data?.stage_name).toBe('Olympia');
+    expect(concertUpdates).toHaveLength(0);
+    expect(concerts.find(concert => concert.id === other.id)).toMatchObject({
+      artist: 'Local Band',
+      stage_id: valley.id,
+      stage_name: 'Valley'
+    });
   });
 
   it('saves notes on a duplicate untimed Concert without treating self as a collision', async () => {

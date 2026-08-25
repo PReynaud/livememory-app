@@ -543,6 +543,22 @@ const sameStageName = (left: string | null | undefined, right: string | null | u
   return trim(left).toLowerCase() === trim(right).toLowerCase();
 };
 
+/** Keep `stage_id` only when both stage fields are omitted. A submitted `stageName` (including null) wins. */
+const inheritStageId = (
+  input: { stageId?: string | null; stageName?: string | null },
+  existingStageId: string | null | undefined
+): string | null | undefined => {
+  if (input.stageId !== undefined) {
+    return input.stageId;
+  }
+
+  if (input.stageName !== undefined) {
+    return null;
+  }
+
+  return existingStageId;
+};
+
 const draftStageLabel = (
   input: { stageId?: string | null; stageName?: string | null },
   stages: EventStageRecord[]
@@ -1135,13 +1151,16 @@ export const updateConcert = async (
   }
 
   const draftTime = normalizeClock(input.time);
-  const nextStageName = draftStageLabel(
-    {
-      stageId: input.stageId === undefined ? current.stage_id : input.stageId,
-      stageName: input.stageName
-    },
-    stagesResult.data ?? []
-  );
+  const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
+    place: input.place,
+    stageId: inheritStageId(input, current.stage_id),
+    stageName: input.stageName
+  });
+  if (placement.error || !placement.data) {
+    return { data: null, error: placement.error, outcome: null };
+  }
+
+  const nextStageName = placement.data.stageName;
   const identityUnchanged
     = sameArtist(current.artist, artist)
       && current.date === date
@@ -1180,15 +1199,6 @@ export const updateConcert = async (
     if (decision.kind === 'attach') {
       return writeAttachTime(client, decision.target, draftTime, eventResult.data.place);
     }
-  }
-
-  const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
-    place: input.place,
-    stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId,
-    stageName: input.stageName
-  });
-  if (placement.error || !placement.data) {
-    return { data: null, error: placement.error, outcome: null };
   }
 
   const stageRow = await ensureEventStage(
