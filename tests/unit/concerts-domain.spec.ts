@@ -595,6 +595,10 @@ describe('concerts migration kernel', () => {
     expect(sql).toMatch(/concerts_owner_artist_date_time_stage_idx/);
     expect(sql).toMatch(/add column stage_name text/);
     expect(sql).toMatch(/grant select \(\s*stage_name\s*\) on table public\.concerts to authenticated/);
+    const indexAt = sql.search(/create unique index concerts_owner_artist_date_time_stage_idx/);
+    const backfillAt = sql.search(/update public\.concerts as concert\s+set stage_name/i);
+    expect(indexAt).toBeGreaterThan(-1);
+    expect(backfillAt).toBeGreaterThan(indexAt);
     expect(sql).toMatch(/concerts\.stage_id is null/);
     expect(sql).toMatch(/drop policy if exists "Authenticated users can insert own concerts"/);
     expect(sql).toMatch(/if tg_op = 'DELETE' then/);
