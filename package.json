@@ -19,6 +19,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:check-latest-migration": "node scripts/check-latest-migration-on-existing-data.mjs",
     "db:types": "supabase gen types typescript --local --schema public > app/types/database.types.ts",
     "secret-scan": "node scripts/secret-scan.mjs"
   },

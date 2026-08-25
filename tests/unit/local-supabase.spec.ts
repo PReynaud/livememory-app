@@ -22,6 +22,16 @@ describe('ci workflow', () => {
     expect(source).toContain(`NUXT_PUBLIC_SUPABASE_URL: ${LOCAL_SUPABASE_URL}`);
     expect(source).toContain(LOCAL_SUPABASE_ANON_KEY);
   });
+
+  it('applies the latest migration on existing rows before a full reset', () => {
+    const source = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+    const startAt = source.indexOf('Start local Supabase');
+    const checkAt = source.indexOf('pnpm db:check-latest-migration');
+    const resetAt = source.indexOf('supabase db reset');
+
+    expect(checkAt).toBeGreaterThan(startAt);
+    expect(resetAt).toBeGreaterThan(checkAt);
+  });
 });
 
 describe('e2e auth fixture', () => {

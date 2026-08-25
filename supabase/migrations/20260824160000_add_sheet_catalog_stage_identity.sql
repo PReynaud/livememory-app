@@ -6,6 +6,21 @@ alter table public.concerts
 
 grant select (stage_name) on table public.concerts to authenticated;
 
+-- CREATE INDEX cannot run in the same transaction as DML on concerts when
+-- rows exist (SQLSTATE 55006 pending trigger events). Local db reset is empty
+-- so it never hit this; hosted data does. Build the unique index first.
+drop index if exists public.concerts_owner_artist_date_time_idx;
+
+create unique index concerts_owner_artist_date_time_stage_idx
+  on public.concerts (
+    owner_id,
+    (lower(artist)),
+    date,
+    "time",
+    (lower(coalesce(stage_name, '')))
+  )
+  where "time" is not null;
+
 update public.concerts as concert
 set stage_name = stage.name
 from public.event_stages as stage
@@ -66,18 +81,6 @@ create trigger event_stages_sync_concert_stage_name
   execute function public.event_stages_sync_concert_stage_name();
 
 revoke execute on function public.event_stages_sync_concert_stage_name() from public, anon, authenticated;
-
-drop index if exists public.concerts_owner_artist_date_time_idx;
-
-create unique index concerts_owner_artist_date_time_stage_idx
-  on public.concerts (
-    owner_id,
-    (lower(artist)),
-    date,
-    "time",
-    (lower(coalesce(stage_name, '')))
-  )
-  where "time" is not null;
 
 create or replace function public.concert_event_rule_violation(concert public.concerts)
 returns text
