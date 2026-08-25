@@ -28,11 +28,15 @@ Production URL: https://livememory.pierre-reynaud.fr
 
 ## Production migrations
 
-On push to `main` (paths under `supabase/migrations/**`), `.github/workflows/deploy-migrations.yml` runs `supabase db push --db-url`. Set the repo secret `SUPABASE_DB_URL` to the direct Postgres URI:
+On push to `main` (paths under `supabase/migrations/**`), `.github/workflows/deploy-migrations.yml` runs `supabase link` then `supabase db push`. GitHub-hosted runners cannot use the IPv6 direct URI (`db.{ref}.supabase.co:5432`); the CLI links through the IPv4 pooler.
 
-`postgresql://postgres:{password}@db.{project_ref}.supabase.co:5432/postgres`
+Repo secrets / variables (already used by this app):
 
-(`factory-new-app` sets this during bootstrap. This app was spawned earlier: set the secret before the first deploy job.) Never commit the URI. Do not push `seed.sql` to production.
+- `SUPABASE_ACCESS_TOKEN` — Account → Access Tokens
+- `SUPABASE_DB_PASSWORD` — Project Settings → Database password (plain password, not a URI)
+- `SUPABASE_PROJECT_ID` — project ref
+
+If you reset the database password in the dashboard, update `SUPABASE_DB_PASSWORD`. Do not push `seed.sql` to production.
 
 ## Tests
 
