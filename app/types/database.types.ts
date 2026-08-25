@@ -62,6 +62,7 @@ export type Database = {
           owner_id: string
           place: string
           stage_id: string | null
+          stage_name: string | null
           time: string | null
         }
         Insert: {
@@ -73,6 +74,7 @@ export type Database = {
           owner_id?: string
           place: string
           stage_id?: string | null
+          stage_name?: string | null
           time?: string | null
         }
         Update: {
@@ -84,6 +86,7 @@ export type Database = {
           owner_id?: string
           place?: string
           stage_id?: string | null
+          stage_name?: string | null
           time?: string | null
         }
         Relationships: [
@@ -206,6 +209,27 @@ export type Database = {
           owner_id?: string
           place?: string
           start_date?: string
+        }
+        Relationships: []
+      }
+      name_catalog: {
+        Row: {
+          created_at: string
+          kind: string
+          name: string
+          name_normalized: string
+        }
+        Insert: {
+          created_at?: string
+          kind: string
+          name: string
+          name_normalized?: string
+        }
+        Update: {
+          created_at?: string
+          kind?: string
+          name?: string
+          name_normalized?: string
         }
         Relationships: []
       }

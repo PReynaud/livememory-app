@@ -6,9 +6,11 @@ import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
 import { useEventsStore, type EventRecord } from '@/stores/events';
 import { eachCivilDateInclusive, formatDayChipParts } from '@/utils/concert-groups';
-import { CONCERT_RULE_MESSAGE } from '#shared/domain/concerts';
+import { CONCERT_RULE_MESSAGE, transparentSingleNightName } from '#shared/domain/concerts';
 import { eventAllowsPlaceOverride } from '#shared/domain/events';
 import { JOINER_IMPACT_COPY } from '#shared/domain/membership';
+import { CATALOG_KIND } from '#shared/domain/catalog';
+import { useNameCatalogStore } from '@/stores/name-catalog';
 
 const NEW_NIGHT = 'new:single_night';
 const NEW_FESTIVAL = 'new:festival';
@@ -16,19 +18,20 @@ const NEW_FESTIVAL = 'new:festival';
 const sheet = useAddConcertSheetStore();
 const editEventSheet = useEditEventSheetStore();
 const eventsStore = useEventsStore();
+const catalog = useNameCatalogStore();
 const toast = useToast();
 const { events, sessionUserId } = storeToRefs(eventsStore);
 const { lockEvent } = storeToRefs(sheet);
 
 const picker = ref('');
-const artist = ref('');
+const artists = ref<string[]>(['']);
 const eventName = ref('');
 const startDate = ref('');
 const endDate = ref('');
 const place = ref('');
 const concertDate = ref('');
 const concertTime = ref('');
-const stageId = ref('');
+const stageName = ref('');
 const formError = ref('');
 const saving = ref(false);
 const pendingChoice = ref(false);
@@ -38,6 +41,18 @@ const confirmMove = ref(false);
 const hasJoiners = ref(false);
 const originalEventId = ref('');
 const editLoaded = ref(false);
+const artistSuggestions = ref<string[]>([]);
+const placeSuggestions = ref<string[]>([]);
+const stageSuggestions = ref<string[]>([]);
+
+const artist = computed({
+  get: () => artists.value[0] ?? '',
+  set: (value: string) => {
+    artists.value = [value, ...artists.value.slice(1)];
+  }
+});
+
+let catalogTimer: ReturnType<typeof setTimeout> | null = null;
 
 const sheetOpen = computed({
   get: () => sheet.open,
@@ -74,9 +89,10 @@ const selectedEvent = computed(() => {
 const isNewNight = computed(() => picker.value === NEW_NIGHT);
 const isNewFestival = computed(() => picker.value === NEW_FESTIVAL);
 const isExistingNight = computed(() => selectedEvent.value?.kind === 'single_night');
-const isTransparent = computed(() => !picker.value);
 const isEdit = computed(() => Boolean(sheet.concertId));
-const eventLocked = computed(() => lockEvent.value && Boolean(selectedEvent.value) && !isEdit.value);
+const eventLocked = computed(() => {
+  return lockEvent.value && Boolean(sheet.eventId || selectedEvent.value) && !isEdit.value;
+});
 const placeLocked = computed(() => Boolean(selectedEvent.value) && !eventAllowsPlaceOverride(selectedEvent.value));
 const dateLocked = computed(() => isExistingNight.value || isNewNight.value);
 const sheetTitle = computed(() => (isEdit.value ? 'Edit concert' : 'Add concert'));
@@ -90,7 +106,14 @@ const eventStages = computed(() => {
 
   return eventsStore.stagesForEvent(selectedEvent.value.id);
 });
-const showStageSelect = computed(() => eventStages.value.length > 0);
+const showAddAnotherArtist = computed(() => !isEdit.value && artist.value.trim().length > 0);
+const stageItems = computed(() => {
+  const fromEvent = eventStages.value.map(stage => stage.name);
+  const extra = stageSuggestions.value.filter((name) => {
+    return !fromEvent.some(existing => existing.toLowerCase() === name.toLowerCase());
+  });
+  return [...fromEvent, ...extra];
+});
 
 const eventItems = computed(() => {
   const owned = events.value
@@ -149,10 +172,54 @@ const resetNewEventFields = () => {
   concertDate.value = '';
 };
 
+const searchCatalog = (
+  kind: typeof CATALOG_KIND.artist | typeof CATALOG_KIND.place | typeof CATALOG_KIND.stage,
+  term: string
+) => {
+  if (catalogTimer) {
+    clearTimeout(catalogTimer);
+  }
+
+  catalogTimer = setTimeout(() => {
+    void catalog.searchNames(kind, term).then((result) => {
+      if (kind === CATALOG_KIND.artist) {
+        artistSuggestions.value = result.data;
+      } else if (kind === CATALOG_KIND.place) {
+        placeSuggestions.value = result.data;
+      } else {
+        stageSuggestions.value = result.data;
+      }
+    });
+  }, 200);
+};
+
+const addArtistRow = () => {
+  artists.value = [...artists.value, ''];
+};
+
+const setArtistAt = (index: number, value: unknown) => {
+  const next = [...artists.value];
+  next[index] = String(value ?? '');
+  artists.value = next;
+};
+
+const onArtistSearch = (index: number, term: string) => {
+  setArtistAt(index, term);
+  searchCatalog(CATALOG_KIND.artist, term);
+};
+
+const removeArtistRow = (index: number) => {
+  if (index === 0) {
+    return;
+  }
+
+  artists.value = artists.value.filter((_, rowIndex) => rowIndex !== index);
+};
+
 const focusArtist = async () => {
   await nextTick();
-  const input = document.getElementById('add-concert-artist');
-  if (input instanceof HTMLInputElement) {
+  const input = document.getElementById(eventLocked.value ? 'add-concert-artist' : 'add-concert-event');
+  if (input instanceof HTMLInputElement || input instanceof HTMLButtonElement) {
     input.focus();
   }
 };
@@ -164,13 +231,18 @@ const resetForOpen = async () => {
   confirmMove.value = false;
   hasJoiners.value = false;
   notes.value = '';
-  artist.value = '';
+  artists.value = [''];
   concertTime.value = '';
-  stageId.value = '';
+  stageName.value = '';
+  artistSuggestions.value = [];
+  placeSuggestions.value = [];
+  stageSuggestions.value = [];
   originalEventId.value = '';
   editLoaded.value = !sheet.concertId;
 
-  if (!sheet.eventId) {
+  if (sheet.eventId) {
+    picker.value = sheet.eventId;
+  } else {
     picker.value = '';
     resetNewEventFields();
   }
@@ -198,7 +270,7 @@ const resetForOpen = async () => {
       concertDate.value = concert.date;
       concertTime.value = concert.time ? concert.time.slice(0, 5) : '';
       notes.value = concert.notes ?? '';
-      stageId.value = concert.stage_id ?? '';
+      stageName.value = concert.stage_name ?? eventStages.value.find(stage => stage.id === concert.stage_id)?.name ?? '';
       place.value = concert.place;
     }
     editLoaded.value = true;
@@ -212,10 +284,24 @@ const resetForOpen = async () => {
   await focusArtist();
 };
 
+const onDocumentKeydown = (event: KeyboardEvent) => {
+  if (event.key !== 'Escape' || !sheet.open || !pendingChoice.value) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  pendingChoice.value = false;
+};
+
 watch(() => sheet.open, (isOpen) => {
   if (isOpen) {
+    window.addEventListener('keydown', onDocumentKeydown, true);
     void resetForOpen();
+    return;
   }
+
+  window.removeEventListener('keydown', onDocumentKeydown, true);
 });
 
 watch(picker, (value) => {
@@ -225,8 +311,8 @@ watch(picker, (value) => {
     const event = events.value.find(item => item.id === value);
     if (event) {
       const targetStages = eventsStore.stagesForEvent(event.id);
-      if (!targetStages.some(stage => stage.id === stageId.value)) {
-        stageId.value = '';
+      if (!targetStages.some(stage => stage.name === stageName.value)) {
+        stageName.value = '';
       }
     }
     return;
@@ -253,16 +339,32 @@ watch(festivalDays, (days) => {
   }
 });
 
-const buildInput = (confirm?: 'attach' | 'create') => {
+const resolvedNightName = () => {
+  const named = eventName.value.trim();
+  if (named) {
+    return named;
+  }
+
+  return transparentSingleNightName(
+    isNewFestival.value ? startDate.value : (startDate.value || concertDate.value),
+    place.value,
+    stageName.value
+  );
+};
+
+const buildInput = (artistName: string, confirm?: 'attach' | 'create') => {
+  const stage = stageName.value.trim() || null;
+
   if (isNewNight.value) {
     return {
-      artist: artist.value,
+      artist: artistName,
       date: startDate.value,
       time: concertTime.value,
       confirm,
+      stageName: stage,
       newEvent: {
         kind: 'single_night' as const,
-        name: eventName.value,
+        name: resolvedNightName(),
         startDate: startDate.value,
         place: place.value
       }
@@ -271,10 +373,11 @@ const buildInput = (confirm?: 'attach' | 'create') => {
 
   if (isNewFestival.value) {
     return {
-      artist: artist.value,
+      artist: artistName,
       date: concertDate.value,
       time: concertTime.value,
       confirm,
+      stageName: stage,
       newEvent: {
         kind: 'festival' as const,
         name: eventName.value,
@@ -285,28 +388,18 @@ const buildInput = (confirm?: 'attach' | 'create') => {
     };
   }
 
-  if (!picker.value) {
-    return {
-      artist: artist.value,
-      date: concertDate.value,
-      time: concertTime.value,
-      place: place.value,
-      confirm
-    };
-  }
-
   return {
-    artist: artist.value,
+    artist: artistName,
     date: isExistingNight.value ? (selectedEvent.value?.start_date ?? concertDate.value) : concertDate.value,
     time: concertTime.value,
     place: place.value,
-    stageId: stageId.value || null,
+    stageName: stage,
     confirm,
-    eventId: picker.value
+    eventId: picker.value || sheet.eventId || undefined
   };
 };
 
-const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') => {
+const persist = async (confirm?: 'attach' | 'create') => {
   if (saving.value) {
     return;
   }
@@ -350,7 +443,7 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
         notes: notes.value,
         confirm,
         place: place.value,
-        stageId: stageId.value || null,
+        stageName: stageName.value.trim() || null,
         ...(moved && targetEventId ? { eventId: targetEventId } : {})
       });
 
@@ -393,63 +486,83 @@ const persist = async (mode: 'save' | 'another', confirm?: 'attach' | 'create') 
       return;
     }
 
+    if (!picker.value && !sheet.eventId) {
+      formError.value = CONCERT_RULE_MESSAGE.requiredEvent;
+      return;
+    }
+
+    if (!picker.value && sheet.eventId) {
+      picker.value = sheet.eventId;
+    }
+
+    const names = artists.value.map(name => name.trim()).filter(Boolean);
+    if (names.length === 0) {
+      formError.value = CONCERT_RULE_MESSAGE.requiredArtist;
+      return;
+    }
+
     const intendedEventId = picker.value;
-    const result = await eventsStore.createOwnedConcert(buildInput(confirm));
+    const openingNewEvent = isNewNight.value || isNewFestival.value;
+    let createdEventId: string | null = null;
 
-    if (result.outcome === 'needs_choice') {
-      pendingChoice.value = true;
-      return;
-    }
+    for (const [index, name] of names.entries()) {
+      const result = await eventsStore.createOwnedConcert(
+        createdEventId
+          ? {
+              artist: name,
+              date: isNewFestival.value ? concertDate.value : startDate.value,
+              time: concertTime.value,
+              place: place.value,
+              stageName: stageName.value.trim() || null,
+              confirm: index === 0 ? confirm : undefined,
+              eventId: createdEventId
+            }
+          : buildInput(name, index === 0 ? confirm : undefined)
+      );
 
-    pendingChoice.value = false;
-
-    if (result.outcome === 'impossible_place') {
-      formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
-      return;
-    }
-
-    if (result.outcome === 'attached' && result.data) {
-      const attachedToIntended
-        = intendedEventId === result.data.event_id
-          && intendedEventId !== NEW_NIGHT
-          && intendedEventId !== NEW_FESTIVAL;
-      if (!attachedToIntended) {
-        toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
+      if (result.outcome === 'needs_choice') {
+        pendingChoice.value = true;
+        return;
       }
 
-      sheet.closeSheet();
-      await navigateTo('/e/' + result.data.event_id);
-      return;
-    }
+      pendingChoice.value = false;
 
-    if (result.error && !result.data) {
-      formError.value = result.error;
-      return;
-    }
+      if (result.outcome === 'impossible_place') {
+        formError.value = result.error ?? CONCERT_RULE_MESSAGE.impossiblePlace;
+        return;
+      }
 
-    toast.add({ title: 'Concert added.' });
-    const keptDate = concertDate.value;
-    const keptTime = concertTime.value;
-    artist.value = '';
+      if (result.outcome === 'attached' && result.data) {
+        const attachedToIntended
+          = intendedEventId === result.data.event_id
+            && intendedEventId !== NEW_NIGHT
+            && intendedEventId !== NEW_FESTIVAL;
+        if (!attachedToIntended) {
+          toast.add({ title: CONCERT_RULE_MESSAGE.otherEvent });
+        }
 
-    if (result.data) {
-      picker.value = result.data.event_id;
-      const event = events.value.find(item => item.id === result.data?.event_id);
-      if (event) {
-        applyEvent(event);
+        sheet.closeSheet();
+        await navigateTo('/e/' + result.data.event_id);
+        return;
+      }
+
+      if (result.error && !result.data) {
+        formError.value = result.error;
+        return;
+      }
+
+      if (result.data && openingNewEvent && !createdEventId) {
+        createdEventId = result.data.event_id;
       }
     }
 
-    if (mode === 'save') {
-      sheet.closeSheet();
-      return;
+    toast.add({ title: names.length > 1 ? 'Concerts added.' : 'Concert added.' });
+
+    if (createdEventId) {
+      picker.value = createdEventId;
     }
 
-    if (keptDate) {
-      concertDate.value = keptDate;
-    }
-    concertTime.value = keptTime;
-    await focusArtist();
+    sheet.closeSheet();
   } finally {
     saving.value = false;
   }
@@ -525,27 +638,46 @@ const slideoverUi = {
       <form
         class="space-y-3"
         novalidate
-        @submit.prevent="persist('save')"
+        @submit.prevent="persist()"
       >
         <UFormField
-          label="Artist"
-          name="artist"
-        >
-          <UInput
-            id="add-concert-artist"
-            v-model="artist"
-            autofocus
-            :disabled="pendingChoice"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Event"
           name="event"
+          required
+          description="The night or festival this concert belongs to."
         >
+          <template #label>
+            <span class="inline-flex items-center gap-1">
+              Event
+              <UPopover>
+                <UButton
+                  icon="i-lucide-info"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  square
+                  aria-label="What is an Event?"
+                />
+                <template #content>
+                  <div class="max-w-72 space-y-2 p-3 text-[13px] text-muted">
+                    <p>
+                      <span class="font-semibold text-white">Night</span>
+                      — one date, one city. Examples: a club show; a soirée with several artists.
+                    </p>
+                    <p>
+                      <span class="font-semibold text-white">Festival</span>
+                      — several days, often several stages. Example: Rock en Seine.
+                    </p>
+                    <p>
+                      New night without a custom name becomes Concerts on the date at the venue and city.
+                    </p>
+                  </div>
+                </template>
+              </UPopover>
+            </span>
+          </template>
           <UInput
             v-if="eventLocked"
+            id="add-concert-event"
             :model-value="eventName"
             readonly
             :disabled="pendingChoice"
@@ -553,6 +685,7 @@ const slideoverUi = {
           />
           <USelect
             v-else
+            id="add-concert-event"
             v-model="picker"
             :items="eventItems"
             placeholder="Select an Event"
@@ -563,8 +696,9 @@ const slideoverUi = {
 
         <template v-if="isNewNight || isNewFestival">
           <UFormField
-            label="Name"
+            :label="isNewFestival ? 'Name' : 'Name'"
             name="name"
+            :description="isNewNight ? 'Leave blank to name from date, venue, and city.' : undefined"
           >
             <UInput
               v-model="eventName"
@@ -573,37 +707,58 @@ const slideoverUi = {
           </UFormField>
         </template>
 
-        <UFormField
-          v-if="isTransparent"
-          label="Date"
-          name="date"
+        <div
+          v-for="(name, index) in artists"
+          :key="`artist-${index}`"
+          class="flex items-end gap-2"
         >
-          <UInput
-            v-model="concertDate"
-            type="date"
+          <UFormField
+            :label="index === 0 ? 'Artist' : `Artist ${index + 1}`"
+            :name="`artist-${index}`"
+            required
+            class="min-w-0 flex-1"
+          >
+            <UInputMenu
+              :id="index === 0 ? 'add-concert-artist' : undefined"
+              :model-value="name"
+              mode="autocomplete"
+              :items="artistSuggestions"
+              :disabled="pendingChoice"
+              :content="{ hideWhenEmpty: true }"
+              class="w-full"
+              @update:model-value="setArtistAt(index, $event)"
+              @update:search-term="onArtistSearch(index, $event)"
+            />
+          </UFormField>
+          <UButton
+            v-if="index > 0"
+            type="button"
+            icon="i-lucide-x"
+            color="neutral"
+            variant="ghost"
+            square
+            aria-label="Remove artist"
             :disabled="pendingChoice"
-            class="w-full"
+            @click="removeArtistRow(index)"
           />
-        </UFormField>
+        </div>
 
-        <UFormField
-          v-if="isNewNight || isExistingNight"
-          label="Date"
-          name="date"
-        >
-          <UInput
-            v-model="startDate"
-            type="date"
-            :readonly="dateLocked && isExistingNight"
-            :disabled="pendingChoice"
-            class="w-full"
-          />
-        </UFormField>
+        <UButton
+          v-if="showAddAnotherArtist"
+          type="button"
+          label="Add another artist"
+          color="neutral"
+          variant="link"
+          class="px-0 font-semibold text-white"
+          :disabled="pendingChoice"
+          @click="addArtistRow"
+        />
 
         <template v-if="isNewFestival">
           <UFormField
             label="Start date"
             name="startDate"
+            required
           >
             <UInput
               v-model="startDate"
@@ -615,6 +770,7 @@ const slideoverUi = {
           <UFormField
             label="End date"
             name="endDate"
+            required
           >
             <UInput
               v-model="endDate"
@@ -657,41 +813,81 @@ const slideoverUi = {
           </div>
         </div>
 
+        <div class="flex gap-3">
+          <UFormField
+            v-if="isNewNight || isExistingNight"
+            label="Date"
+            name="date"
+            required
+            class="min-w-0 flex-1"
+          >
+            <UInput
+              v-model="startDate"
+              type="date"
+              :readonly="dateLocked && isExistingNight"
+              :disabled="pendingChoice"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            v-else-if="!isNewFestival"
+            label="Date"
+            name="date"
+            required
+            class="min-w-0 flex-1"
+          >
+            <UInput
+              v-model="concertDate"
+              type="date"
+              :disabled="pendingChoice"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Time"
+            name="time"
+            class="w-32 shrink-0"
+          >
+            <UInput
+              v-model="concertTime"
+              type="time"
+              :disabled="pendingChoice"
+              class="w-full"
+            />
+          </UFormField>
+        </div>
+
         <UFormField
           label="Place"
           name="place"
+          required
+          description="City"
         >
-          <UInput
+          <UInputMenu
             v-model="place"
+            mode="autocomplete"
+            :items="placeSuggestions"
             :readonly="placeLocked"
             :disabled="pendingChoice"
+            :content="{ hideWhenEmpty: true }"
             class="w-full"
+            @update:search-term="searchCatalog(CATALOG_KIND.place, $event)"
           />
         </UFormField>
 
         <UFormField
-          v-if="showStageSelect"
           label="Stage or Scene"
           name="stage"
+          description="Venue or stage"
         >
-          <USelect
-            v-model="stageId"
-            :items="eventStages.map(stage => ({ label: stage.name, value: stage.id }))"
-            placeholder="Select a Stage or Scene"
+          <UInputMenu
+            v-model="stageName"
+            mode="autocomplete"
+            :items="stageItems"
             :disabled="pendingChoice"
+            :content="{ hideWhenEmpty: true }"
             class="w-full"
-          />
-        </UFormField>
-
-        <UFormField
-          label="Time"
-          name="time"
-        >
-          <UInput
-            v-model="concertTime"
-            type="time"
-            :disabled="pendingChoice"
-            class="w-full"
+            @update:search-term="searchCatalog(CATALOG_KIND.stage, $event)"
           />
         </UFormField>
 
@@ -730,7 +926,7 @@ const slideoverUi = {
               variant="outline"
               class="h-11 flex-1 rounded-full ring-2"
               :loading="saving"
-              @click="persist('save', 'attach')"
+              @click="persist('attach')"
             />
             <UButton
               type="button"
@@ -739,7 +935,7 @@ const slideoverUi = {
               variant="outline"
               class="h-11 flex-1 rounded-full ring-2"
               :disabled="saving"
-              @click="persist('save', 'create')"
+              @click="persist('create')"
             />
             <UButton
               type="button"
@@ -767,17 +963,7 @@ const slideoverUi = {
               :disabled="saving || (isEdit && !editLoaded) || confirmMove"
             />
             <UButton
-              v-if="!isEdit"
-              type="button"
-              label="Add another"
-              color="neutral"
-              variant="link"
-              class="px-0 font-semibold text-white"
-              :disabled="saving"
-              @click="persist('another')"
-            />
-            <UButton
-              v-else-if="!confirmDelete"
+              v-if="isEdit && !confirmDelete"
               type="button"
               label="Delete"
               color="error"
@@ -827,7 +1013,7 @@ const slideoverUi = {
               variant="outline"
               class="h-11 rounded-full"
               :loading="saving"
-              @click="persist('save')"
+              @click="persist()"
             />
             <UButton
               type="button"

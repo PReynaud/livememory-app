@@ -1,9 +1,16 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
+import {
+  addSheetArtist,
+  addSheetPlace,
+  selectAddSheetEvent
+} from './helpers/add-concert-sheet';
 
 const expectConcertAddedToast = async (page: Page) => {
-  await expect(page.getByText('Concert added.', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Concert added.', { exact: true }).or(page.getByText('Concerts added.', { exact: true }))
+  ).toBeVisible();
 };
 
 const expectConcertAddedToastGone = async (page: Page) => {
@@ -26,7 +33,7 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(sheet.getByRole('heading', { name: 'Add concert' })).toBeVisible();
   await expect(sheet.getByRole('textbox', { name: 'Event' })).toHaveValue('Club Night');
   await expect(sheet.getByRole('textbox', { name: 'Date' })).toHaveValue('2026-08-18');
-  await expect(sheet.getByRole('textbox', { name: 'Place' })).toHaveValue('Berlin');
+  await expect(addSheetPlace(sheet)).toHaveValue('Berlin');
 
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet.getByText('Artist is required.')).toBeVisible();
@@ -34,22 +41,15 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
 
   await sheet.getByLabel('Artist').click();
   await authenticatedPage.keyboard.type('n');
-  await expect(sheet.getByRole('textbox', { name: 'Artist' })).toHaveValue('n');
+  await expect(addSheetArtist(sheet)).toHaveValue('n');
   await expect(sheet.getByRole('textbox', { name: 'Event' })).toHaveValue('Club Night');
 
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Time').fill('20:15');
-  await sheet.getByRole('button', { name: 'Add another' }).click();
-  await expectConcertAddedToast(authenticatedPage);
-  await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole('textbox', { name: 'Artist' })).toHaveValue('');
-  await expect(sheet.getByRole('textbox', { name: 'Time' })).toHaveValue('20:15');
-  await expect(sheet.getByRole('textbox', { name: 'Event' })).toHaveValue('Club Night');
-  await expect(sheet.getByRole('textbox', { name: 'Date' })).toHaveValue('2026-08-18');
-  await expect(sheet.getByRole('textbox', { name: 'Place' })).toHaveValue('Berlin');
-
-  await sheet.getByLabel('Artist').fill('Fontaines D.C.');
+  await sheet.getByRole('button', { name: 'Add another artist' }).click();
+  await sheet.getByLabel('Artist 2').fill('Fontaines D.C.');
   await sheet.getByRole('button', { name: 'Save' }).click();
+  await expectConcertAddedToast(authenticatedPage);
   await expect(sheet).toHaveCount(0);
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toHaveCount(0);
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
@@ -80,7 +80,7 @@ test('adds a festival concert on a picked day and groups it', async ({ authentic
   await authenticatedPage.getByRole('button', { name: 'Add to this festival' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet.getByRole('textbox', { name: 'Event' })).toHaveValue('Rock Week');
-  await expect(sheet.getByRole('textbox', { name: 'Place' })).toHaveValue('Paris');
+  await expect(addSheetPlace(sheet)).toHaveValue('Paris');
   await sheet.getByLabel('Artist').fill('The Last Dinner Party');
   await sheet.getByRole('button', { name: '2026-08-22' }).click();
   await sheet.getByRole('button', { name: 'Save' }).click();
@@ -103,8 +103,7 @@ test('opens Add from nav, creates a New night with a concert, and persists', asy
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Add concert' })).toBeVisible();
 
-  await sheet.getByLabel('Event').click();
-  await authenticatedPage.getByRole('option', { name: 'New night' }).click();
+  await selectAddSheetEvent(authenticatedPage, sheet, 'New night');
   await sheet.getByLabel('Artist').fill('Local Band');
   await sheet.getByLabel('Name').fill('Warehouse');
   await sheet.getByLabel('Date').fill('2026-12-01');
@@ -155,8 +154,7 @@ test('creates a New festival from the Add sheet on a non-start day', async ({ au
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Add concert' })).toBeVisible();
 
-  await sheet.getByLabel('Event').click();
-  await authenticatedPage.getByRole('option', { name: 'New festival' }).click();
+  await selectAddSheetEvent(authenticatedPage, sheet, 'New festival');
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Name').fill('Rock en Seine');
   await sheet.getByLabel('Start date').fill('2026-08-20');
@@ -183,8 +181,7 @@ test('nav Add onto an existing Event stores the concert', async ({ authenticated
 
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add concert' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
-  await sheet.getByLabel('Event').click();
-  await authenticatedPage.getByRole('option', { name: 'Club Night' }).click();
+  await selectAddSheetEvent(authenticatedPage, sheet, 'Club Night');
   await sheet.getByLabel('Artist').fill('Fontaines D.C.');
   await sheet.getByRole('button', { name: 'Save' }).click();
 
@@ -273,7 +270,7 @@ test('refuses a timed match at a different Place and stays in the sheet', async 
   await expect(sheet).toBeVisible();
   await expect(sheet.getByText('This concert already exists at a different Place.')).toBeVisible();
   await expect(authenticatedPage).toHaveURL(new RegExp(`${parisPath}$`));
-  await expect(sheet.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
+  await expect(sheet.getByRole('combobox', { name: 'Artist' })).toHaveValue('Justice');
 });
 
 test('keeps the Add draft when needs_choice is cancelled', async ({ authenticatedPage }) => {
@@ -293,7 +290,7 @@ test('keeps the Add draft when needs_choice is cancelled', async ({ authenticate
   await expect(again.getByText('This artist and date already exist. Attach to the existing concert or create another.')).toBeVisible();
   await again.getByRole('button', { name: 'Cancel' }).click();
   await expect(again).toBeVisible();
-  await expect(again.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
+  await expect(again.getByRole('combobox', { name: 'Artist' })).toHaveValue('Justice');
   await expect(again.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
 });
@@ -364,7 +361,7 @@ test('Escape dismisses needs_choice and keeps the Add draft', async ({ authentic
   await authenticatedPage.keyboard.press('Escape');
 
   await expect(again).toBeVisible();
-  await expect(again.getByRole('textbox', { name: 'Artist' })).toHaveValue('Justice');
+  await expect(again.getByRole('combobox', { name: 'Artist' })).toHaveValue('Justice');
   await expect(again.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(again.getByRole('button', { name: 'Attach' })).toHaveCount(0);
 });

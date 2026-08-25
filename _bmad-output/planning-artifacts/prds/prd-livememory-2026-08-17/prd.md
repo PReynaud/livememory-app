@@ -29,8 +29,8 @@ He can plan ahead (Going). After a Concert he marked `going` has passed in Europ
 - **Concerts** — The signed-in User's full Event log: Events they own (including empty) and Events they have joined, grouped, upcoming then past. Distinct from **Home**, from **Shared List**, and from **Event view**.
 - **Concert** — One artist or group performing on a date (optional time). Belongs to exactly one Event. Optional Stage/Scene. Attendance is per User. Notes are Event-owner-only in v1.
 - **Event** — A group of Concerts: `single_night` (soirée) or `festival`. One shared record. Has a name, date or date range, Place, optional Stage/Scene list, optional per-Concert Place override, and an unguessable Event link. May exist with zero Concerts. Festivals span days; single-night Events use the same start and end date.
-- **Place** — Where an Event or Concert happened (venue, city, festival site, or a combination). Free text. Inherited from the Event unless that Event allows overrides.
-- **Stage/Scene** — A named performance area on an Event, mainly for festivals. An empty list means a Stage/Scene is not required.
+- **Place** — The **city** where an Event or Concert happened. Not the venue. Inherited from the Event unless that Event allows overrides.
+- **Stage/Scene** — The **venue or stage** name (room, hall, or festival stage). Optional; strongly recommended. The User may type a new name when adding a Concert. A defined list is a suggestion set, not a closed required enum.
 - **Attendance** — Optional per User on a Concert: `going` (shipped label "Going") or `attended`. Absent means the Concert is only on the Event Bill for that User. There is no skipped value. "J'y vais" is a spoken synonym, not UI copy.
 - **Bill** — The Event-owner-entered set of Concerts on an Event. Shared with joiners. v1 is not a scraped or canonical festival database.
 - **Event link** — Unguessable URL for one Event. The only write-join path: a signed-in User who opens it can view the Bill and set their own Attendance. Reachable by copying the Event URL or by tapping an Event on an enabled Shared List. A joiner can leave. No Event search in v1. Rotation, owner kick, and a joiner roster are out of v1.
@@ -120,7 +120,7 @@ A User can register with email, password, and a unique username, then sign in an
 
 #### FR-2: Concert CRUD
 
-A User who owns an Event can create, view, update, and delete Concerts on that Event. A Concert requires artist or group, date, and exactly one Event. Time is optional. Date may be in the future. Adding a Concert without first selecting an Event transparently creates a single-night Event owned by that User from the entered date and Place. The default Event name is `Concerts on {DD/MM/YYYY} at {Place}` using that Concert's Europe/Paris calendar date and entered Place. The owner can edit the name afterwards. Joiners cannot create, update, or delete Concerts.
+A User who owns an Event can create, view, update, and delete Concerts on that Event. A Concert requires artist or group, date, and exactly one Event. Time is optional. Date may be in the future. Nav Add always chooses an Event first (an existing owned Event, **New night**, or **New festival**). New night without a custom name creates a `single_night` Event named `Concerts on {DD/MM/YYYY} at {Stage}, {Place}` when Stage/Scene is filled, otherwise `Concerts on {DD/MM/YYYY} at {Place}` (Europe/Paris calendar date, city Place, optional venue/stage). The owner can edit the name afterwards. Joiners cannot create, update, or delete Concerts.
 
 **Consequences (testable):**
 - A created Concert belongs to the Event's Bill and is visible to the Event owner and to signed-in Users who opened that Event link.
@@ -203,7 +203,7 @@ When the User adds a Concert from an Event, the Event supplies defaults and cons
 
 **Consequences (testable):**
 - From a `single_night` Event: date and Place are prefilled; the User mainly enters the artist or group.
-- From a `festival` Event: Place is prefilled; the User still chooses the day inside the Event range, the artist or group, and a Stage/Scene when that list exists.
+- From a `festival` Event: Place (city) is prefilled; the User still chooses the day inside the Event range, the artist or group, and may enter a Stage/Scene (venue or stage) immediately.
 - The new Concert belongs to that Event without a second record.
 
 #### FR-8: Home and Concerts
@@ -256,12 +256,12 @@ Deleting a non-empty Event is Event-owner-only and requires explicit confirmatio
 
 #### FR-12: Constrain Concerts by Event
 
-A Concert cannot be saved or moved outside its Event dates, on a disallowed Stage/Scene, or with a conflicting Place when override is off. An Event update cannot leave existing Concerts in any of those invalid states.
+A Concert cannot be saved or moved outside its Event dates, onto a Stage/Scene that is not on that Event after create, or with a conflicting Place (city) when override is off. An Event update cannot leave existing Concerts in any of those invalid states.
 
 **Consequences (testable):**
 - Event start and end dates are inclusive Europe/Paris calendar dates.
 - Out-of-range dates are rejected.
-- A defined Stage/Scene list restricts selection to those names.
+- A defined Stage/Scene list is an open suggestion set. Typing a new venue or stage name adds it to the Event. Stage/Scene stays optional even when the list is non-empty.
 - Event Place is inherited by default; an Event may opt in to per-Concert Place overrides.
 - When override is off, a conflicting Place cannot be saved.
 - Incompatible Event updates are blocked and list every affected Concert.
@@ -269,14 +269,15 @@ A Concert cannot be saved or moved outside its Event dates, on a disallowed Stag
 
 #### FR-13: Named validation and Concert identity on create
 
-Validation copy names the failed rule (dates, Stage/Scene, required fields, ownership, or Concert identity). Creating a Concert uses the Event owner's journal, not a worldwide artist catalog. This overrides the earlier warn-then-allow duplicate rule.
+Validation copy names the failed rule (dates, Stage/Scene, required fields, ownership, or Concert identity). Creating a Concert uses the Event owner's journal. A shared **name** catalog (artists, cities, venues/stages) only powers autocomplete after three characters — it is not a canonical worldwide artist database. This overrides the earlier warn-then-allow duplicate rule.
 
 **Consequences (testable):**
 - The message identifies which rule failed.
-- Same owner, artist (case-insensitive), date, and clock time: no new row; the existing Concert is returned (attach). Attach does not move the Concert to the Event being created under.
-- Event and Stage/Scene are not part of Concert identity. A timed match on a different owned Event still attaches (does not reparent). A timed match on a different Stage/Scene still attaches.
-- Same owner, artist, date, and time at a different effective Place: create is refused.
-- Same owner, artist, and date, with time missing on one or both sides: the User (and MCP) must choose attach (may then set time on the existing Concert) or create a second Concert.
+- Same owner, artist (case-insensitive), date, clock time, and Stage/Scene (case-insensitive, or both empty): no new row; the existing Concert is returned (attach). Attach does not move the Concert to the Event being created under.
+- Event is not part of Concert identity. A timed match on a different owned Event still attaches (does not reparent).
+- A timed match at a different Stage/Scene creates a second Concert.
+- Same owner, artist, date, time, and Stage/Scene at a different effective Place (city): create is refused.
+- Same owner, artist, date, and Stage/Scene, with time missing on one or both sides: the User (and MCP) must choose attach (may then set time on the existing Concert) or create a second Concert.
 - Same artist and date with different times: create is allowed without that choice.
 
 ### 5.4 Shared List

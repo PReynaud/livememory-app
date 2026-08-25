@@ -983,8 +983,8 @@ describe('updateEvent', () => {
     expect(concerts.map(concert => concert.date)).toEqual(['2026-08-10', '2026-08-11']);
   });
 
-  it('blocks adding Stages when existing Concerts have no stage_id and does not assign the first Stage', async () => {
-    const { client, rpcCalls, updateCalls, concerts } = createMockEventsClient({
+  it('allows adding a Stage list without assigning existing Concerts', async () => {
+    const { client, rpcCalls, concerts } = createMockEventsClient({
       rows: [festivalRow],
       concerts: [justice, phoenix]
     });
@@ -998,31 +998,10 @@ describe('updateEvent', () => {
       stages: [{ name: 'Main' }, { name: 'Valley' }]
     });
 
-    expect(result.data).toBeNull();
-    expect(result.error?.ruleId).toBe(EVENT_RULE.concertConflict);
-    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.concertConflict);
-    expect(result.error?.message).toContain('Justice (20/08/2026)');
-    expect(result.error?.message).toContain('Phoenix (21/08/2026)');
-    expect(result.error?.message).toContain(EVENT_RULE_MESSAGE.requiredStage);
-    expect(result.error?.conflicts).toEqual([
-      expect.objectContaining({
-        concertId: justice.id,
-        artist: 'Justice',
-        date: justice.date,
-        ruleId: EVENT_RULE.requiredStage,
-        message: EVENT_RULE_MESSAGE.requiredStage
-      }),
-      expect.objectContaining({
-        concertId: phoenix.id,
-        artist: 'Phoenix',
-        date: phoenix.date,
-        ruleId: EVENT_RULE.requiredStage,
-        message: EVENT_RULE_MESSAGE.requiredStage
-      })
-    ]);
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe(festivalRow.id);
     expect(concerts.map(concert => concert.stage_id)).toEqual([null, null]);
-    expect(updateCalls).toHaveLength(0);
-    expect(rpcCalls).toHaveLength(0);
+    expect(rpcCalls).toHaveLength(1);
   });
 
   it('saves new Stages with explicit per-Concert Stage choices in one domain operation', async () => {

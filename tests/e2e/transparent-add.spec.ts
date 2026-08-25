@@ -1,9 +1,11 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { selectAddSheetEvent } from './helpers/add-concert-sheet';
 
 test('logs a past one-performer show from nav Add without picking an Event', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add concert' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await expect(sheet.getByRole('heading', { name: 'Add concert' })).toBeVisible();
+  await selectAddSheetEvent(authenticatedPage, sheet, 'New night');
 
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Date').fill('2026-08-10');
@@ -25,6 +27,7 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
   const chip = compact.getByRole('button', { name: 'Mark as attended' });
   await expect(chip).toHaveAttribute('aria-pressed', 'true');
   await expect(chip).toHaveText('Attended');
+  await expect(chip).toBeEnabled();
 
   await chip.click();
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
@@ -39,6 +42,7 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
 test('defaults future transparent Attendance to Going and groups after a second Concert', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add concert' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
+  await selectAddSheetEvent(authenticatedPage, sheet, 'New night');
   await sheet.getByLabel('Artist').fill('Fontaines D.C.');
   await sheet.getByLabel('Date').fill('2026-12-01');
   await sheet.getByLabel('Place').fill('Lyon');
