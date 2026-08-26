@@ -45,8 +45,8 @@ const eventPath = computed(() => `/e/${props.event.id}`);
 
 <template>
   <section
-    class="rounded-2xl bg-[#1A1A1A] p-4"
-    :class="compact ? '' : 'space-y-2'"
+    class="lm-card lm-card-interactive p-4"
+    :class="compact ? '' : 'space-y-3'"
     :data-event-card="compact ? 'compact' : 'group'"
     :data-featured="featured ? 'true' : 'false'"
   >
@@ -102,49 +102,43 @@ const eventPath = computed(() => `/e/${props.event.id}`);
       <a
         v-if="readonly"
         :href="eventPath"
-        class="block space-y-1"
+        class="block space-y-1 border-b border-white/8 pb-3 mb-3"
       >
         <p :class="titleClass">
           {{ event.name }}
         </p>
         <p class="text-[13px] text-muted">
-          {{ formatEventDateLabel(event) }}
-        </p>
-        <p class="text-[13px] text-muted">
-          {{ event.place }}
+          {{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}
         </p>
       </a>
       <NuxtLink
         v-else
         :to="eventPath"
-        class="block space-y-1"
+        class="block space-y-1 border-b border-white/8 pb-3 mb-3"
       >
         <p :class="titleClass">
           {{ event.name }}
         </p>
         <p class="text-[13px] text-muted">
-          {{ formatEventDateLabel(event) }}
-        </p>
-        <p class="text-[13px] text-muted">
-          {{ event.place }}
+          {{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}
         </p>
       </NuxtLink>
       <template v-if="concerts.length">
         <div
           v-for="(group, index) in groups"
           :key="group.date"
-          :class="index > 0 ? 'border-t border-white/10 pt-2' : ''"
+          :class="[index > 0 ? 'mt-2.5 border-t border-white/8 pt-2.5' : '', 'space-y-1.5']"
         >
           <p
             v-if="showDayHeaders"
-            class="text-[13px] font-semibold text-muted"
+            class="mb-1 px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
           >
             {{ formatConcertDayLabel(group.date) }}
           </p>
           <div
             v-for="row in group.concerts"
             :key="row.id"
-            class="flex items-start justify-between gap-3 py-1.5"
+            class="lm-concert-row"
           >
             <div class="min-w-0">
               <p class="text-base font-semibold">

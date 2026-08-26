@@ -120,6 +120,7 @@ const reloadHome = async (page: Parameters<typeof waitForNuxtHydration>[0]) => {
 
 test('shows empty featured copy and zero souvenir stats that are not tappable', async ({ authenticatedPage }) => {
   await expect(authenticatedPage.getByRole('heading', { name: 'Home' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Your journal')).toBeVisible();
   await expect(authenticatedPage.getByTestId('home-featured-empty')).toContainText('Nothing upcoming.');
   await expect(authenticatedPage.getByTestId('home-featured-empty')).toContainText('Add a night or a concert.');
   await expect(authenticatedPage.getByTestId('home-featured')).toHaveCount(0);
@@ -162,6 +163,9 @@ test('features the next 1–3 upcoming Events and keeps the rest of the log on C
 
   const featured = authenticatedPage.getByTestId('home-featured');
   await expect(featured).toBeVisible();
+  await expect(featured.getByRole('heading', { name: 'Coming up' })).toBeVisible();
+  await expect(featured.getByText('3', { exact: true })).toBeVisible();
+  await expect(authenticatedPage.getByText('Your journal')).toHaveCount(0);
   await expect(featured.getByText('Empty Soon')).toBeVisible();
   await expect(featured.getByText('Second Night')).toBeVisible();
   await expect(featured.getByText('Third Night')).toBeVisible();
@@ -238,6 +242,9 @@ test('uses compact artist anatomy for one Concert and grouped Event name for two
   await expect(group.getByRole('link')).toContainText('Rock Week');
   await expect(group.getByText('Fontaines D.C.')).toBeVisible();
   await expect(group.getByText('LCD Soundsystem')).toBeVisible();
+  await expect(authenticatedPage.getByText('Justice and Rock Week are waiting.')).toBeVisible();
+  await expect(authenticatedPage.getByRole('heading', { name: 'Coming up' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Your journal')).toHaveCount(0);
 
   await compact.getByRole('link').click();
   await expect(authenticatedPage).toHaveURL(new RegExp(`/e/${nightId}$`));

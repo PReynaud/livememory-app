@@ -69,6 +69,7 @@ describe('Home featured and stats surfaces', () => {
     expect(home).not.toMatch(/<svg/);
     const stats = home.slice(home.indexOf('home-stats'));
     expect(stats).not.toMatch(/NuxtLink|<a |@click|to="/);
+    expect(stats).not.toMatch(/#FF4D8A|text-primary|text-going/);
 
     const store = read('app/stores/events.ts');
     expect(store).toMatch(/selectFeaturedEvents/);
@@ -132,5 +133,29 @@ describe('Home featured and stats surfaces', () => {
     expect(card).toMatch(/eventPath/);
     expect(card).toMatch(/`\/e\/\$\{props\.event\.id\}`/);
     expect(card).not.toMatch(/for you|Pour vous|album/i);
+  });
+
+  it('renders Coming up header, count, muted lead, souvenirs, and empty journal chrome', () => {
+    const home = read('app/pages/home.vue');
+    expect(home).toMatch(/Coming up/);
+    expect(home).toMatch(/Your journal/);
+    expect(home).toMatch(/Your souvenirs/);
+    expect(home).toMatch(/home-souvenirs-heading/);
+    expect(home).toMatch(/is waiting\./);
+    expect(home).toMatch(/are waiting\./);
+    expect(home).toMatch(/isCompactBill/);
+    expect(home).toMatch(/featuredEvents\.length/);
+    expect(home).toMatch(/UIcon/);
+    expect(home).toMatch(/i-lucide-music/);
+    expect(home).toMatch(/border-l/);
+    expect(home).not.toMatch(/card-spotlight/);
+    expect(home).not.toMatch(/How was it\?/);
+    expect(home).not.toMatch(/for you|Pour vous|album/i);
+
+    const card = read('app/components/AppEventCard.vue');
+    expect(card).toMatch(/lm-card|border-\[#2E2E2E\]/);
+    expect(card).toMatch(/lm-concert-row|--well/);
+    expect(card).not.toMatch(/card-spotlight/);
+    expect(card).not.toMatch(/py-1\.5/);
   });
 });

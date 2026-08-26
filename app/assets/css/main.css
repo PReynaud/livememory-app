@@ -20,6 +20,17 @@
 html {
   background-color: #000000;
   --ui-bg: #000000;
+  --bg: #000000;
+  --surface: #1A1A1A;
+  --fg: #ffffff;
+  --muted: #A3A3A3;
+  --border: #2E2E2E;
+  --glass: color-mix(in oklch, var(--surface) 58%, transparent);
+  --sheet-glass: color-mix(in oklch, var(--surface) 64%, transparent);
+  --panel-glass: color-mix(in oklch, var(--bg) 42%, transparent);
+  --well: color-mix(in oklch, var(--bg) 88%, var(--surface));
+  --well-glass: color-mix(in oklch, var(--bg) 55%, transparent);
+  --well-border: color-mix(in oklch, var(--fg) 12%, transparent);
 }
 
 .dark {
@@ -32,9 +43,125 @@ html {
   outline-offset: 2px;
 }
 
+.lm-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.lm-card-interactive {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.lm-card-interactive:hover {
+  border-color: color-mix(in oklch, var(--fg) 18%, var(--border));
+  background: color-mix(in oklch, var(--surface) 92%, var(--fg));
+}
+
+.lm-card-interactive:focus-within {
+  border-color: color-mix(in oklch, var(--fg) 22%, var(--border));
+}
+
+.lm-concert-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--well);
+  border: 1px solid transparent;
+}
+
+.lm-form-panel {
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--panel-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+}
+
+.lm-form-panel-artist {
+  border-color: color-mix(in oklch, var(--fg) 14%, transparent);
+  background: color-mix(in oklch, var(--panel-glass) 70%, var(--surface));
+}
+
+.lm-event-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: var(--well-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--well-border);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lm-sheet-shell {
+  background: var(--sheet-glass);
+  backdrop-filter: blur(28px) saturate(1.15);
+  -webkit-backdrop-filter: blur(28px) saturate(1.15);
+  border: 1px solid color-mix(in oklch, var(--fg) 10%, transparent);
+  border-bottom: 0;
+}
+
+.lm-sheet-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: color-mix(in oklch, var(--sheet-glass) 88%, var(--bg));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+}
+
+.lm-sheet-head::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 5px;
+  border-radius: 9999px;
+  background: color-mix(in oklch, var(--fg) 28%, transparent);
+  margin: 0 auto 10px;
+}
+
+.sheet-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: start;
+  gap: 12px;
+}
+
+.field-row.time-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.field-row > * {
+  min-width: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lm-chrome {
     transition: none !important;
     animation: none !important;
+  }
+
+  .lm-card-interactive {
+    transition: none;
   }
 }

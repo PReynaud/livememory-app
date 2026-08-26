@@ -30,7 +30,7 @@ const chipClass = computed(() => {
     : 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A3A3A3]';
 
   if (!confirmed.value) {
-    return `${base} ${focusRing} border border-dashed border-[#A3A3A3] bg-transparent text-[#A3A3A3]`;
+    return `${base} ${focusRing} border border-dashed border-[#FF4D8A] bg-transparent text-[#FF4D8A]`;
   }
 
   if (displayStatus.value === 'going') {
