@@ -11,6 +11,7 @@ import { eventAllowsPlaceOverride } from '#shared/domain/events';
 import { JOINER_IMPACT_COPY } from '#shared/domain/membership';
 import { CATALOG_KIND } from '#shared/domain/catalog';
 import { useNameCatalogStore } from '@/stores/name-catalog';
+import { formatEventDateLabel } from '@/utils/event-dates';
 
 const NEW_NIGHT = 'new:single_night';
 const NEW_FESTIVAL = 'new:festival';
@@ -106,6 +107,20 @@ const eventStages = computed(() => {
   return eventsStore.stagesForEvent(selectedEvent.value.id);
 });
 const showAddAnotherArtist = computed(() => !isEdit.value && artist.value.trim().length > 0);
+const eventFieldInvalid = computed(() => formError.value === CONCERT_RULE_MESSAGE.requiredEvent);
+const artistFieldInvalid = computed(() => formError.value === CONCERT_RULE_MESSAGE.requiredArtist);
+const dateFieldInvalid = computed(() => formError.value === CONCERT_RULE_MESSAGE.requiredDate);
+const placeFieldInvalid = computed(() => formError.value === CONCERT_RULE_MESSAGE.requiredPlace);
+const saveLabel = computed(() => (saving.value ? 'Saving…' : 'Save'));
+const eventContextMeta = computed(() => {
+  if (!selectedEvent.value) {
+    return '';
+  }
+
+  return [formatEventDateLabel(selectedEvent.value), selectedEvent.value.place]
+    .filter(Boolean)
+    .join(' · ');
+});
 const stageItems = computed(() => eventStages.value.map(stage => stage.name));
 
 const eventItems = computed(() => {
@@ -610,11 +625,13 @@ const removeConcert = async () => {
 
 const slideoverUi = {
   overlay: 'bg-elevated/0',
-  content: 'lm-chrome bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:w-[28rem] max-h-[min(85dvh,36rem)]',
-  header: 'px-4 pt-4 pb-0 sm:px-4',
-  body: 'px-4 py-3 sm:px-4 sm:py-3',
-  footer: 'px-4 pb-4 sm:px-4',
-  title: 'text-base font-semibold'
+  content: 'lm-chrome lm-sheet-shell bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:w-[28rem] max-h-[min(85dvh,36rem)]',
+  header: 'lm-sheet-head relative flex-col items-stretch gap-0 px-4 pt-6 pb-0 sm:px-4 min-h-0',
+  body: 'min-h-0 overflow-y-auto px-4 py-3 sm:px-4 sm:py-3',
+  footer: 'lm-sheet-foot px-4 pb-4 sm:px-4',
+  wrapper: 'flex min-h-0 flex-col',
+  title: 'text-lg font-bold tracking-tight order-2 pb-3',
+  description: 'sheet-eyebrow order-1'
 };
 </script>
 
@@ -623,402 +640,446 @@ const slideoverUi = {
     v-model:open="sheetOpen"
     side="bottom"
     :title="sheetTitle"
+    :description="isEdit ? undefined : 'New'"
     :close="false"
     :ui="slideoverUi"
   >
     <template #body>
       <form
-        class="space-y-3"
+        id="add-concert-form"
+        class="space-y-2.5"
         novalidate
         @submit.prevent="persist()"
       >
-        <UFormField
-          name="event"
-          required
-          description="The night or festival this concert belongs to."
-        >
-          <template #label>
-            <span class="inline-flex items-center gap-1">
-              Event
-              <UPopover>
-                <UButton
-                  icon="i-lucide-info"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  square
-                  aria-label="What is an Event?"
-                />
-                <template #content>
-                  <div class="max-w-72 space-y-2 p-3 text-[13px] text-muted">
-                    <p>
-                      <span class="font-semibold text-white">Night</span>
-                      — one date, one city. Examples: a club show; a soirée with several artists.
-                    </p>
-                    <p>
-                      <span class="font-semibold text-white">Festival</span>
-                      — several days, often several stages. Example: Rock en Seine.
-                    </p>
-                    <p>
-                      New night without a custom name becomes Concerts on the date at the venue and city.
-                    </p>
-                  </div>
-                </template>
-              </UPopover>
-            </span>
-          </template>
-          <UInput
-            v-if="eventLocked"
-            id="add-concert-event"
-            :model-value="eventName"
-            readonly
-            :disabled="pendingChoice"
-            class="w-full"
-          />
-          <USelect
-            v-else
-            id="add-concert-event"
-            v-model="picker"
-            :items="eventItems"
-            placeholder="Select an Event"
-            :disabled="pendingChoice"
-            class="w-full"
-          />
-        </UFormField>
-
-        <template v-if="isNewNight || isNewFestival">
-          <UFormField
-            :label="isNewFestival ? 'Name' : 'Name'"
-            name="name"
-            :description="isNewNight ? 'Leave blank to name from date, venue, and city.' : undefined"
+        <section class="lm-form-panel space-y-2.5">
+          <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Event
+          </p>
+          <div
+            v-if="selectedEvent"
+            class="lm-event-context"
+            aria-live="polite"
           >
+            <span class="font-semibold text-white">{{ selectedEvent.name }}</span>
+            <span class="text-muted">{{ eventContextMeta }}</span>
+          </div>
+          <UFormField
+            name="event"
+            required
+            description="The night or festival this concert belongs to."
+            :error="eventFieldInvalid"
+          >
+            <template #label>
+              <span class="inline-flex items-center gap-1">
+                Event
+                <UPopover>
+                  <UButton
+                    icon="i-lucide-info"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    square
+                    aria-label="What is an Event?"
+                  />
+                  <template #content>
+                    <div class="max-w-72 space-y-2 p-3 text-[13px] text-muted">
+                      <p>
+                        <span class="font-semibold text-white">Night</span>
+                        — one date, one city. Examples: a club show; a soirée with several artists.
+                      </p>
+                      <p>
+                        <span class="font-semibold text-white">Festival</span>
+                        — several days, often several stages. Example: Rock en Seine.
+                      </p>
+                      <p>
+                        New night without a custom name becomes Concerts on the date at the venue and city.
+                      </p>
+                    </div>
+                  </template>
+                </UPopover>
+              </span>
+            </template>
             <UInput
-              v-model="eventName"
+              v-if="eventLocked"
+              id="add-concert-event"
+              :model-value="eventName"
+              readonly
+              :disabled="pendingChoice"
               class="w-full"
+              :aria-invalid="eventFieldInvalid || undefined"
+            />
+            <USelect
+              v-else
+              id="add-concert-event"
+              v-model="picker"
+              :items="eventItems"
+              placeholder="Select an Event"
+              :disabled="pendingChoice"
+              class="w-full"
+              :aria-invalid="eventFieldInvalid || undefined"
             />
           </UFormField>
-        </template>
 
-        <div
-          v-for="(name, index) in artists"
-          :key="`artist-${index}`"
-          class="flex items-end gap-2"
-        >
+          <template v-if="isNewNight || isNewFestival">
+            <UFormField
+              :label="isNewFestival ? 'Name' : 'Name'"
+              name="name"
+              :description="isNewNight ? 'Leave blank to name from date, venue, and city.' : undefined"
+            >
+              <UInput
+                v-model="eventName"
+                class="w-full"
+              />
+            </UFormField>
+          </template>
+        </section>
+
+        <section class="lm-form-panel lm-form-panel-artist space-y-2.5">
+          <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Artist
+          </p>
+          <div
+            v-for="(name, index) in artists"
+            :key="`artist-${index}`"
+            class="flex items-end gap-2"
+          >
+            <UFormField
+              :label="index === 0 ? 'Artist' : `Artist ${index + 1}`"
+              :name="`artist-${index}`"
+              required
+              class="min-w-0 flex-1"
+              :error="index === 0 && artistFieldInvalid"
+            >
+              <UInputMenu
+                :id="index === 0 ? 'add-concert-artist' : undefined"
+                :model-value="name"
+                mode="autocomplete"
+                :items="artistSuggestions"
+                :disabled="pendingChoice"
+                :content="{ hideWhenEmpty: true }"
+                class="w-full"
+                :aria-invalid="index === 0 && artistFieldInvalid ? true : undefined"
+                @update:model-value="setArtistAt(index, $event)"
+                @update:search-term="onArtistSearch(index, $event)"
+              />
+            </UFormField>
+            <UButton
+              v-if="index > 0"
+              type="button"
+              icon="i-lucide-x"
+              color="neutral"
+              variant="ghost"
+              square
+              aria-label="Remove artist"
+              :disabled="pendingChoice"
+              @click="removeArtistRow(index)"
+            />
+          </div>
+
+          <UButton
+            v-if="showAddAnotherArtist"
+            type="button"
+            label="Add another artist"
+            color="neutral"
+            variant="link"
+            class="px-0 font-semibold text-white"
+            :disabled="pendingChoice"
+            @click="addArtistRow"
+          />
+        </section>
+
+        <section class="lm-form-panel space-y-2.5">
+          <p class="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Details
+          </p>
+
+          <template v-if="isNewFestival">
+            <UFormField
+              label="Start date"
+              name="startDate"
+              required
+            >
+              <UInput
+                v-model="startDate"
+                type="date"
+                :disabled="pendingChoice"
+                class="h-11 w-full"
+              />
+            </UFormField>
+            <UFormField
+              label="End date"
+              name="endDate"
+              required
+            >
+              <UInput
+                v-model="endDate"
+                type="date"
+                :disabled="pendingChoice"
+                class="h-11 w-full"
+              />
+            </UFormField>
+          </template>
+
+          <div
+            v-if="showDayPicker"
+            class="space-y-1.5"
+            :aria-invalid="dateFieldInvalid || undefined"
+          >
+            <p class="text-[13px] text-muted">
+              Day
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="day in festivalDays"
+                :key="day"
+                type="button"
+                class="min-h-11 min-w-14 flex-1 rounded-xl border px-2 py-1.5 text-[13px] font-medium leading-tight"
+                :class="concertDate === day
+                  ? 'border-primary bg-primary text-black'
+                  : 'border-white/16 bg-[rgba(10,10,10,0.88)] text-white'"
+                :aria-pressed="concertDate === day"
+                :aria-label="day"
+                :disabled="pendingChoice"
+                @click="concertDate = day"
+              >
+                {{ formatDayChipParts(day).weekday }}
+                <span
+                  class="block text-[11px] font-normal"
+                  :class="concertDate === day ? 'text-black' : 'text-muted'"
+                >
+                  {{ formatDayChipParts(day).rest }}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="field-row"
+            :class="{ 'time-only': isNewFestival }"
+          >
+            <UFormField
+              v-if="isNewNight || isExistingNight"
+              label="Date"
+              name="date"
+              required
+              class="min-w-0"
+              :error="dateFieldInvalid"
+            >
+              <UInput
+                v-model="startDate"
+                type="date"
+                :readonly="dateLocked && isExistingNight"
+                :disabled="pendingChoice"
+                class="h-11 w-full"
+                :aria-invalid="dateFieldInvalid || undefined"
+              />
+            </UFormField>
+            <UFormField
+              v-else-if="!isNewFestival"
+              label="Date"
+              name="date"
+              required
+              class="min-w-0"
+              :error="dateFieldInvalid"
+            >
+              <UInput
+                v-model="concertDate"
+                type="date"
+                :disabled="pendingChoice"
+                class="h-11 w-full"
+                :aria-invalid="dateFieldInvalid || undefined"
+              />
+            </UFormField>
+            <UFormField
+              label="Time"
+              name="time"
+              class="min-w-0"
+            >
+              <UInput
+                v-model="concertTime"
+                type="time"
+                :disabled="pendingChoice"
+                class="h-11 w-full"
+              />
+            </UFormField>
+          </div>
+
           <UFormField
-            :label="index === 0 ? 'Artist' : `Artist ${index + 1}`"
-            :name="`artist-${index}`"
+            label="Place"
+            name="place"
             required
-            class="min-w-0 flex-1"
+            :error="placeFieldInvalid"
           >
             <UInputMenu
-              :id="index === 0 ? 'add-concert-artist' : undefined"
-              :model-value="name"
+              v-model="place"
               mode="autocomplete"
-              :items="artistSuggestions"
+              :items="placeSuggestions"
+              placeholder="City"
+              :readonly="placeLocked"
               :disabled="pendingChoice"
               :content="{ hideWhenEmpty: true }"
               class="w-full"
-              @update:model-value="setArtistAt(index, $event)"
-              @update:search-term="onArtistSearch(index, $event)"
+              :aria-invalid="placeFieldInvalid || undefined"
+              @update:search-term="searchCatalog(CATALOG_KIND.place, $event)"
             />
           </UFormField>
-          <UButton
-            v-if="index > 0"
-            type="button"
-            icon="i-lucide-x"
-            color="neutral"
-            variant="ghost"
-            square
-            aria-label="Remove artist"
-            :disabled="pendingChoice"
-            @click="removeArtistRow(index)"
-          />
-        </div>
 
-        <UButton
-          v-if="showAddAnotherArtist"
-          type="button"
-          label="Add another artist"
-          color="neutral"
-          variant="link"
-          class="px-0 font-semibold text-white"
-          :disabled="pendingChoice"
-          @click="addArtistRow"
-        />
-
-        <template v-if="isNewFestival">
           <UFormField
-            label="Start date"
-            name="startDate"
-            required
+            v-if="!isNewFestival"
+            label="Stage or Scene"
+            name="stage"
           >
-            <UInput
-              v-model="startDate"
-              type="date"
+            <UInputMenu
+              v-model="stageName"
+              mode="autocomplete"
+              :items="stageItems"
+              placeholder="Venue or stage"
               :disabled="pendingChoice"
+              :content="{ hideWhenEmpty: true }"
               class="w-full"
             />
           </UFormField>
+
           <UFormField
-            label="End date"
-            name="endDate"
-            required
+            v-if="isEdit"
+            label="Notes"
+            name="notes"
           >
-            <UInput
-              v-model="endDate"
-              type="date"
+            <UTextarea
+              v-model="notes"
+              placeholder="Private. Never on your public profile."
               :disabled="pendingChoice"
               class="w-full"
+              :rows="3"
             />
           </UFormField>
-        </template>
-
-        <div
-          v-if="showDayPicker"
-          class="space-y-1.5"
-        >
-          <p class="text-[13px] text-muted">
-            Day
-          </p>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="day in festivalDays"
-              :key="day"
-              type="button"
-              class="min-h-11 min-w-14 flex-1 rounded-xl border px-2 py-1.5 text-[13px] font-medium leading-tight"
-              :class="concertDate === day
-                ? 'border-primary bg-primary text-black'
-                : 'border-white/16 bg-[rgba(10,10,10,0.88)] text-white'"
-              :aria-pressed="concertDate === day"
-              :aria-label="day"
-              :disabled="pendingChoice"
-              @click="concertDate = day"
-            >
-              {{ formatDayChipParts(day).weekday }}
-              <span
-                class="block text-[11px] font-normal"
-                :class="concertDate === day ? 'text-black' : 'text-muted'"
-              >
-                {{ formatDayChipParts(day).rest }}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <div class="flex gap-3">
-          <UFormField
-            v-if="isNewNight || isExistingNight"
-            label="Date"
-            name="date"
-            required
-            class="min-w-0 flex-1"
-          >
-            <UInput
-              v-model="startDate"
-              type="date"
-              :readonly="dateLocked && isExistingNight"
-              :disabled="pendingChoice"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            v-else-if="!isNewFestival"
-            label="Date"
-            name="date"
-            required
-            class="min-w-0 flex-1"
-          >
-            <UInput
-              v-model="concertDate"
-              type="date"
-              :disabled="pendingChoice"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="Time"
-            name="time"
-            class="w-32 shrink-0"
-          >
-            <UInput
-              v-model="concertTime"
-              type="time"
-              :disabled="pendingChoice"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-
-        <UFormField
-          label="Place"
-          name="place"
-          required
-          description="City"
-        >
-          <UInputMenu
-            v-model="place"
-            mode="autocomplete"
-            :items="placeSuggestions"
-            :readonly="placeLocked"
-            :disabled="pendingChoice"
-            :content="{ hideWhenEmpty: true }"
-            class="w-full"
-            @update:search-term="searchCatalog(CATALOG_KIND.place, $event)"
-          />
-        </UFormField>
-
-        <UFormField
-          v-if="!isNewFestival"
-          label="Stage or Scene"
-          name="stage"
-          description="Venue or stage"
-        >
-          <UInputMenu
-            v-model="stageName"
-            mode="autocomplete"
-            :items="stageItems"
-            :disabled="pendingChoice"
-            :content="{ hideWhenEmpty: true }"
-            class="w-full"
-          />
-        </UFormField>
-
-        <UFormField
-          v-if="isEdit"
-          label="Notes"
-          name="notes"
-        >
-          <UTextarea
-            v-model="notes"
-            placeholder="Private. Never on your public profile."
-            :disabled="pendingChoice"
-            class="w-full"
-            :rows="3"
-          />
-        </UFormField>
-
-        <UAlert
-          v-if="formError"
-          color="error"
-          variant="subtle"
-          :title="formError"
-        />
-
-        <template v-if="pendingChoice">
-          <UAlert
-            color="warning"
-            variant="subtle"
-            :title="CONCERT_RULE_MESSAGE.needsChoice"
-          />
-          <div class="flex items-center gap-4 pt-1">
-            <UButton
-              type="button"
-              label="Attach"
-              color="primary"
-              variant="outline"
-              class="h-11 flex-1 justify-center rounded-full ring-2"
-              :loading="saving"
-              @click="persist('attach')"
-            />
-            <UButton
-              type="button"
-              label="Create"
-              color="neutral"
-              variant="outline"
-              class="h-11 flex-1 justify-center rounded-full ring-2"
-              :disabled="saving"
-              @click="persist('create')"
-            />
-            <UButton
-              type="button"
-              label="Cancel"
-              color="neutral"
-              variant="link"
-              class="px-0 font-semibold text-white"
-              :disabled="saving"
-              @click="dismissChoice"
-            />
-          </div>
-        </template>
-        <div
-          v-else
-          class="flex flex-col gap-3 pt-1"
-        >
-          <div class="flex items-center gap-4">
-            <UButton
-              type="submit"
-              label="Save"
-              color="primary"
-              variant="outline"
-              class="h-11 flex-1 justify-center rounded-full ring-2"
-              :loading="saving"
-              :disabled="saving || (isEdit && !editLoaded) || confirmMove"
-            />
-            <UButton
-              v-if="isEdit && !confirmDelete"
-              type="button"
-              label="Delete"
-              color="error"
-              variant="link"
-              class="px-0 font-semibold"
-              :disabled="saving"
-              @click="requestDelete"
-            />
-          </div>
-          <div
-            v-if="isEdit && confirmDelete"
-            class="flex items-center gap-4"
-          >
-            <p class="flex-1 text-[15px] text-muted">
-              {{ concertDeleteCopy }}
-            </p>
-            <UButton
-              type="button"
-              label="Delete concert"
-              color="error"
-              variant="outline"
-              class="h-11 justify-center rounded-full"
-              :loading="saving"
-              @click="removeConcert"
-            />
-            <UButton
-              type="button"
-              label="Cancel"
-              color="neutral"
-              variant="link"
-              class="px-0 font-semibold text-white"
-              :disabled="saving"
-              @click="cancelDelete"
-            />
-          </div>
-          <div
-            v-if="isEdit && confirmMove"
-            class="flex items-center gap-4"
-          >
-            <p class="flex-1 text-[15px] text-muted">
-              {{ JOINER_IMPACT_COPY.moveConcert }}
-            </p>
-            <UButton
-              type="button"
-              label="Move concert"
-              color="error"
-              variant="outline"
-              class="h-11 justify-center rounded-full"
-              :loading="saving"
-              @click="persist()"
-            />
-            <UButton
-              type="button"
-              label="Cancel"
-              color="neutral"
-              variant="link"
-              class="px-0 font-semibold text-white"
-              :disabled="saving"
-              @click="cancelMove"
-            />
-          </div>
-        </div>
+        </section>
       </form>
+    </template>
+    <template #footer>
+      <UAlert
+        v-if="formError"
+        color="error"
+        variant="subtle"
+        role="alert"
+        :title="formError"
+      />
+
+      <template v-if="pendingChoice">
+        <UAlert
+          color="warning"
+          variant="subtle"
+          :title="CONCERT_RULE_MESSAGE.needsChoice"
+        />
+        <div class="flex items-center gap-4 pt-1">
+          <UButton
+            type="button"
+            label="Attach"
+            color="primary"
+            variant="outline"
+            class="h-11 flex-1 justify-center rounded-full ring-2"
+            :loading="saving"
+            @click="persist('attach')"
+          />
+          <UButton
+            type="button"
+            label="Create"
+            color="neutral"
+            variant="outline"
+            class="h-11 flex-1 justify-center rounded-full ring-2"
+            :disabled="saving"
+            @click="persist('create')"
+          />
+          <UButton
+            type="button"
+            label="Cancel"
+            color="neutral"
+            variant="link"
+            class="px-0 font-semibold text-white"
+            :disabled="saving"
+            @click="dismissChoice"
+          />
+        </div>
+      </template>
+      <div
+        v-else
+        class="flex flex-col gap-3"
+      >
+        <div class="flex items-center gap-4">
+          <UButton
+            type="submit"
+            form="add-concert-form"
+            :label="saveLabel"
+            color="primary"
+            variant="outline"
+            class="h-11 flex-1 justify-center rounded-full ring-2"
+            :disabled="saving || (isEdit && !editLoaded) || confirmMove"
+            :aria-busy="saving || undefined"
+          />
+          <UButton
+            v-if="isEdit && !confirmDelete"
+            type="button"
+            label="Delete"
+            color="error"
+            variant="link"
+            class="px-0 font-semibold"
+            :disabled="saving"
+            @click="requestDelete"
+          />
+        </div>
+        <div
+          v-if="isEdit && confirmDelete"
+          class="flex items-center gap-4"
+        >
+          <p class="flex-1 text-[15px] text-muted">
+            {{ concertDeleteCopy }}
+          </p>
+          <UButton
+            type="button"
+            label="Delete concert"
+            color="error"
+            variant="outline"
+            class="h-11 justify-center rounded-full"
+            :loading="saving"
+            @click="removeConcert"
+          />
+          <UButton
+            type="button"
+            label="Cancel"
+            color="neutral"
+            variant="link"
+            class="px-0 font-semibold text-white"
+            :disabled="saving"
+            @click="cancelDelete"
+          />
+        </div>
+        <div
+          v-if="isEdit && confirmMove"
+          class="flex items-center gap-4"
+        >
+          <p class="flex-1 text-[15px] text-muted">
+            {{ JOINER_IMPACT_COPY.moveConcert }}
+          </p>
+          <UButton
+            type="button"
+            label="Move concert"
+            color="error"
+            variant="outline"
+            class="h-11 justify-center rounded-full"
+            :loading="saving"
+            @click="persist()"
+          />
+          <UButton
+            type="button"
+            label="Cancel"
+            color="neutral"
+            variant="link"
+            class="px-0 font-semibold text-white"
+            :disabled="saving"
+            @click="cancelMove"
+          />
+        </div>
+      </div>
     </template>
   </USlideover>
 </template>

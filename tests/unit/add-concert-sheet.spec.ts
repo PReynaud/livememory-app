@@ -150,14 +150,41 @@ describe('add concert sheet open/close state', () => {
 
     expect(sheet).toMatch(/v-if="!isNewFestival"/);
     expect(sheet).toMatch(/label="Stage or Scene"/);
-    expect(sheet).toMatch(/Venue or stage/);
-    expect(sheet).toMatch(/City/);
+    expect(sheet).toMatch(/placeholder="Venue or stage"/);
+    expect(sheet).toMatch(/placeholder="City"/);
     expect(sheet).toMatch(/eventAllowsPlaceOverride/);
+    expect(sheet).not.toMatch(/description="City"/);
+    expect(sheet).not.toMatch(/description="Venue or stage"/);
     expect(stageItems).toMatch(/eventStages\.value\.map/);
     expect(stageItems).not.toMatch(/stageSuggestions/);
     expect(sheet).not.toMatch(/CATALOG_KIND\.stage/);
     expect(festivalBlock).not.toMatch(/stageName/);
     expect(persist).toMatch(/isNewFestival\.value \? null/);
+  });
+
+  it('lays out three glass panels, date/time grid, Saving…, and aria-invalid', () => {
+    const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(sheet.match(/lm-form-panel/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(sheet).toMatch(/lm-form-panel-artist/);
+    expect(sheet).toMatch(/sheet-eyebrow/);
+    expect(sheet).toMatch(/isEdit \? undefined : 'New'/);
+    expect(sheet).toMatch(/field-row/);
+    expect(sheet).toMatch(/time-only/);
+    expect(sheet).toMatch(/id="add-concert-form"/);
+    expect(sheet).toMatch(/#footer|name="footer"/);
+    expect(sheet).toMatch(/role="alert"/);
+    expect(sheet).toMatch(/Saving…/);
+    expect(sheet).toMatch(/aria-busy|ariaBusy/);
+    expect(sheet).toMatch(/aria-invalid|:error=/);
+    expect(sheet).toMatch(/lm-event-context/);
+    expect(sheet).toMatch(/overflow-y-auto/);
+    expect(sheet).toMatch(/persist\(/);
+
+    const artistPanel = sheet.slice(
+      sheet.indexOf('lm-form-panel-artist'),
+      sheet.indexOf('Details')
+    );
+    expect(artistPanel).not.toMatch(/#FF4D8A|border-primary|border-going/);
   });
 
   it('centers flex-1 outline actions and uses translucent frost without a dim overlay', () => {
@@ -166,7 +193,7 @@ describe('add concert sheet open/close state', () => {
     const addUi = addSheet.slice(addSheet.indexOf('const slideoverUi ='), addSheet.indexOf('</script>'));
     const editUi = editSheet.slice(editSheet.indexOf('const slideoverUi ='), editSheet.indexOf('</script>'));
 
-    expect(addSheet).toMatch(/label="Save"[\s\S]*?class="h-11 flex-1 justify-center rounded-full ring-2"/);
+    expect(addSheet).toMatch(/:label="saveLabel"[\s\S]*?class="h-11 flex-1 justify-center rounded-full ring-2"/);
     expect(addSheet).toMatch(/label="Attach"[\s\S]*?justify-center/);
     expect(addSheet).toMatch(/label="Create"[\s\S]*?justify-center/);
     expect(addUi).toMatch(/overlay: 'bg-elevated\/0'/);

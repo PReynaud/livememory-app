@@ -103,9 +103,20 @@ describe('list polish source guards', () => {
     expect(css).toMatch(/:focus-visible/);
     expect(css).toMatch(/#FF4D8A/);
     expect(css).toMatch(/prefers-reduced-motion/);
+    expect(css).toMatch(/lm-card-interactive/);
+    expect(css).toMatch(/--glass:/);
+    expect(css).toMatch(/--sheet-glass:/);
+    expect(css).toMatch(/--panel-glass:/);
+    expect(css).toMatch(/--well:/);
+    expect(css).toMatch(/--well-glass:/);
+    expect(css).toMatch(/-webkit-backdrop-filter/);
+    expect(chip).toMatch(/border-dashed border-\[#FF4D8A\]/);
+    expect(chip).not.toMatch(/border-dashed border-\[#A3A3A3\]/);
+    expect(chip).toMatch(/shadow-\[0_0_8px_#FF4D8A66\]/);
     expect(chip).toMatch(/motion-reduce:shadow-none/);
     expect(chip).toMatch(/motion-reduce:outline/);
     expect(nav).toMatch(/lm-chrome|motion-reduce/);
+    expect(nav).toMatch(/--glass|var\(--glass\)/);
   });
 
   it('blocks offline writes in the store with a toast and no queue', () => {

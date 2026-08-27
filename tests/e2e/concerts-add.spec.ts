@@ -37,6 +37,7 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
 
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet.getByText('Artist is required.')).toBeVisible();
+  await expect(addSheetArtist(sheet)).toHaveAttribute('aria-invalid', 'true');
   await expect(sheet).toBeVisible();
 
   await sheet.getByLabel('Artist').click();
@@ -112,8 +113,9 @@ test('opens Add from nav, creates a New night with a concert, and persists', asy
 
   await expectConcertAddedToast(authenticatedPage);
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await expect(authenticatedPage).toHaveURL(/\/concerts/);
   await expect(authenticatedPage.getByRole('link', { name: /Warehouse/ })).toBeVisible();
-  await expect(authenticatedPage.getByText('Local Band')).toBeVisible();
+  await expect(authenticatedPage.getByText('Local Band', { exact: true })).toBeVisible();
 
   const eventLink = authenticatedPage.getByRole('link', { name: /Warehouse/ });
   await eventLink.click();
