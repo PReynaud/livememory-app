@@ -138,16 +138,28 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/confirmMove/);
   });
 
-  it('always shows Stage or Scene, city Place helper, and unlocks Place only when override is on', () => {
+  it('hides Stage or Scene on New festival, lists only that Event\'s stages, and omits stageName', () => {
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
-    expect(sheet).toMatch(/Stage or Scene/);
+    const buildInput = sheet.slice(sheet.indexOf('const buildInput ='), sheet.indexOf('const persist ='));
+    const festivalBlock = buildInput.slice(
+      buildInput.indexOf('if (isNewFestival.value)'),
+      buildInput.lastIndexOf('return {')
+    );
+    const persist = sheet.slice(sheet.indexOf('const persist ='), sheet.indexOf('const dismissChoice ='));
+    const stageItems = sheet.slice(sheet.indexOf('const stageItems ='), sheet.indexOf('const eventItems ='));
+
+    expect(sheet).toMatch(/v-if="!isNewFestival"/);
+    expect(sheet).toMatch(/label="Stage or Scene"/);
     expect(sheet).toMatch(/placeholder="Venue or stage"/);
     expect(sheet).toMatch(/placeholder="City"/);
     expect(sheet).toMatch(/eventAllowsPlaceOverride/);
-    expect(sheet).toMatch(/stageName/);
-    expect(sheet).not.toMatch(/showStageSelect/);
     expect(sheet).not.toMatch(/description="City"/);
     expect(sheet).not.toMatch(/description="Venue or stage"/);
+    expect(stageItems).toMatch(/eventStages\.value\.map/);
+    expect(stageItems).not.toMatch(/stageSuggestions/);
+    expect(sheet).not.toMatch(/CATALOG_KIND\.stage/);
+    expect(festivalBlock).not.toMatch(/stageName/);
+    expect(persist).toMatch(/isNewFestival\.value \? null/);
   });
 
   it('lays out three glass panels, date/time grid, Saving…, and aria-invalid', () => {
@@ -173,5 +185,26 @@ describe('add concert sheet open/close state', () => {
       sheet.indexOf('Details')
     );
     expect(artistPanel).not.toMatch(/#FF4D8A|border-primary|border-going/);
+  });
+
+  it('centers flex-1 outline actions and uses translucent frost without a dim overlay', () => {
+    const addSheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    const editSheet = readFileSync(resolve(process.cwd(), 'app/components/AppEditEventSheet.vue'), 'utf8');
+    const addUi = addSheet.slice(addSheet.indexOf('const slideoverUi ='), addSheet.indexOf('</script>'));
+    const editUi = editSheet.slice(editSheet.indexOf('const slideoverUi ='), editSheet.indexOf('</script>'));
+
+    expect(addSheet).toMatch(/:label="saveLabel"[\s\S]*?class="h-11 flex-1 justify-center rounded-full ring-2"/);
+    expect(addSheet).toMatch(/label="Attach"[\s\S]*?justify-center/);
+    expect(addSheet).toMatch(/label="Create"[\s\S]*?justify-center/);
+    expect(addUi).toMatch(/overlay: 'bg-elevated\/0'/);
+    expect(addUi).toMatch(/bg-default\/50/);
+    expect(addUi).toMatch(/backdrop-blur-\[24px\]/);
+    expect(addUi).not.toMatch(/bg-elevated\/75/);
+    expect(addUi).not.toMatch(/-translate-x-1\/2/);
+    expect(editUi).toMatch(/overlay: 'bg-elevated\/0'/);
+    expect(editUi).toMatch(/bg-default\/50/);
+    expect(editUi).toMatch(/backdrop-blur-\[24px\]/);
+    expect(editUi).not.toMatch(/bg-elevated\/75/);
+    expect(editUi).not.toMatch(/-translate-x-1\/2/);
   });
 });

@@ -44,7 +44,6 @@ const originalEventId = ref('');
 const editLoaded = ref(false);
 const artistSuggestions = ref<string[]>([]);
 const placeSuggestions = ref<string[]>([]);
-const stageSuggestions = ref<string[]>([]);
 
 const artist = computed({
   get: () => artists.value[0] ?? '',
@@ -122,13 +121,7 @@ const eventContextMeta = computed(() => {
     .filter(Boolean)
     .join(' · ');
 });
-const stageItems = computed(() => {
-  const fromEvent = eventStages.value.map(stage => stage.name);
-  const extra = stageSuggestions.value.filter((name) => {
-    return !fromEvent.some(existing => existing.toLowerCase() === name.toLowerCase());
-  });
-  return [...fromEvent, ...extra];
-});
+const stageItems = computed(() => eventStages.value.map(stage => stage.name));
 
 const eventItems = computed(() => {
   const owned = events.value
@@ -188,7 +181,7 @@ const resetNewEventFields = () => {
 };
 
 const searchCatalog = (
-  kind: typeof CATALOG_KIND.artist | typeof CATALOG_KIND.place | typeof CATALOG_KIND.stage,
+  kind: typeof CATALOG_KIND.artist | typeof CATALOG_KIND.place,
   term: string
 ) => {
   if (catalogTimer) {
@@ -199,10 +192,8 @@ const searchCatalog = (
     void catalog.searchNames(kind, term).then((result) => {
       if (kind === CATALOG_KIND.artist) {
         artistSuggestions.value = result.data;
-      } else if (kind === CATALOG_KIND.place) {
-        placeSuggestions.value = result.data;
       } else {
-        stageSuggestions.value = result.data;
+        placeSuggestions.value = result.data;
       }
     });
   }, 200);
@@ -251,7 +242,6 @@ const resetForOpen = async () => {
   stageName.value = '';
   artistSuggestions.value = [];
   placeSuggestions.value = [];
-  stageSuggestions.value = [];
   originalEventId.value = '';
   editLoaded.value = !sheet.concertId;
 
@@ -335,6 +325,9 @@ watch(picker, (value) => {
 
   if (value === NEW_NIGHT || value === NEW_FESTIVAL) {
     resetNewEventFields();
+    if (value === NEW_FESTIVAL) {
+      stageName.value = '';
+    }
     return;
   }
 
@@ -392,7 +385,6 @@ const buildInput = (artistName: string, confirm?: 'attach' | 'create') => {
       date: concertDate.value,
       time: concertTime.value,
       confirm,
-      stageName: stage,
       newEvent: {
         kind: 'festival' as const,
         name: eventName.value,
@@ -528,7 +520,7 @@ const persist = async (confirm?: 'attach' | 'create') => {
               date: isNewFestival.value ? concertDate.value : startDate.value,
               time: concertTime.value,
               place: place.value,
-              stageName: stageName.value.trim() || null,
+              stageName: isNewFestival.value ? null : (stageName.value.trim() || null),
               confirm: index === 0 ? confirm : undefined,
               eventId: createdEventId
             }
@@ -632,8 +624,8 @@ const removeConcert = async () => {
 };
 
 const slideoverUi = {
-  overlay: 'bg-white/8',
-  content: 'lm-chrome lm-sheet-shell divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-1/2 lg:w-[28rem] lg:-translate-x-1/2 max-h-[min(85dvh,36rem)]',
+  overlay: 'bg-elevated/0',
+  content: 'lm-chrome lm-sheet-shell bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:w-[28rem] max-h-[min(85dvh,36rem)]',
   header: 'lm-sheet-head relative flex-col items-stretch gap-0 px-4 pt-6 pb-0 sm:px-4 min-h-0',
   body: 'min-h-0 overflow-y-auto px-4 py-3 sm:px-4 sm:py-3',
   footer: 'lm-sheet-foot px-4 pb-4 sm:px-4',
@@ -933,6 +925,7 @@ const slideoverUi = {
           </UFormField>
 
           <UFormField
+            v-if="!isNewFestival"
             label="Stage or Scene"
             name="stage"
           >
@@ -944,7 +937,6 @@ const slideoverUi = {
               :disabled="pendingChoice"
               :content="{ hideWhenEmpty: true }"
               class="w-full"
-              @update:search-term="searchCatalog(CATALOG_KIND.stage, $event)"
             />
           </UFormField>
 
@@ -985,7 +977,7 @@ const slideoverUi = {
             label="Attach"
             color="primary"
             variant="outline"
-            class="h-11 flex-1 rounded-full ring-2"
+            class="h-11 flex-1 justify-center rounded-full ring-2"
             :loading="saving"
             @click="persist('attach')"
           />
@@ -994,7 +986,7 @@ const slideoverUi = {
             label="Create"
             color="neutral"
             variant="outline"
-            class="h-11 flex-1 rounded-full ring-2"
+            class="h-11 flex-1 justify-center rounded-full ring-2"
             :disabled="saving"
             @click="persist('create')"
           />
@@ -1020,7 +1012,7 @@ const slideoverUi = {
             :label="saveLabel"
             color="primary"
             variant="outline"
-            class="h-11 flex-1 rounded-full ring-2"
+            class="h-11 flex-1 justify-center rounded-full ring-2"
             :disabled="saving || (isEdit && !editLoaded) || confirmMove"
             :aria-busy="saving || undefined"
           />
@@ -1047,7 +1039,7 @@ const slideoverUi = {
             label="Delete concert"
             color="error"
             variant="outline"
-            class="h-11 rounded-full"
+            class="h-11 justify-center rounded-full"
             :loading="saving"
             @click="removeConcert"
           />
@@ -1073,7 +1065,7 @@ const slideoverUi = {
             label="Move concert"
             color="error"
             variant="outline"
-            class="h-11 rounded-full"
+            class="h-11 justify-center rounded-full"
             :loading="saving"
             @click="persist()"
           />
