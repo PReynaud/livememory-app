@@ -31,7 +31,7 @@ authTest('creates a festival, lists it on Concerts, and opens an empty Bill', as
   await authenticatedPage.getByLabel('Name').fill('Rock Week');
   await authenticatedPage.getByLabel('Start date').fill('2026-08-20');
   await authenticatedPage.getByLabel('End date').fill('2026-08-22');
-  await authenticatedPage.getByLabel('Place').fill('Paris');
+  await authenticatedPage.getByLabel('City').fill('Paris');
   await authenticatedPage.getByRole('button', { name: 'Save' }).click();
 
   await authExpect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
@@ -61,7 +61,7 @@ authTest('creates a single_night with one date and lists a header-only group', a
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
   await authenticatedPage.getByLabel('Name').fill('Club Night');
   await authenticatedPage.getByLabel('Date').fill('2026-08-10');
-  await authenticatedPage.getByLabel('Place').fill('Berlin');
+  await authenticatedPage.getByLabel('City').fill('Berlin');
   await authenticatedPage.getByRole('button', { name: 'Save' }).click();
 
   await authExpect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
@@ -83,7 +83,7 @@ authTest('stays on the festival form for inverted dates and missing required fie
   await authenticatedPage.getByLabel('Name').fill('Bad Range');
   await authenticatedPage.getByLabel('Start date').fill('2026-08-22');
   await authenticatedPage.getByLabel('End date').fill('2026-08-20');
-  await authenticatedPage.getByLabel('Place').fill('Paris');
+  await authenticatedPage.getByLabel('City').fill('Paris');
   await authenticatedPage.getByRole('button', { name: 'Save' }).click();
 
   await authExpect(authenticatedPage).toHaveURL(/\/concerts/);
@@ -104,7 +104,7 @@ authTest('unknown Event URLs are quiet not-found and a stranger joins via the UR
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
   await authenticatedPage.getByLabel('Name').fill('Private Night');
   await authenticatedPage.getByLabel('Date').fill('2026-08-12');
-  await authenticatedPage.getByLabel('Place').fill('Lyon');
+  await authenticatedPage.getByLabel('City').fill('Lyon');
   await authenticatedPage.getByRole('button', { name: 'Save' }).click();
   await authExpect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
   const ownedPath = new URL(authenticatedPage.url()).pathname;

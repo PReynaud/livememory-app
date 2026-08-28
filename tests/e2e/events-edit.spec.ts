@@ -9,7 +9,7 @@ const createFestivalWithConcert = async (
   await page.getByLabel('Name').fill(input.name);
   await page.getByLabel('Start date').fill(input.start);
   await page.getByLabel('End date').fill(input.end);
-  await page.getByLabel('Place').fill(input.place);
+  await page.getByLabel('City').fill(input.place);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
 
@@ -37,10 +37,10 @@ test('owner edits Event name and Place from the glass sheet', async ({ authentic
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole('heading', { name: 'Edit event' })).toBeVisible();
   await expect(sheet.getByLabel('Name')).toHaveValue('Rock Week');
-  await expect(sheet.getByRole('textbox', { name: 'Place' })).toHaveValue('Paris');
+  await expect(sheet.getByRole('textbox', { name: 'City' })).toHaveValue('Paris');
 
   await sheet.getByLabel('Name').fill('Rock Week Paris');
-  await sheet.getByRole('textbox', { name: 'Place' }).fill('La Villette');
+  await sheet.getByRole('textbox', { name: 'City' }).fill('La Villette');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(authenticatedPage.getByRole('heading', { name: 'Rock Week Paris' })).toBeVisible();

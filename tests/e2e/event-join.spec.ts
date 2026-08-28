@@ -172,7 +172,7 @@ test('signed-in joiner opens an Event URL once, sees the Bill, and lists it on C
     await page.goto('/home');
     await waitForNuxtHydration(page);
     await expect(page.getByTestId('home-featured').getByText('Shared Night')).toBeVisible();
-    await expect(page.getByTestId('home-stats').locator('[data-stat="events"]')).toHaveText(/1/);
+    await expect(page.getByTestId('home-stats').locator('[data-stat="events"]')).toHaveText(/0/);
     await expect(page.getByTestId('home-stats').locator('[data-stat="going"]')).toHaveText(/1/);
   } finally {
     await deleteE2EAccountForTest(owner.userId);

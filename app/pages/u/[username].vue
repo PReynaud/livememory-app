@@ -44,7 +44,7 @@ watch(username, (handle) => {
 </script>
 
 <template>
-  <UContainer class="py-8 max-w-lg space-y-4">
+  <UContainer class="py-8 max-w-3xl space-y-4">
     <template v-if="profile">
       <div
         data-testid="route-announcer"

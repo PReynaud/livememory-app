@@ -79,7 +79,7 @@ if (import.meta.server) {
 </script>
 
 <template>
-  <UContainer class="py-8 max-w-lg space-y-4">
+  <UContainer class="py-8 max-w-3xl space-y-4">
     <h1 class="text-[34px] font-bold tracking-tight leading-tight">
       Concerts
     </h1>
@@ -157,11 +157,12 @@ if (import.meta.server) {
       </template>
 
       <UFormField
-        label="Place"
+        label="City"
         name="place"
       >
         <UInput
           v-model="place"
+          placeholder="City"
           class="w-full"
         />
       </UFormField>

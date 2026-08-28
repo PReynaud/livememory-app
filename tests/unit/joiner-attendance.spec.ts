@@ -137,6 +137,7 @@ describe('joiner Event attendance surface', () => {
 
     expect(page).toMatch(/AppAttendanceChip/);
     expect(page).toMatch(/cycleAttendance/);
+    expect(page).toMatch(/currentEvent\.kind === 'festival'/);
     expect(page).not.toMatch(/v-if="isOwner"\s*\n\s*:status="eventsStore.attendanceStatus"/);
     expect(page).toMatch(/v-if="showAttendThisNight"/);
     expect(page).not.toMatch(/isOwner && showAttendThisNight/);

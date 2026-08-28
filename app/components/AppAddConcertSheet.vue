@@ -625,7 +625,7 @@ const removeConcert = async () => {
 
 const slideoverUi = {
   overlay: 'bg-elevated/0',
-  content: 'lm-chrome lm-sheet-shell bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:w-[28rem] max-h-[min(85dvh,36rem)]',
+  content: 'lm-chrome lm-sheet-shell bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-24 lg:right-0 lg:mx-auto lg:w-[28rem] max-h-[min(85dvh,36rem)]',
   header: 'lm-sheet-head relative flex-col items-stretch gap-0 px-4 pt-6 pb-0 sm:px-4 min-h-0',
   body: 'min-h-0 overflow-y-auto px-4 py-3 sm:px-4 sm:py-3',
   footer: 'lm-sheet-foot px-4 pb-4 sm:px-4',
@@ -905,7 +905,7 @@ const slideoverUi = {
           </div>
 
           <UFormField
-            label="Place"
+            label="City"
             name="place"
             required
             :error="placeFieldInvalid"
