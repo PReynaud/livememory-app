@@ -469,8 +469,8 @@ test('tapping a Shared List Event does not join until the Event URL; joined Even
     await expect(page.getByRole('heading', { name: 'Pierre Night' })).toBeVisible();
     await expect(page.getByText('Phoenix')).toBeVisible();
     await expect(page.getByText('Extra Act')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Mark as going/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Attend this night' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Mark as going/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Edit event' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add to this night' })).toHaveCount(0);
 

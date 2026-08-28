@@ -139,8 +139,8 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   await futureSheet.getByLabel('Artist').fill('Justice');
   await futureSheet.getByRole('button', { name: 'Save' }).click();
 
-  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const goingChip = authenticatedPage.getByRole('button', { name: 'Mark as going' });
@@ -159,7 +159,9 @@ test('marks a future concert Going and a past concert Attended, then clear stays
 
   await authenticatedPage.goto(futureEventPath);
   await waitForNuxtHydration(authenticatedPage);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'false');
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await authenticatedPage.getByRole('button', { name: 'New night' }).click();
@@ -184,8 +186,9 @@ test('marks a future concert Going and a past concert Attended, then clear stays
 
   await pastGroup.getByRole('link', { name: /Past Night/ }).click();
   await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 });
 
 test('hides another user attendance over REST and coerces past going to attended', async ({ page: _page }, testInfo) => {

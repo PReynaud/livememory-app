@@ -170,9 +170,11 @@ describe('join surfaces', () => {
     const page = read('app/pages/e/[id].vue');
     expect(page).toMatch(/isOwner/);
     expect(page).not.toMatch(/useSupabaseUser/);
-    expect(page).toMatch(/Copy link/);
-    expect(page).toMatch(/copyEventLink/);
+    expect(page).toMatch(/Share event/);
+    expect(page).toMatch(/shareEventLink/);
     expect(page).toMatch(/COPY_LINK_FAILED/);
+    expect(page).not.toMatch(/Copy link/);
+    expect(page).not.toMatch(/copyEventLink/);
     expect(page).not.toMatch(/share sheet|Share sheet|invite modal|Invite friends|directory/i);
     expect(page).toMatch(/v-if="isOwner"/);
     expect(page).toMatch(/Edit event/);

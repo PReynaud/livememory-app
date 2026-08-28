@@ -132,17 +132,20 @@ const createAttendanceClient = (rows: AttendanceRecord[] = []) => {
 };
 
 describe('joiner Event attendance surface', () => {
-  it('shows own chips and Attend this night, and hides Bill writes and notes', () => {
+  it('shows own chips and night Going, and hides Bill writes and notes', () => {
     const page = read('app/pages/e/[id].vue');
 
     expect(page).toMatch(/AppAttendanceChip/);
     expect(page).toMatch(/cycleAttendance/);
+    expect(page).toMatch(/cycleEventGoing/);
     expect(page).toMatch(/currentEvent\.kind === 'festival'/);
     expect(page).not.toMatch(/v-if="isOwner"\s*\n\s*:status="eventsStore.attendanceStatus"/);
-    expect(page).toMatch(/v-if="showAttendThisNight"/);
-    expect(page).not.toMatch(/isOwner && showAttendThisNight/);
+    expect(page).toMatch(/v-if="showNightGoingChip"/);
+    expect(page).not.toMatch(/isOwner && showNightGoingChip/);
+    expect(page).not.toMatch(/Attend this night/);
     expect(page).toMatch(/v-if="isOwner"/);
     expect(page).toMatch(/Edit event/);
+    expect(page).toMatch(/Share event/);
     expect(page).toMatch(/billCtaLabel/);
     expect(page).toMatch(/openEditSheet/);
     expect(page).not.toMatch(/label="Notes"|name="notes"/);
