@@ -23,6 +23,7 @@ import {
   EVENTS_LIST_WINDOW,
   nextEventsListWindowEnd,
   listConcertsForEvent,
+  listConcertEventIds,
   listConcertsForEventIds,
   listOwnedConcerts,
   moveConcert,
@@ -2506,6 +2507,39 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const windowed = await listConcertsForEventIds(client, [festivalRow.id, '  ']);
     expect(windowed.error).toBeNull();
     expect(windowed.data?.map(concert => concert.artist)).toEqual(['The Last Dinner Party']);
+  });
+
+  it('lists concert ids and event ids for souvenir stats without requiring a window', async () => {
+    const first: ConcertRecord = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      event_id: festivalRow.id,
+      owner_id: festivalRow.owner_id,
+      artist: 'The Last Dinner Party',
+      date: '2026-08-20',
+      time: '20:15',
+      place: 'Paris'
+    };
+    const other: ConcertRecord = {
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      event_id: nightRow.id,
+      owner_id: nightRow.owner_id,
+      artist: 'Local Band',
+      date: '2026-08-18',
+      time: null,
+      place: 'Berlin'
+    };
+
+    const { client } = createMockConcertsClient({
+      events: [festivalRow, nightRow],
+      concerts: [first, other]
+    });
+
+    const indexed = await listConcertEventIds(client);
+    expect(indexed.error).toBeNull();
+    expect(indexed.data).toEqual([
+      { id: first.id, event_id: first.event_id },
+      { id: other.id, event_id: other.event_id }
+    ]);
   });
 });
 
