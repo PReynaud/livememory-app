@@ -56,8 +56,8 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toHaveCount(1);
   await expect(authenticatedPage.getByText('20:15')).toHaveCount(2);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const nightGroup = authenticatedPage.getByRole('link', { name: /Club Night/ });
@@ -190,8 +190,8 @@ test('nav Add onto an existing Event stores the concert', async ({ authenticated
 
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 });
 
 const createOwnedNight = async (

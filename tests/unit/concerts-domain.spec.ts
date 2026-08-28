@@ -2548,7 +2548,8 @@ describe('concerts store and pages use domain helpers only', () => {
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/Add to this night/);
     expect(eventPage).toMatch(/Add to this festival/);
-    expect(eventPage).toMatch(/Attend this night/);
+    expect(eventPage).toMatch(/cycleEventGoing/);
+    expect(eventPage).toMatch(/Bill/);
     expect(eventPage).toMatch(/billLoadFailed/);
     expect(eventPage).toMatch(/concertId/);
     expect(eventPage).toMatch(/Edit /);

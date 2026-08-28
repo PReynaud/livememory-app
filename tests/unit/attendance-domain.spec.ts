@@ -560,6 +560,8 @@ describe('attendance stays off pages and the store query path', () => {
     expect(store).toMatch(/cycleEventGoing/);
     expect(store).toMatch(/kind !== 'single_night'/);
     expect(store).toMatch(/eventGoingStatus/);
+    expect(store).toMatch(/currentEvent\.value\?\.id !== eventId/);
+    expect(store).toMatch(/return currentConcerts\.value/);
     const attendThisNightAction = store.slice(store.indexOf('const attendThisNight ='));
     expect(attendThisNightAction).not.toMatch(/loading\.value = true/);
     expect(attendThisNightAction).not.toMatch(/error\.value =/);
@@ -581,10 +583,13 @@ describe('attendance stays off pages and the store query path', () => {
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/AppAttendanceChip/);
     expect(eventPage).toMatch(/isAttendanceBusy/);
-    expect(eventPage).toMatch(/isAttendThisNightBusy/);
-    expect(eventPage).toMatch(/Attend this night/);
+    expect(eventPage).toMatch(/isEventGoingBusy/);
+    expect(eventPage).toMatch(/cycleEventGoing/);
+    expect(eventPage).toMatch(/showNightGoingChip/);
     expect(eventPage).toMatch(/kind === 'single_night'/);
     expect(eventPage).toMatch(/currentEvent\.kind === 'festival'/);
+    expect(eventPage).not.toMatch(/Attend this night/);
+    expect(eventPage).not.toMatch(/isAttendThisNightBusy/);
     expect(eventPage).not.toMatch(/Attend this festival|Mark every concert/i);
     expect(eventPage).not.toMatch(/compact card|compactCard/i);
 

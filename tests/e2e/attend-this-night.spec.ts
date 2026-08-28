@@ -35,9 +35,10 @@ test('future night attend-all marks Going, later add inherits, clear stays unset
     artists: ['Justice', 'Fontaines D.C.']
   });
 
-  const attend = authenticatedPage.getByRole('button', { name: 'Attend this night' });
+  const attend = authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ });
   await expect(attend).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(attend).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await attend.click();
 
@@ -60,7 +61,8 @@ test('future night attend-all marks Going, later add inherits, clear stays unset
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet).toHaveCount(0);
   await expect(authenticatedPage.getByText('Aphex Twin')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'true');
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await expect(goingChipOnConcerts(authenticatedPage)).toHaveCount(1);
@@ -79,15 +81,16 @@ test('past night attend-all marks Attended', async ({ authenticatedPage }) => {
     artists: ['Justice', 'Fontaines D.C.']
   });
 
-  await authenticatedPage.getByRole('button', { name: 'Attend this night' }).click();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ }).click();
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'true');
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await expect(goingChipOnConcerts(authenticatedPage)).toHaveAttribute('aria-pressed', 'true');
   await expect(goingChipOnConcerts(authenticatedPage)).toHaveText('Attended');
 });
 
-test('festival Event hides Attend this night', async ({ authenticatedPage }) => {
+test('festival Event has per-concert chips and no night Going chip', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await authenticatedPage.getByRole('button', { name: 'New festival' }).click();
   await authenticatedPage.getByLabel('Name').fill('Rock Week');

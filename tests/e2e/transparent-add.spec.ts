@@ -65,8 +65,8 @@ test('defaults future transparent Attendance to Going and groups after a second 
 
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('Local Band')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   const group = authenticatedPage.locator('[data-event-card="group"]');

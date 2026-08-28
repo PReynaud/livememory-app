@@ -200,7 +200,12 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const concertsForEvent = (eventId: string) => {
-    return concerts.value.filter(concert => concert.event_id === eventId);
+    const listed = concerts.value.filter(concert => concert.event_id === eventId);
+    if (listed.length || currentEvent.value?.id !== eventId) {
+      return listed;
+    }
+
+    return currentConcerts.value;
   };
 
   const stagesForEvent = (eventId: string) => {

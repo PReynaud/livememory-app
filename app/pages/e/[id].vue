@@ -5,7 +5,8 @@ import { storeToRefs } from 'pinia';
 import { useEventsStore, type ConcertRecord } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEditEventSheetStore } from '@/stores/edit-event-sheet';
-import { COPY_LINK_FAILED, copyTextToClipboard } from '@/utils/copy-link';
+import { COPY_LINK_FAILED } from '@/utils/copy-link';
+import { LINK_COPIED, shareEventLink } from '@/utils/share-event';
 import { formatEventDateLabel } from '@/utils/event-dates';
 import {
   formatConcertClock,
@@ -25,7 +26,7 @@ const addSheet = useAddConcertSheetStore();
 const editEventSheet = useEditEventSheetStore();
 const { currentEvent, currentConcerts, error, isOwner } = storeToRefs(eventsStore);
 const hasResolved = ref(false);
-const copyBusy = ref(false);
+const shareBusy = ref(false);
 const confirmLeave = ref(false);
 const leaving = ref(false);
 const hasLeft = ref(false);
@@ -59,12 +60,37 @@ const billLoadFailed = computed(() => {
 const billCtaLabel = computed(() => {
   return currentEvent.value?.kind === 'festival' ? 'Add to this festival' : 'Add to this night';
 });
-const showAttendThisNight = computed(() => {
+const eventKindLabel = computed(() => {
+  return currentEvent.value?.kind === 'festival' ? 'Festival' : 'Night';
+});
+const eventLead = computed(() => {
+  if (!currentEvent.value) {
+    return '';
+  }
+
+  return [formatEventDateLabel(currentEvent.value), currentEvent.value.place].filter(Boolean).join(' · ');
+});
+const showNightGoingChip = computed(() => {
   return currentEvent.value?.kind === 'single_night' && hasConcerts.value;
+});
+const nightIsPast = computed(() => {
+  return hasConcerts.value && currentConcerts.value.every(row => eventsStore.concertIsPast(row));
+});
+const concertCountLabel = computed(() => {
+  const count = currentConcerts.value.length;
+  return count === 1 ? '1 concert' : `${count} concerts`;
 });
 
 const stageName = (concert: ConcertRecord) => {
+  if (concert.stage_name) {
+    return concert.stage_name;
+  }
+
   return eventsStore.currentStages.find(stage => stage.id === concert.stage_id)?.name ?? '';
+};
+
+const concertMeta = (concert: ConcertRecord) => {
+  return [concert.time ? formatConcertClock(concert.time) : '', stageName(concert)].filter(Boolean).join(' · ');
 };
 
 const loadEvent = async (id: string) => {
@@ -111,14 +137,6 @@ const openAddSheet = () => {
   });
 };
 
-const attendThisNight = async () => {
-  if (!currentEvent.value) {
-    return;
-  }
-
-  await eventsStore.attendThisNight(currentEvent.value.id);
-};
-
 const openEditSheet = (concert: ConcertRecord) => {
   if (!currentEvent.value || !isOwner.value) {
     return;
@@ -131,19 +149,28 @@ const openEditSheet = (concert: ConcertRecord) => {
   });
 };
 
-const copyEventLink = async () => {
-  if (copyBusy.value) {
+const shareThisEvent = async () => {
+  if (!currentEvent.value || shareBusy.value) {
     return;
   }
 
-  copyBusy.value = true;
+  shareBusy.value = true;
   try {
-    const result = await copyTextToClipboard(window.location.href);
+    const result = await shareEventLink({
+      title: currentEvent.value.name,
+      text: `${currentEvent.value.name} — ${eventLead.value}`,
+      url: window.location.href
+    });
     if (result.error) {
       toast.add({ title: COPY_LINK_FAILED });
+      return;
+    }
+
+    if (result.method === 'clipboard') {
+      toast.add({ title: LINK_COPIED });
     }
   } finally {
-    copyBusy.value = false;
+    shareBusy.value = false;
   }
 };
 
@@ -180,125 +207,152 @@ const leaveThisEvent = async () => {
 </script>
 
 <template>
-  <UContainer class="py-8 max-w-3xl space-y-4">
+  <UContainer class="py-8 max-w-3xl space-y-5">
     <template v-if="currentEvent">
-      <h1 class="text-[34px] font-bold tracking-tight leading-tight">
-        {{ currentEvent.name }}
-      </h1>
-      <p class="text-[13px] text-muted">
-        {{ formatEventDateLabel(currentEvent) }}
-      </p>
-      <p class="text-[13px] text-muted">
-        {{ currentEvent.place }}
-      </p>
-      <UButton
-        v-if="isOwner"
-        label="Edit event"
-        color="neutral"
-        variant="link"
-        class="px-0 font-semibold text-white"
-        @click="openEditEvent"
-      />
-      <UButton
-        v-if="isOwner"
-        label="Copy link"
-        color="neutral"
-        variant="link"
-        class="px-0 text-[13px] font-medium text-muted"
-        :loading="copyBusy"
-        @click="void copyEventLink()"
-      />
-      <section class="rounded-2xl bg-[#1A1A1A] p-4 space-y-2">
-        <template v-if="billLoadFailed">
-          <AppLoadError @retry="retryLoad" />
-        </template>
-        <p
-          v-else-if="!hasConcerts"
-          class="text-lg font-semibold"
-        >
-          No concerts on this bill.
+      <header class="space-y-0">
+        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+          {{ eventKindLabel }}
         </p>
-        <template v-else>
-          <div
-            v-for="(group, index) in billGroups"
-            :key="group.date"
-            :class="index > 0 ? 'border-t border-white/10 pt-2' : ''"
-          >
-            <p
-              v-if="showDayHeaders"
-              class="text-[13px] font-semibold text-muted"
+        <div class="flex items-start justify-between gap-3">
+          <h1 class="min-w-0 flex-1 text-[34px] font-bold tracking-tight leading-[1.1]">
+            {{ currentEvent.name }}
+          </h1>
+          <div class="lm-header-actions">
+            <button
+              v-if="isOwner"
+              type="button"
+              class="lm-header-icon"
+              aria-label="Edit event"
+              title="Edit event"
+              @click="openEditEvent"
             >
-              {{ formatConcertDayLabel(group.date) }}
-            </p>
-            <div
-              v-for="concert in group.concerts"
-              :key="concert.id"
-              class="flex items-start justify-between gap-3 py-1.5"
-            >
-              <button
-                v-if="isOwner"
-                type="button"
-                class="min-w-0 flex-1 text-left"
-                :aria-label="`Edit ${concert.artist}`"
-                @click="openEditSheet(concert)"
-              >
-                <p class="text-base font-semibold">
-                  {{ concert.artist }}
-                </p>
-                <p
-                  v-if="concert.time"
-                  class="text-[13px] text-muted"
-                >
-                  {{ formatConcertClock(concert.time) }}
-                </p>
-                <p
-                  v-if="stageName(concert)"
-                  class="text-[13px] text-muted"
-                >
-                  {{ stageName(concert) }}
-                </p>
-              </button>
-              <div
-                v-else
-                class="min-w-0 flex-1"
-              >
-                <p class="text-base font-semibold">
-                  {{ concert.artist }}
-                </p>
-                <p
-                  v-if="concert.time"
-                  class="text-[13px] text-muted"
-                >
-                  {{ formatConcertClock(concert.time) }}
-                </p>
-                <p
-                  v-if="stageName(concert)"
-                  class="text-[13px] text-muted"
-                >
-                  {{ stageName(concert) }}
-                </p>
-              </div>
-              <AppAttendanceChip
-                v-if="currentEvent.kind === 'festival'"
-                :status="eventsStore.attendanceStatus(concert.id)"
-                :is-past="eventsStore.concertIsPast(concert)"
-                :disabled="eventsStore.isAttendanceBusy(concert.id)"
-                @click="void eventsStore.cycleAttendance(concert)"
+              <UIcon
+                name="i-lucide-pencil"
+                class="size-5"
               />
-            </div>
+            </button>
+            <button
+              type="button"
+              class="lm-header-icon"
+              aria-label="Share event"
+              title="Share event"
+              :disabled="shareBusy"
+              :aria-busy="shareBusy || undefined"
+              @click="void shareThisEvent()"
+            >
+              <UIcon
+                name="i-lucide-share"
+                class="lm-header-icon-spin size-5"
+              />
+            </button>
           </div>
-        </template>
+        </div>
+        <p class="mt-2 max-w-[40ch] text-[15px] leading-[1.45] text-muted">
+          {{ eventLead }}
+        </p>
+      </header>
+
+      <section
+        class="space-y-3"
+        aria-labelledby="event-bill-heading"
+      >
+        <div class="flex items-center justify-between gap-3 px-0.5">
+          <h2
+            id="event-bill-heading"
+            class="text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+          >
+            Bill
+          </h2>
+          <div class="flex shrink-0 items-center gap-2.5">
+            <AppAttendanceChip
+              v-if="showNightGoingChip"
+              :status="eventsStore.eventGoingStatus(currentEvent.id)"
+              :is-past="nightIsPast"
+              :disabled="eventsStore.isEventGoingBusy(currentEvent.id)"
+              @click="void eventsStore.cycleEventGoing(currentEvent.id)"
+            />
+            <span
+              class="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 text-xs font-semibold tabular-nums"
+              :aria-label="concertCountLabel"
+            >
+              {{ currentConcerts.length }}
+            </span>
+          </div>
+        </div>
+
+        <div class="lm-card p-3.5 space-y-0">
+          <template v-if="billLoadFailed">
+            <AppLoadError @retry="retryLoad" />
+          </template>
+          <p
+            v-else-if="!hasConcerts"
+            class="text-[15px] text-muted"
+          >
+            No concerts on this bill.
+          </p>
+          <template v-else>
+            <div
+              v-for="(group, index) in billGroups"
+              :key="group.date"
+              :class="index > 0 ? 'mt-3 border-t border-white/8 pt-3' : ''"
+            >
+              <p
+                v-if="showDayHeaders"
+                class="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
+              >
+                {{ formatConcertDayLabel(group.date) }}
+              </p>
+              <div class="space-y-2">
+                <div
+                  v-for="concert in group.concerts"
+                  :key="concert.id"
+                  class="lm-concert-row"
+                >
+                  <button
+                    v-if="isOwner"
+                    type="button"
+                    class="concert-main min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 text-left text-inherit"
+                    :aria-label="`Edit ${concert.artist}`"
+                    @click="openEditSheet(concert)"
+                  >
+                    <p class="text-base font-semibold leading-snug">
+                      {{ concert.artist }}
+                    </p>
+                    <p
+                      v-if="concertMeta(concert)"
+                      class="mt-0.5 text-[13px] leading-snug text-muted"
+                    >
+                      {{ concertMeta(concert) }}
+                    </p>
+                  </button>
+                  <div
+                    v-else
+                    class="min-w-0 flex-1"
+                  >
+                    <p class="text-base font-semibold leading-snug">
+                      {{ concert.artist }}
+                    </p>
+                    <p
+                      v-if="concertMeta(concert)"
+                      class="mt-0.5 text-[13px] leading-snug text-muted"
+                    >
+                      {{ concertMeta(concert) }}
+                    </p>
+                  </div>
+                  <AppAttendanceChip
+                    v-if="currentEvent.kind === 'festival'"
+                    :status="eventsStore.attendanceStatus(concert.id)"
+                    :is-past="eventsStore.concertIsPast(concert)"
+                    :disabled="eventsStore.isAttendanceBusy(concert.id)"
+                    @click="void eventsStore.cycleAttendance(concert)"
+                  />
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
       </section>
-      <UButton
-        v-if="showAttendThisNight"
-        label="Attend this night"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        :loading="eventsStore.isAttendThisNightBusy()"
-        :disabled="eventsStore.isAttendThisNightBusy()"
-        @click="void attendThisNight()"
-      />
+
       <UButton
         v-if="isOwner"
         :label="billCtaLabel"
@@ -307,40 +361,46 @@ const leaveThisEvent = async () => {
         class="h-11 rounded-full ring-2"
         @click="openAddSheet"
       />
-      <UButton
-        v-if="!isOwner && !confirmLeave"
-        label="Leave Event"
-        color="neutral"
-        variant="link"
-        class="px-0 text-[13px] font-medium text-muted"
-        :disabled="leaving"
-        @click="requestLeave"
-      />
       <div
-        v-if="!isOwner && confirmLeave"
-        class="space-y-3"
+        v-if="!isOwner"
+        class="member-zone mt-1 border-t border-white/8 pt-4"
       >
-        <p class="text-[15px] text-muted">
-          Leave this Event? It will leave your list. The bill stays for the owner.
-        </p>
-        <div class="flex items-center gap-4">
-          <UButton
-            label="Leave"
-            color="error"
-            variant="outline"
-            class="h-11 rounded-full"
-            :loading="leaving"
-            :disabled="leaving"
-            @click="void leaveThisEvent()"
-          />
-          <UButton
-            label="Cancel"
-            color="neutral"
-            variant="link"
-            class="px-0 font-semibold text-white"
-            :disabled="leaving"
-            @click="cancelLeave"
-          />
+        <UButton
+          v-if="!confirmLeave"
+          label="Leave Event"
+          color="neutral"
+          variant="link"
+          class="px-0 text-[13px] font-medium text-muted"
+          :disabled="leaving"
+          @click="requestLeave"
+        />
+        <div
+          v-else
+          class="space-y-3"
+        >
+          <p class="text-[15px] leading-[1.45] text-muted">
+            Leave this Event? It will leave your list. The bill stays for the owner.
+          </p>
+          <div class="flex items-center gap-4">
+            <UButton
+              :label="leaving ? 'Leaving...' : 'Leave'"
+              color="neutral"
+              variant="outline"
+              class="h-11 rounded-full"
+              :loading="leaving"
+              :disabled="leaving"
+              :aria-busy="leaving || undefined"
+              @click="void leaveThisEvent()"
+            />
+            <UButton
+              label="Cancel"
+              color="neutral"
+              variant="link"
+              class="px-0 font-semibold text-white"
+              :disabled="leaving"
+              @click="cancelLeave"
+            />
+          </div>
         </div>
       </div>
       <UAlert
@@ -348,6 +408,7 @@ const leaveThisEvent = async () => {
         color="error"
         variant="subtle"
         :title="leaveError"
+        role="alert"
       />
     </template>
 
@@ -360,9 +421,15 @@ const leaveThisEvent = async () => {
     </template>
 
     <template v-else-if="notFound">
-      <h1 class="text-[34px] font-bold tracking-tight leading-tight">
+      <p class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+        Event
+      </p>
+      <h1 class="text-[34px] font-bold tracking-tight leading-tight text-muted">
         Event not found.
       </h1>
+      <p class="mt-2 max-w-[40ch] text-[15px] leading-[1.45] text-muted">
+        This Event is missing, or you cannot see it.
+      </p>
     </template>
   </UContainer>
 </template>

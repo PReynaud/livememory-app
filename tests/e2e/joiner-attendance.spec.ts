@@ -72,7 +72,7 @@ const chipFor = (page: import('@playwright/test').Page, artist: string) => {
     .locator('xpath=following::button[contains(@aria-label,"Mark as")][1]');
 };
 
-test('joiner sets, changes, and clears only their Attendance and can attend this night', async ({
+test('joiner sets, changes, and clears only their Attendance and can mark the night Going', async ({
   page
 }, testInfo) => {
   const owner = await createE2EAccountForTest(`j2a-own-${testInfo.workerIndex}-${testInfo.retry}`);
@@ -135,10 +135,13 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
     await expect(page.getByRole('button', { name: 'Delete event' })).toHaveCount(0);
     await expect(page.getByText('Back of the room.')).toHaveCount(0);
     await expect(page.getByLabel('Notes')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Attend this night' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Share event' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Attend this night' }).click();
+    const nightChip = page.getByRole('button', { name: /Mark as (going|attended)/ });
+    await nightChip.click();
+    await expect(nightChip).toHaveAttribute('aria-pressed', 'true');
 
     const joinerSession = await signInRest(joiner);
     const joinerRows = await fetch(
