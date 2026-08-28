@@ -102,6 +102,77 @@ describe('MCP log tools call domain, not SQL', () => {
     });
   });
 
+  it('forwards stageName on create, update, and move concert', async () => {
+    const createConcert = vi.fn().mockResolvedValue({
+      data: concert,
+      error: null,
+      outcome: CONCERT_IDENTITY.created
+    });
+    const updateConcert = vi.fn().mockResolvedValue({
+      data: concert,
+      error: null,
+      outcome: CONCERT_IDENTITY.created
+    });
+    const moveConcert = vi.fn().mockResolvedValue({
+      data: concert,
+      error: null
+    });
+
+    await invokeLogTool(
+      'create_concert',
+      {
+        artist: 'Justice',
+        date: '2026-08-18',
+        place: 'Lyon',
+        stageName: 'Marché Gare'
+      },
+      {},
+      domainStub({ createConcert })
+    );
+    expect(createConcert.mock.calls[0]?.[1]).toMatchObject({
+      place: 'Lyon',
+      stageName: 'Marché Gare'
+    });
+
+    await invokeLogTool(
+      'update_concert',
+      {
+        concertId: 'concert-1',
+        artist: 'Justice',
+        date: '2026-08-18',
+        place: 'Lyon',
+        stageName: 'Marché Gare'
+      },
+      {},
+      domainStub({ updateConcert })
+    );
+    expect(updateConcert.mock.calls[0]?.[1]).toMatchObject({
+      place: 'Lyon',
+      stageName: 'Marché Gare'
+    });
+
+    await invokeLogTool(
+      'move_concert',
+      {
+        concertId: 'concert-1',
+        targetEventId: 'event-2',
+        place: 'Lyon',
+        stageName: 'Marché Gare'
+      },
+      {},
+      domainStub({
+        moveConcert,
+        listOwnedConcerts: vi.fn().mockResolvedValue({ data: [concert], error: null }),
+        requireEventOwnerAccess: vi.fn().mockResolvedValue(null),
+        concertMoveWouldLoseJoiners: vi.fn().mockResolvedValue({ data: false, error: null })
+      })
+    );
+    expect(moveConcert.mock.calls[0]?.[1]).toMatchObject({
+      place: 'Lyon',
+      stageName: 'Marché Gare'
+    });
+  });
+
   it('returns attached, needs_choice, and impossible_place without warn-then-save-anyway', async () => {
     const attached = await invokeLogTool(
       'create_concert',
@@ -501,6 +572,10 @@ describe('MCP adapter wiring', () => {
     expect(server).toMatch(/join_event/);
     expect(server).toMatch(/leave_event/);
     expect(server).toMatch(/confirmChoiceSchema/);
+    expect(server).toMatch(/City \(not the venue \/ Stage\)/);
+    expect(server).toMatch(/required for transparent create/);
+    expect(server).toMatch(/Venue or stage name; type to create/);
+    expect(tools).toMatch(/stageName: asNullableString\(args\.stageName\)/);
     expect(server).not.toMatch(/from\('events'\)/);
     expect(server).not.toMatch(/service_role/);
 

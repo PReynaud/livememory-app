@@ -10,7 +10,7 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Date').fill('2026-08-10');
   await expect(sheet.getByLabel('Date')).toHaveValue('2026-08-10');
-  await sheet.getByLabel('Place').fill('Berlin');
+  await sheet.getByLabel('City').fill('Berlin');
   await sheet.getByLabel('Time').fill('20:15');
   await sheet.getByRole('button', { name: 'Save' }).click();
 
@@ -45,7 +45,7 @@ test('defaults future transparent Attendance to Going and groups after a second 
   await selectAddSheetEvent(authenticatedPage, sheet, 'New night');
   await sheet.getByLabel('Artist').fill('Fontaines D.C.');
   await sheet.getByLabel('Date').fill('2026-12-01');
-  await sheet.getByLabel('Place').fill('Lyon');
+  await sheet.getByLabel('City').fill('Lyon');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toBeVisible();
 
@@ -65,9 +65,8 @@ test('defaults future transparent Attendance to Going and groups after a second 
 
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('Local Band')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as going' })).toHaveCount(2);
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as going' }).nth(0)).toHaveAttribute('aria-pressed', 'true');
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as going' }).nth(1)).toHaveAttribute('aria-pressed', 'false');
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   const group = authenticatedPage.locator('[data-event-card="group"]');
@@ -76,6 +75,6 @@ test('defaults future transparent Attendance to Going and groups after a second 
   await expect(group.getByText('Concerts on 01/12/2026 at Lyon')).toBeVisible();
   await expect(group.getByText('Fontaines D.C.')).toBeVisible();
   await expect(group.getByText('Local Band')).toBeVisible();
-  await expect(group.getByRole('button', { name: 'Mark as going' }).nth(0)).toHaveAttribute('aria-pressed', 'true');
-  await expect(group.getByRole('button', { name: 'Mark as going' }).nth(1)).toHaveAttribute('aria-pressed', 'false');
+  await expect(group.getByRole('button', { name: 'Mark as going' })).toHaveCount(1);
+  await expect(group.getByRole('button', { name: 'Mark as going' })).toHaveAttribute('aria-pressed', 'true');
 });

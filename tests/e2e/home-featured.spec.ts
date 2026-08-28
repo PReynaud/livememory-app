@@ -128,7 +128,7 @@ test('shows empty featured copy and zero souvenir stats that are not tappable', 
   const stats = authenticatedPage.getByTestId('home-stats');
   await expect(stats.getByText('Attended')).toBeVisible();
   await expect(stats.getByText('Events')).toBeVisible();
-  await expect(stats.getByText('Going')).toBeVisible();
+  await expect(stats.getByText('Upcoming')).toBeVisible();
   await expect(stats.locator('[data-stat="attended"]')).toHaveText(/0/);
   await expect(stats.locator('[data-stat="events"]')).toHaveText(/0/);
   await expect(stats.locator('[data-stat="going"]')).toHaveText(/0/);
@@ -172,7 +172,8 @@ test('features the next 1–3 upcoming Events and keeps the rest of the log on C
   await expect(featured.getByText('Fourth Night')).toHaveCount(0);
   await expect(featured.getByText('Past Night')).toHaveCount(0);
   await expect(authenticatedPage.getByTestId('home-featured-empty')).toHaveCount(0);
-  await expect(authenticatedPage.getByTestId('home-stats').locator('[data-stat="events"]')).toHaveText(/5/);
+  await expect(authenticatedPage.getByTestId('home-stats').locator('[data-stat="events"]')).toHaveText(/0/);
+  await expect(authenticatedPage.getByTestId('home-stats').locator('[data-stat="going"]')).toHaveText(/4/);
 
   await featured.getByRole('link', { name: /Empty Soon/ }).click();
   await expect(authenticatedPage).toHaveURL(new RegExp(`/e/${emptyId}$`));
@@ -242,6 +243,8 @@ test('uses compact artist anatomy for one Concert and grouped Event name for two
   await expect(group.getByRole('link')).toContainText('Rock Week');
   await expect(group.getByText('Fontaines D.C.')).toBeVisible();
   await expect(group.getByText('LCD Soundsystem')).toBeVisible();
+  await expect(group.getByRole('button', { name: 'Mark as going' })).toHaveCount(2);
+  await expect(compact.getByRole('button', { name: 'Mark as going' })).toHaveCount(1);
   await expect(authenticatedPage.getByText('Justice and Rock Week are waiting.')).toBeVisible();
   await expect(authenticatedPage.getByRole('heading', { name: 'Coming up' })).toBeVisible();
   await expect(authenticatedPage.getByText('Your journal')).toHaveCount(0);
@@ -289,8 +292,8 @@ test('counts effective attended, owned Events, and going; past nights leave feat
 
   const stats = authenticatedPage.getByTestId('home-stats');
   await expect(stats.locator('[data-stat="attended"]')).toHaveText(/1/);
-  await expect(stats.locator('[data-stat="events"]')).toHaveText(/3/);
-  await expect(stats.locator('[data-stat="going"]')).toHaveText(/1/);
+  await expect(stats.locator('[data-stat="events"]')).toHaveText(/1/);
+  await expect(stats.locator('[data-stat="going"]')).toHaveText(/2/);
 
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
   await expect(authenticatedPage.getByText('Past Night')).toBeVisible();

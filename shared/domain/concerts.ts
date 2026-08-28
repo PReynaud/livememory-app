@@ -1,5 +1,6 @@
 import {
   isConcertPast,
+  listMyAttendance,
   setAttendance,
   type AttendanceClient
 } from './attendance';
@@ -108,6 +109,7 @@ export type MoveConcertInput = {
   targetEventId: string;
   place?: string;
   stageId?: string | null;
+  stageName?: string | null;
 };
 
 type QueryError = {
@@ -802,6 +804,48 @@ const applyOwnerAttendanceDefault = async (
   return null;
 };
 
+const inheritNightGoingIfSiblingAttending = async (
+  client: ConcertsClient,
+  event: EventRecord,
+  concert: ConcertRecord
+): Promise<CreateConcertResult | null> => {
+  if (event.kind !== 'single_night') {
+    return null;
+  }
+
+  const siblingsResult = await client
+    .from('concerts')
+    .select(CONCERT_VISIBLE_COLUMNS)
+    .eq('event_id', event.id)
+    .order('date', { ascending: true });
+
+  if (siblingsResult.error) {
+    return failCreate('list_failed', siblingsResult.error.message);
+  }
+
+  const siblingIds = (siblingsResult.data ?? [])
+    .map(row => row.id)
+    .filter(id => id !== concert.id);
+  if (!siblingIds.length) {
+    return null;
+  }
+
+  const listed = await listMyAttendance(client as unknown as AttendanceClient);
+  if (listed.error) {
+    return failCreate(listed.error.ruleId, listed.error.message);
+  }
+
+  const siblingHasAttendance = (listed.data ?? []).some((row) => {
+    return siblingIds.includes(row.concert_id)
+      && (row.status === 'going' || row.status === 'attended');
+  });
+  if (!siblingHasAttendance) {
+    return null;
+  }
+
+  return applyOwnerAttendanceDefault(client, concert);
+};
+
 export const createConcert = async (
   client: ConcertsClient,
   input: CreateConcertInput
@@ -1049,6 +1093,12 @@ export const createConcert = async (
       await rollbackNewConcert(client, data.id);
       await rollbackNewEvent(client, createdEventId);
       return attendanceError;
+    }
+  } else {
+    const inherited = await inheritNightGoingIfSiblingAttending(client, event, data);
+    if (inherited) {
+      await rollbackNewConcert(client, data.id);
+      return inherited;
     }
   }
 
@@ -1334,7 +1384,7 @@ export const moveConcert = async (
   const placement = resolvePlaceAndStage(eventResult.data, stagesResult.data ?? [], {
     place: input.place === undefined ? existing.data.place : input.place,
     stageId: input.stageId === undefined ? existing.data.stage_id : input.stageId,
-    stageName: existing.data.stage_name
+    stageName: input.stageName === undefined ? existing.data.stage_name : input.stageName
   });
   if (placement.error || !placement.data) {
     return { data: null, error: placement.error };
@@ -1509,4 +1559,25 @@ export const listOwnedConcerts = async (
   }
 
   return ok(sortConcerts(withNotes.data));
+};
+
+export const listConcertEventIds = async (
+  client: ConcertsClient
+): Promise<DomainResult<Array<{ id: string; event_id: string }>>> => {
+  const { data, error } = await client
+    .from('concerts')
+    .select('id, event_id')
+    .order('date', { ascending: true });
+
+  if (error) {
+    return {
+      data: null,
+      error: {
+        ruleId: 'list_failed',
+        message: error.message
+      }
+    };
+  }
+
+  return ok((data ?? []).map(row => ({ id: row.id, event_id: row.event_id })));
 };

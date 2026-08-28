@@ -152,6 +152,7 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/label="Stage or Scene"/);
     expect(sheet).toMatch(/placeholder="Venue or stage"/);
     expect(sheet).toMatch(/placeholder="City"/);
+    expect(sheet).toMatch(/label="City"/);
     expect(sheet).toMatch(/eventAllowsPlaceOverride/);
     expect(sheet).not.toMatch(/description="City"/);
     expect(sheet).not.toMatch(/description="Venue or stage"/);
@@ -201,10 +202,16 @@ describe('add concert sheet open/close state', () => {
     expect(addUi).toMatch(/backdrop-blur-\[24px\]/);
     expect(addUi).not.toMatch(/bg-elevated\/75/);
     expect(addUi).not.toMatch(/-translate-x-1\/2/);
+    expect(addUi).toMatch(/lg:left-24/);
+    expect(addUi).toMatch(/lg:right-0/);
+    expect(addUi).toMatch(/lg:mx-auto/);
     expect(editUi).toMatch(/overlay: 'bg-elevated\/0'/);
     expect(editUi).toMatch(/bg-default\/50/);
     expect(editUi).toMatch(/backdrop-blur-\[24px\]/);
     expect(editUi).not.toMatch(/bg-elevated\/75/);
     expect(editUi).not.toMatch(/-translate-x-1\/2/);
+    expect(editUi).toMatch(/lg:left-24/);
+    expect(editUi).toMatch(/lg:right-0/);
+    expect(editUi).toMatch(/lg:mx-auto/);
   });
 });

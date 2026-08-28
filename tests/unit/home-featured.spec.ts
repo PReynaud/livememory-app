@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { souvenirStats } from '../../shared/domain/home';
+import { concertRefsForSouvenirs, souvenirStats } from '../../shared/domain/home';
 import { selectFeaturedEvents, type EventRecord } from '../../shared/domain/events';
 
 const read = (relative: string) => readFileSync(resolve(process.cwd(), relative), 'utf8');
@@ -17,21 +17,72 @@ const eventAt = (id: string, name: string, start: string): EventRecord => ({
 });
 
 describe('souvenirStats', () => {
-  it('counts effective attended, owned Events, and current going, including zeros', () => {
-    expect(souvenirStats({ eventCount: 0, statuses: [] })).toEqual({
+  it('counts attended concerts, participated events, and uncapped upcoming events', () => {
+    expect(souvenirStats({
+      events: [],
+      concerts: [],
+      statuses: {}
+    })).toEqual({
       attended: 0,
       events: 0,
       going: 0
     });
 
+    const past = eventAt('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Past Night', '2026-08-10');
+    const upcomingA = eventAt('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Soon A', '2026-12-01');
+    const upcomingB = eventAt('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Soon B', '2026-12-08');
+    const upcomingC = eventAt('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'Soon C', '2026-12-15');
+    const upcomingD = eventAt('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'Soon D', '2026-12-22');
+
     expect(souvenirStats({
-      eventCount: 4,
-      statuses: ['attended', 'going', 'attended', 'going', 'going']
+      events: [past, upcomingA, upcomingB, upcomingC, upcomingD],
+      concerts: [
+        { id: 'c-past-1', event_id: past.id },
+        { id: 'c-past-2', event_id: past.id },
+        { id: 'c-soon', event_id: upcomingA.id }
+      ],
+      statuses: {
+        'c-past-1': 'attended',
+        'c-past-2': 'attended',
+        'c-soon': 'going'
+      },
+      now: new Date('2026-08-19T12:00:00Z')
     })).toEqual({
       attended: 2,
-      events: 4,
-      going: 3
+      events: 1,
+      going: 4
     });
+  });
+
+  it('counts a Paris-today Event as Upcoming and participated Events from indexed concerts', () => {
+    const past = eventAt('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Past Night', '2026-08-10');
+    const todayNight = eventAt('ffffffff-ffff-4fff-8fff-ffffffffffff', 'Tonight', '2026-08-19');
+    const now = new Date('2026-08-19T12:00:00Z');
+
+    expect(souvenirStats({
+      events: [past, todayNight],
+      concerts: [
+        { id: 'c-past', event_id: past.id },
+        { id: 'c-today', event_id: todayNight.id }
+      ],
+      statuses: {
+        'c-past': 'attended',
+        'c-today': 'going'
+      },
+      now
+    })).toEqual({
+      attended: 1,
+      events: 1,
+      going: 1
+    });
+
+    expect(concertRefsForSouvenirs(
+      [{ id: 'c-past', event_id: past.id }],
+      [{ id: 'c-today', event_id: todayNight.id }]
+    )).toEqual([
+      { id: 'c-past', event_id: past.id },
+      { id: 'c-today', event_id: todayNight.id }
+    ]);
   });
 });
 
@@ -76,7 +127,11 @@ describe('Home featured and stats surfaces', () => {
     expect(store).toMatch(/souvenirStats/);
     expect(store).toMatch(/featuredEvents/);
     expect(store).toMatch(/homeStats/);
-    expect(store).toMatch(/eventCount:/);
+    expect(store).toMatch(/concertRefsForSouvenirs/);
+    expect(store).toMatch(/listConcertEventIds/);
+    expect(store).toMatch(/concertEventIndex/);
+    expect(store).toMatch(/statuses: attendanceByConcertId\.value/);
+    expect(store).not.toMatch(/eventCount:/);
     expect(store).not.toMatch(/from\('attendance'\)/);
     expect(store).not.toMatch(/from\('attendance_effective'\)/);
   });
@@ -126,6 +181,7 @@ describe('Home featured and stats surfaces', () => {
     expect(card).toMatch(/formatConcertMetaLine/);
     expect(card).toMatch(/groupConcertsByDate/);
     expect(card).toMatch(/cycleAttendance/);
+    expect(card).toMatch(/cycleEventGoing/);
     expect(card).toMatch(/data-event-card/);
     expect(card).toMatch(/data-featured/);
     expect(card).toMatch(/text-2xl font-bold tracking-tight leading-\[1\.15\]/);
@@ -140,6 +196,7 @@ describe('Home featured and stats surfaces', () => {
     expect(home).toMatch(/Coming up/);
     expect(home).toMatch(/Your journal/);
     expect(home).toMatch(/Your souvenirs/);
+    expect(home).toMatch(/Upcoming/);
     expect(home).toMatch(/home-souvenirs-heading/);
     expect(home).toMatch(/is waiting\./);
     expect(home).toMatch(/are waiting\./);

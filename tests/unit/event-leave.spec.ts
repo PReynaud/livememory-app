@@ -190,14 +190,17 @@ describe('leave surfaces', () => {
   it('shows a quiet Leave Event confirm for joiners only', () => {
     const page = read('app/pages/e/[id].vue');
     expect(page).toMatch(/label="Leave Event"/);
-    expect(page).toMatch(/v-if="!isOwner && !confirmLeave"/);
+    expect(page).toMatch(/v-if="!isOwner"/);
+    expect(page).toMatch(/v-if="!confirmLeave"/);
     expect(page).toMatch(/color="neutral"/);
     expect(page).toMatch(/variant="link"/);
     expect(page).toMatch(/Leave this Event\? It will leave your list\. The bill stays for the owner\./);
     expect(page).toMatch(/leaveJoinedEvent/);
     expect(page).toMatch(/navigateTo\('\/concerts'\)/);
-    expect(page).toMatch(/label="Leave"/);
-    expect(page).toMatch(/color="error"/);
+    expect(page).toMatch(/:label="leaving \? 'Leaving\.\.\.' : 'Leave'"/);
+    expect(page).toMatch(/:label="leaving \? 'Leaving\.\.\.' : 'Leave'"[\s\S]{0,80}color="neutral"/);
+    expect(page).toMatch(/variant="outline"/);
+    expect(page).not.toMatch(/:label="leaving \? 'Leaving\.\.\.' : 'Leave'"[\s\S]{0,120}color="error"/);
     expect(page).not.toMatch(/label="Leave Event"[\s\S]{0,120}color="primary"/);
     expect(page).not.toMatch(/label="Leave Event"[\s\S]{0,200}button-primary/);
     expect(page).not.toMatch(/Shared List|joiner impact/i);

@@ -170,9 +170,11 @@ describe('join surfaces', () => {
     const page = read('app/pages/e/[id].vue');
     expect(page).toMatch(/isOwner/);
     expect(page).not.toMatch(/useSupabaseUser/);
-    expect(page).toMatch(/Copy link/);
-    expect(page).toMatch(/copyEventLink/);
+    expect(page).toMatch(/Share event/);
+    expect(page).toMatch(/shareEventLink/);
     expect(page).toMatch(/COPY_LINK_FAILED/);
+    expect(page).not.toMatch(/Copy link/);
+    expect(page).not.toMatch(/copyEventLink/);
     expect(page).not.toMatch(/share sheet|Share sheet|invite modal|Invite friends|directory/i);
     expect(page).toMatch(/v-if="isOwner"/);
     expect(page).toMatch(/Edit event/);
@@ -187,13 +189,30 @@ describe('join surfaces', () => {
     expect(auth).toMatch(/redirect: to\.fullPath/);
   });
 
-  it('counts owned plus joined Events in souvenir stats', () => {
+  it('counts participated Events, not owned plus joined totals, in souvenir stats', () => {
     expect(souvenirStats({
-      eventCount: 2,
-      statuses: ['going', 'attended']
+      events: [
+        {
+          id: 'owned',
+          start_date: '2026-12-01'
+        },
+        {
+          id: 'joined',
+          start_date: '2026-08-10'
+        }
+      ],
+      concerts: [
+        { id: 'c-going', event_id: 'owned' },
+        { id: 'c-attended', event_id: 'joined' }
+      ],
+      statuses: {
+        'c-going': 'going',
+        'c-attended': 'attended'
+      },
+      now: new Date('2026-08-19T12:00:00Z')
     })).toEqual({
       attended: 1,
-      events: 2,
+      events: 1,
       going: 1
     });
     expect(COPY_LINK_FAILED).toBe('Couldn\'t copy the link.');

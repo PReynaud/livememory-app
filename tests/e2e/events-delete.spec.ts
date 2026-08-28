@@ -35,7 +35,7 @@ const createEmptyNight = async (
   await page.getByRole('button', { name: 'New night' }).click();
   await page.getByLabel('Name').fill(input.name);
   await page.getByLabel('Date').fill(input.date);
-  await page.getByLabel('Place').fill(input.place);
+  await page.getByLabel('City').fill(input.place);
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
   return new URL(page.url()).pathname;

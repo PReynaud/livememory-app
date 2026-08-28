@@ -7,6 +7,7 @@ import {
   attendThisNight,
   clearAttendance,
   isConcertPast,
+  isNightGoingPressed,
   listMyAttendance,
   setAttendance,
   type AttendanceRecord,
@@ -278,6 +279,15 @@ describe('attendance migration kernel', () => {
   });
 });
 
+describe('isNightGoingPressed', () => {
+  it('is pressed only when every concert is going or attended', () => {
+    expect(isNightGoingPressed([])).toBe(false);
+    expect(isNightGoingPressed(['going', 'attended'])).toBe(true);
+    expect(isNightGoingPressed(['going', null])).toBe(false);
+    expect(isNightGoingPressed(['going'])).toBe(true);
+  });
+});
+
 describe('isConcertPast', () => {
   it('treats untimed concerts as upcoming until the next Paris calendar day', () => {
     const concert = { date: '2026-08-18', time: null };
@@ -544,6 +554,14 @@ describe('attendance stays off pages and the store query path', () => {
     const cycleAttendance = store.slice(store.indexOf('const cycleAttendance'));
     expect(cycleAttendance).not.toMatch(/loading\.value = true/);
     expect(cycleAttendance).not.toMatch(/error\.value =/);
+    const cycleEventGoing = store.slice(store.indexOf('const cycleEventGoing'));
+    expect(cycleEventGoing).not.toMatch(/loading\.value = true/);
+    expect(cycleEventGoing).not.toMatch(/error\.value =/);
+    expect(store).toMatch(/cycleEventGoing/);
+    expect(store).toMatch(/kind !== 'single_night'/);
+    expect(store).toMatch(/eventGoingStatus/);
+    expect(store).toMatch(/currentEvent\.value\?\.id !== eventId/);
+    expect(store).toMatch(/return currentConcerts\.value/);
     const attendThisNightAction = store.slice(store.indexOf('const attendThisNight ='));
     expect(attendThisNightAction).not.toMatch(/loading\.value = true/);
     expect(attendThisNightAction).not.toMatch(/error\.value =/);
@@ -565,9 +583,13 @@ describe('attendance stays off pages and the store query path', () => {
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/AppAttendanceChip/);
     expect(eventPage).toMatch(/isAttendanceBusy/);
-    expect(eventPage).toMatch(/isAttendThisNightBusy/);
-    expect(eventPage).toMatch(/Attend this night/);
+    expect(eventPage).toMatch(/isEventGoingBusy/);
+    expect(eventPage).toMatch(/cycleEventGoing/);
+    expect(eventPage).toMatch(/showNightGoingChip/);
     expect(eventPage).toMatch(/kind === 'single_night'/);
+    expect(eventPage).toMatch(/currentEvent\.kind === 'festival'/);
+    expect(eventPage).not.toMatch(/Attend this night/);
+    expect(eventPage).not.toMatch(/isAttendThisNightBusy/);
     expect(eventPage).not.toMatch(/Attend this festival|Mark every concert/i);
     expect(eventPage).not.toMatch(/compact card|compactCard/i);
 
@@ -579,6 +601,10 @@ describe('attendance stays off pages and the store query path', () => {
     expect(eventCard).toMatch(/isAttendanceBusy/);
     expect(eventCard).toMatch(/data-event-card/);
     expect(eventCard).toMatch(/cycleAttendance/);
+    expect(eventCard).toMatch(/cycleEventGoing/);
+    expect(eventCard).toMatch(/event\.kind === 'single_night'/);
+    expect(eventCard).toMatch(/concerts\.length > 0/);
+    expect(eventCard).toMatch(/event\.kind === 'festival'/);
 
     const chip = readFileSync(resolve(process.cwd(), 'app/components/AppAttendanceChip.vue'), 'utf8');
     expect(chip).toMatch(/<button/);

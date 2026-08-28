@@ -56,7 +56,7 @@ if (import.meta.server) {
 </script>
 
 <template>
-  <UContainer class="py-8 max-w-lg space-y-4">
+  <UContainer class="py-8 max-w-3xl space-y-4">
     <header class="mb-2">
       <p
         v-if="homeEyebrow"
@@ -184,7 +184,7 @@ if (import.meta.server) {
               {{ homeStats.going }}
             </p>
             <p class="mt-1.5 text-xs tracking-wide text-muted">
-              Going
+              Upcoming
             </p>
           </div>
         </div>

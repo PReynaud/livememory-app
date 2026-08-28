@@ -120,7 +120,7 @@ test('blocks an offline Concert write with a toast and does not create the night
   await selectAddSheetEvent(authenticatedPage, sheet, 'New night');
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Date').fill('2026-12-01');
-  await sheet.getByLabel('Place').fill('Paris');
+  await sheet.getByLabel('City').fill('Paris');
 
   await authenticatedPage.context().setOffline(true);
   await sheet.getByRole('button', { name: 'Save' }).click();

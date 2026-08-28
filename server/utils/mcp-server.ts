@@ -11,7 +11,7 @@ const createEventShape = {
   name: z.string().describe('Event name'),
   startDate: z.string().describe('Start date YYYY-MM-DD in Europe/Paris'),
   endDate: z.string().optional().describe('End date YYYY-MM-DD; required for festival'),
-  place: z.string().describe('Event Place')
+  place: z.string().describe('City (not the venue / Stage)')
 };
 
 const run = async (
@@ -52,14 +52,14 @@ export const createLiveMemoryMcpServer = (client: unknown) => {
   server.registerTool('update_event', {
     title: 'Update event',
     description:
-      'Update an owned Event. Date, Place, and Stage rules match the UI. Pass concertDates to save Event and Concert dates together.',
+      'Update an owned Event. Date, City, and Stage rules match the UI. Pass concertDates to save Event and Concert dates together.',
     inputSchema: {
       eventId: z.string().describe('Event id'),
       name: z.string().describe('Event name'),
       startDate: z.string().describe('Start date YYYY-MM-DD'),
       endDate: z.string().optional().describe('End date YYYY-MM-DD; required for festival'),
-      place: z.string().describe('Event Place'),
-      allowPlaceOverride: z.boolean().optional().describe('Whether Concerts may use a different Place'),
+      place: z.string().describe('City (not the venue / Stage)'),
+      allowPlaceOverride: z.boolean().optional().describe('Whether Concerts may use a different city'),
       stages: z.array(z.object({
         id: z.string().optional(),
         name: z.string()
@@ -99,8 +99,9 @@ export const createLiveMemoryMcpServer = (client: unknown) => {
       artist: z.string().describe('Artist or group'),
       date: z.string().describe('Concert date YYYY-MM-DD'),
       time: z.string().nullable().optional().describe('Optional clock time HH:MM'),
-      place: z.string().optional().describe('Place; required for transparent create'),
+      place: z.string().optional().describe('City (not the venue / Stage); required for transparent create'),
       stageId: z.string().nullable().optional().describe('Stage/Scene id when the Event has a list'),
+      stageName: z.string().nullable().optional().describe('Venue or stage name; type to create'),
       eventId: z.string().optional().describe('Existing Event id'),
       newEvent: z.object(createEventShape).optional().describe('Create this Event and add the Concert to it'),
       confirm: confirmChoiceSchema.optional().describe('attach or create when identity needs a choice')
@@ -109,15 +110,16 @@ export const createLiveMemoryMcpServer = (client: unknown) => {
 
   server.registerTool('update_concert', {
     title: 'Update concert',
-    description: 'Update an owned Concert. Identity, dates, Place, and Stage rules match the UI.',
+    description: 'Update an owned Concert. Identity, dates, City, and Stage rules match the UI.',
     inputSchema: {
       concertId: z.string().describe('Concert id'),
       artist: z.string().describe('Artist or group'),
       date: z.string().describe('Concert date YYYY-MM-DD'),
       time: z.string().nullable().optional().describe('Optional clock time HH:MM'),
       notes: z.string().nullable().optional().describe('Owner notes; omitted for joiners'),
-      place: z.string().optional().describe('Place override when the Event allows it'),
+      place: z.string().optional().describe('City (not the venue / Stage)'),
       stageId: z.string().nullable().optional().describe('Stage/Scene id'),
+      stageName: z.string().nullable().optional().describe('Venue or stage name; type to create'),
       eventId: z.string().optional().describe('Leave unset unless also moving via update'),
       confirm: confirmChoiceSchema.optional().describe('attach or create when identity needs a choice')
     }
@@ -130,8 +132,9 @@ export const createLiveMemoryMcpServer = (client: unknown) => {
     inputSchema: {
       concertId: z.string().describe('Concert id'),
       targetEventId: z.string().describe('Target Event id owned by the acting User'),
-      place: z.string().optional(),
+      place: z.string().optional().describe('City (not the venue / Stage)'),
       stageId: z.string().nullable().optional(),
+      stageName: z.string().nullable().optional().describe('Venue or stage name; type to create'),
       confirm: z.boolean().optional().describe('Required when joiners of the source would lose the Concert')
     }
   }, async args => run('move_concert', args, client));

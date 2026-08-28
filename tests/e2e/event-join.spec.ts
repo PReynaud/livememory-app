@@ -172,7 +172,7 @@ test('signed-in joiner opens an Event URL once, sees the Bill, and lists it on C
     await page.goto('/home');
     await waitForNuxtHydration(page);
     await expect(page.getByTestId('home-featured').getByText('Shared Night')).toBeVisible();
-    await expect(page.getByTestId('home-stats').locator('[data-stat="events"]')).toHaveText(/1/);
+    await expect(page.getByTestId('home-stats').locator('[data-stat="events"]')).toHaveText(/0/);
     await expect(page.getByTestId('home-stats').locator('[data-stat="going"]')).toHaveText(/1/);
   } finally {
     await deleteE2EAccountForTest(owner.userId);
@@ -270,7 +270,7 @@ test('unknown Event URL is a quiet not-found', async ({ page }) => {
   }
 });
 
-authTest('owner Event page is the unguessable link with quiet copy and no share sheet', async ({
+authTest('owner Event page is the unguessable link with Share and no share sheet', async ({
   authenticatedPage,
   account
 }) => {
@@ -289,11 +289,15 @@ authTest('owner Event page is the unguessable link with quiet copy and no share 
   await authenticatedPage.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await authenticatedPage.goto(`/e/${eventId}`);
   await waitForNuxtHydration(authenticatedPage);
+  await authenticatedPage.evaluate(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+  });
   await authExpect(authenticatedPage.getByRole('heading', { name: 'Copy Night' })).toBeVisible();
-  await authExpect(authenticatedPage.getByRole('button', { name: 'Copy link' })).toBeVisible();
+  await authExpect(authenticatedPage.getByRole('button', { name: 'Share event' })).toBeVisible();
+  await authExpect(authenticatedPage.getByRole('button', { name: 'Copy link' })).toHaveCount(0);
   await authExpect(authenticatedPage.getByText(/share sheet|invite|directory/i)).toHaveCount(0);
 
-  await authenticatedPage.getByRole('button', { name: 'Copy link' }).click();
+  await authenticatedPage.getByRole('button', { name: 'Share event' }).click();
   const copied = await authenticatedPage.evaluate(async () => navigator.clipboard.readText());
   expect(copied).toContain(`/e/${eventId}`);
 });
