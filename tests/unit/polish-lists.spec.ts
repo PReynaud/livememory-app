@@ -41,12 +41,17 @@ describe('list polish source guards', () => {
     expect(home).toMatch(/variant="home"/);
     expect(home).toMatch(/loading/);
     expect(home).toMatch(/import\.meta\.server/);
+    expect(home).toMatch(/max-w-3xl/);
     expect(concerts).toMatch(/AppListSkeleton/);
     expect(concerts).toMatch(/variant="groups"/);
     expect(concerts).toMatch(/import\.meta\.server/);
+    expect(concerts).toMatch(/max-w-3xl/);
     expect(concerts).not.toMatch(/Loading events/);
     expect(eventPage).toMatch(/AppListSkeleton/);
+    expect(eventPage).toMatch(/max-w-3xl/);
     expect(eventPage).not.toMatch(/Loading event/);
+    expect(read('app/pages/profile.vue')).toMatch(/max-w-3xl/);
+    expect(read('app/pages/u/[username].vue')).toMatch(/max-w-3xl/);
   });
 
   it('shows Couldn\'t load with Retry on Home, Concerts, and Event', () => {
@@ -89,7 +94,7 @@ describe('list polish source guards', () => {
     expect(concerts).not.toMatch(/v-for="event in events"/);
   });
 
-  it('uses max-w-3xl on list and Event pages and keeps Profile narrower', () => {
+  it('uses max-w-3xl on list, Event, Profile, and public pages', () => {
     const home = read('app/pages/home.vue');
     const concerts = read('app/pages/concerts.vue');
     const eventPage = read('app/pages/e/[id].vue');
@@ -101,11 +106,12 @@ describe('list polish source guards', () => {
     expect(concerts).toMatch(/max-w-3xl/);
     expect(eventPage).toMatch(/max-w-3xl/);
     expect(shared).toMatch(/max-w-3xl/);
+    expect(profile).toMatch(/max-w-3xl/);
     expect(home).not.toMatch(/max-w-lg/);
     expect(concerts).not.toMatch(/max-w-lg/);
     expect(eventPage).not.toMatch(/max-w-lg/);
     expect(shared).not.toMatch(/max-w-lg/);
-    expect(profile).toMatch(/max-w-lg/);
+    expect(profile).not.toMatch(/max-w-lg/);
     expect(app).toMatch(/chrome-safe/);
   });
 
@@ -152,6 +158,7 @@ describe('list polish source guards', () => {
     expect(store).toMatch(/createOwnedEvent/);
     expect(store).toMatch(/createOwnedConcert/);
     expect(store).toMatch(/cycleAttendance/);
+    expect(store).toMatch(/cycleEventGoing/);
   });
 
   it('keeps list actions tappable on small screens, forbids drag-and-drop, and stacks one sheet', () => {
@@ -165,6 +172,7 @@ describe('list polish source guards', () => {
     expect(eventPage).not.toMatch(/draggable|dragstart|vuedraggable/);
     expect(card).not.toMatch(/draggable|dragstart/);
     expect(card).toMatch(/AppAttendanceChip/);
+    expect(card).toMatch(/cycleEventGoing/);
     expect(addSheet).toMatch(/useEditEventSheetStore/);
     expect(addSheet).toMatch(/closeSheet/);
     expect(editSheet).toMatch(/useAddConcertSheetStore/);

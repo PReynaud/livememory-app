@@ -27,7 +27,7 @@ import {
   joinEvent,
   leaveEvent
 } from '#shared/domain/membership';
-import { souvenirStats } from '#shared/domain/home';
+import { concertRefsForSouvenirs, souvenirStats } from '#shared/domain/home';
 import {
   createConcert,
   deleteConcert,
@@ -35,6 +35,7 @@ import {
   nextEventsListWindowEnd,
   listConcertsForEvent,
   listConcertsForEventIds,
+  listConcertEventIds,
   listOwnedConcerts,
   moveConcert,
   updateConcert,
@@ -49,6 +50,7 @@ import {
   attendThisNight as markNightAttendance,
   clearAttendance,
   isConcertPast,
+  isNightGoingPressed,
   listMyAttendance,
   setAttendance,
   type AttendanceClient,
@@ -107,6 +109,7 @@ export const useEventsStore = defineStore('events', () => {
   const error = ref<string | null>(null);
   const eventWindowEnd = ref(0);
   const allConcertsLoaded = ref(false);
+  const concertEventIndex = ref<Array<{ id: string; event_id: string }>>([]);
 
   const offlineWriteError = () => {
     if (canWriteOnline()) {
@@ -180,8 +183,30 @@ export const useEventsStore = defineStore('events', () => {
     return isConcertPast(concert, now);
   };
 
+  const eventGoingStatus = (eventId: string): AttendanceStatus | null => {
+    const rows = concertsForEvent(eventId);
+    if (!isNightGoingPressed(rows.map(row => attendanceStatus(row.id)))) {
+      return null;
+    }
+
+    return rows.every(row => concertIsPast(row)) ? 'attended' : 'going';
+  };
+
+  const isEventGoingBusy = (eventId: string) => {
+    if (attendThisNightBusy.value) {
+      return true;
+    }
+
+    return concertsForEvent(eventId).some(row => isAttendanceBusy(row.id));
+  };
+
   const concertsForEvent = (eventId: string) => {
-    return concerts.value.filter(concert => concert.event_id === eventId);
+    const listed = concerts.value.filter(concert => concert.event_id === eventId);
+    if (listed.length || currentEvent.value?.id !== eventId) {
+      return listed;
+    }
+
+    return currentConcerts.value;
   };
 
   const stagesForEvent = (eventId: string) => {
@@ -201,8 +226,9 @@ export const useEventsStore = defineStore('events', () => {
   const hasMoreEvents = computed(() => eventWindowEnd.value < events.value.length);
 
   const homeStats = computed(() => souvenirStats({
-    eventCount: events.value.length,
-    statuses: Object.values(attendanceByConcertId.value)
+    events: events.value,
+    concerts: concertRefsForSouvenirs(concertEventIndex.value, concerts.value),
+    statuses: attendanceByConcertId.value
   }));
 
   const fetchEvents = async (options?: { silent?: boolean }) => {
@@ -221,6 +247,9 @@ export const useEventsStore = defineStore('events', () => {
       }
 
       events.value = result.data ?? [];
+
+      const indexedConcerts = await listConcertEventIds(concertsClient());
+      concertEventIndex.value = indexedConcerts.error ? [] : (indexedConcerts.data ?? []);
 
       const { upcoming } = splitEventsForConcerts(events.value);
       const nextWindowEnd = Math.min(
@@ -861,6 +890,68 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const cycleEventGoing = async (eventId: string) => {
+    const offline = offlineWriteError();
+    if (offline) {
+      return { data: null, error: offline };
+    }
+
+    const event = events.value.find(row => row.id === eventId) ?? currentEvent.value;
+    if (event?.kind !== 'single_night') {
+      return { data: null, error: null };
+    }
+
+    const rows = concertsForEvent(eventId);
+    if (!rows.length || isEventGoingBusy(eventId)) {
+      return { data: null, error: null };
+    }
+
+    if (eventGoingStatus(eventId) === null) {
+      return attendThisNight(eventId);
+    }
+
+    attendThisNightBusy.value = true;
+    attendanceError.value = null;
+    const busyIds = rows.map(row => row.id);
+    attendanceBusyByConcertId.value = {
+      ...attendanceBusyByConcertId.value,
+      ...Object.fromEntries(busyIds.map(id => [id, true as const]))
+    };
+
+    try {
+      let remaining = { ...attendanceByConcertId.value };
+      for (const concert of rows) {
+        if (!remaining[concert.id]) {
+          continue;
+        }
+
+        const result = await clearAttendance(attendanceClient(), concert.id);
+        if (result.error) {
+          attendanceError.value = result.error.message;
+          await loadAttendance();
+          return { data: null, error: result.error.message };
+        }
+
+        remaining = Object.fromEntries(
+          Object.entries(remaining).filter(([concertId]) => concertId !== concert.id)
+        ) as Record<string, AttendanceStatus>;
+      }
+
+      attendanceByConcertId.value = remaining;
+      return { data: null, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update attendance');
+      attendanceError.value = errorMessage;
+      await loadAttendance();
+      return { data: null, error: errorMessage };
+    } finally {
+      attendThisNightBusy.value = false;
+      attendanceBusyByConcertId.value = Object.fromEntries(
+        Object.entries(attendanceBusyByConcertId.value).filter(([concertId]) => !busyIds.includes(concertId))
+      ) as Record<string, true>;
+    }
+  };
+
   return {
     events,
     concerts,
@@ -883,6 +974,8 @@ export const useEventsStore = defineStore('events', () => {
     attendanceStatus,
     isAttendanceBusy,
     isAttendThisNightBusy,
+    eventGoingStatus,
+    isEventGoingBusy,
     concertIsPast,
     loadingMore,
     fetchEvents,
@@ -899,6 +992,7 @@ export const useEventsStore = defineStore('events', () => {
     moveOwnedConcert,
     deleteOwnedConcert,
     cycleAttendance,
+    cycleEventGoing,
     attendThisNight
   };
 });

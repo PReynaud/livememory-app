@@ -72,7 +72,7 @@ const chipFor = (page: import('@playwright/test').Page, artist: string) => {
     .locator('xpath=following::button[contains(@aria-label,"Mark as")][1]');
 };
 
-test('joiner sets, changes, and clears only their Attendance and can attend this night', async ({
+test('joiner sets, changes, and clears only their Attendance and can mark the night Going', async ({
   page
 }, testInfo) => {
   const owner = await createE2EAccountForTest(`j2a-own-${testInfo.workerIndex}-${testInfo.retry}`);
@@ -135,17 +135,13 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
     await expect(page.getByRole('button', { name: 'Delete event' })).toHaveCount(0);
     await expect(page.getByText('Back of the room.')).toHaveCount(0);
     await expect(page.getByLabel('Notes')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Share event' })).toBeVisible();
 
-    const justiceChip = chipFor(page, 'Justice');
-    const fontainesChip = chipFor(page, 'Fontaines D.C.');
-    await expect(justiceChip).toBeVisible();
-    await expect(justiceChip).toHaveAttribute('aria-pressed', 'false');
-    await expect(fontainesChip).toHaveAttribute('aria-pressed', 'false');
-
-    await justiceChip.click();
-    await expect(justiceChip).toHaveAttribute('aria-pressed', 'true');
-    await expect(justiceChip).toHaveText('Going');
-    await expect(fontainesChip).toHaveAttribute('aria-pressed', 'false');
+    const nightChip = page.getByRole('button', { name: /Mark as (going|attended)/ });
+    await nightChip.click();
+    await expect(nightChip).toHaveAttribute('aria-pressed', 'true');
 
     const joinerSession = await signInRest(joiner);
     const joinerRows = await fetch(
@@ -153,9 +149,9 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
       { headers: joinerSession.headers }
     );
     expect(joinerRows.ok).toBe(true);
-    expect(await joinerRows.json()).toEqual([
-      { concert_id: justiceId, status: 'going', user_id: joiner.userId }
-    ]);
+    const joinerAttendance = await joinerRows.json() as { concert_id: string; status: string; user_id: string }[];
+    expect(joinerAttendance).toHaveLength(2);
+    expect(joinerAttendance.every(row => row.status === 'going' && row.user_id === joiner.userId)).toBe(true);
 
     const ownerRows = await fetch(
       `${ownerSession.supabaseUrl}/rest/v1/attendance?select=concert_id,status,user_id`,
@@ -166,23 +162,19 @@ test('joiner sets, changes, and clears only their Attendance and can attend this
       { concert_id: justiceId, status: 'going', user_id: owner.userId }
     ]);
 
-    await page.getByRole('button', { name: 'Attend this night' }).click();
-    await expect(chipFor(page, 'Justice')).toHaveAttribute('aria-pressed', 'true');
-    await expect(chipFor(page, 'Fontaines D.C.')).toHaveAttribute('aria-pressed', 'true');
-    await expect(chipFor(page, 'Fontaines D.C.')).toHaveText('Going');
-
-    await chipFor(page, 'Justice').click();
-    await expect(chipFor(page, 'Justice')).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByText('Justice')).toBeVisible();
-    await expect(chipFor(page, 'Fontaines D.C.')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('link', { name: 'Concerts' }).click();
+    await waitForNuxtHydration(page);
+    const groupChip = page.locator('[data-event-card="group"]').getByRole('button', { name: /Mark as (going|attended)/ });
+    await expect(groupChip).toHaveCount(1);
+    await expect(groupChip).toHaveAttribute('aria-pressed', 'true');
+    await groupChip.click();
+    await expect(groupChip).toHaveAttribute('aria-pressed', 'false');
 
     const afterClear = await fetch(
       `${joinerSession.supabaseUrl}/rest/v1/attendance?select=concert_id,status,user_id`,
       { headers: joinerSession.headers }
     );
-    expect(await afterClear.json()).toEqual([
-      { concert_id: fontainesId, status: 'going', user_id: joiner.userId }
-    ]);
+    expect(await afterClear.json()).toEqual([]);
     const ownerStill = await fetch(
       `${ownerSession.supabaseUrl}/rest/v1/attendance?select=concert_id,user_id`,
       { headers: ownerSession.headers }

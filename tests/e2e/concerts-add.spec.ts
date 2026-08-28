@@ -66,16 +66,17 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toHaveCount(1);
   await expect(authenticatedPage.getByText('20:15')).toHaveCount(2);
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveCount(2);
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' }).first()).toHaveAttribute('aria-pressed', 'false');
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await gotoConcertsPeriod(authenticatedPage, 'past');
   const nightGroup = authenticatedPage.getByRole('link', { name: /Club Night/ });
   await expect(nightGroup).toBeVisible();
   await expect(authenticatedPage.getByText('Justice').first()).toBeVisible();
   await expect(authenticatedPage.getByText('20:15').first()).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveCount(2);
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' }).first()).toHaveAttribute('aria-pressed', 'false');
+  const nightChip = authenticatedPage.locator('[data-event-card="group"]').getByRole('button', { name: /Mark as (going|attended)/ });
+  await expect(nightChip).toHaveCount(1);
+  await expect(nightChip).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('adds a festival concert on a picked day and groups it', async ({ authenticatedPage, account }) => {
@@ -119,7 +120,7 @@ test('opens Add from nav, creates a New night with a concert, and persists', asy
   await sheet.getByLabel('Artist').fill('Local Band');
   await sheet.getByLabel('Name').fill('Warehouse');
   await sheet.getByLabel('Date').fill('2026-12-01');
-  await sheet.getByLabel('Place').fill('Lyon');
+  await sheet.getByLabel('City').fill('Lyon');
   await sheet.getByRole('button', { name: 'Save' }).click();
 
   await expectConcertAddedToast(authenticatedPage);
@@ -172,7 +173,7 @@ test('creates a New festival from the Add sheet on a non-start day', async ({ au
   await sheet.getByLabel('Name').fill('Rock en Seine');
   await sheet.getByLabel('Start date').fill('2026-08-20');
   await sheet.getByLabel('End date').fill('2026-08-22');
-  await sheet.getByLabel('Place').fill('Saint-Cloud');
+  await sheet.getByLabel('City').fill('Saint-Cloud');
   await sheet.getByRole('button', { name: '2026-08-21' }).click();
   await sheet.getByRole('button', { name: 'Save' }).click();
 
@@ -200,7 +201,8 @@ test('nav Add onto an existing Event stores the concert', async ({ authenticated
 
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 });
 
 const createOwnedNight = async (

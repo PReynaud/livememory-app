@@ -287,17 +287,18 @@ const slideoverUi = {
         </template>
 
         <UFormField
-          label="Place"
+          label="City"
           name="place"
         >
           <UInput
             v-model="place"
+            placeholder="City"
             class="w-full"
           />
         </UFormField>
 
         <UFormField
-          label="Allow a different Place on each Concert"
+          label="Allow a different City on each Concert"
           name="allowPlaceOverride"
         >
           <USwitch v-model="allowPlaceOverride" />

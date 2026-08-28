@@ -99,30 +99,39 @@ const eventPath = computed(() => `/e/${props.event.id}`);
       />
     </div>
     <template v-else>
-      <a
-        v-if="readonly"
-        :href="eventPath"
-        class="block space-y-1 border-b border-white/8 pb-3 mb-3"
-      >
-        <p :class="titleClass">
-          {{ event.name }}
-        </p>
-        <p class="text-[13px] text-muted">
-          {{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}
-        </p>
-      </a>
-      <NuxtLink
-        v-else
-        :to="eventPath"
-        class="block space-y-1 border-b border-white/8 pb-3 mb-3"
-      >
-        <p :class="titleClass">
-          {{ event.name }}
-        </p>
-        <p class="text-[13px] text-muted">
-          {{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}
-        </p>
-      </NuxtLink>
+      <div class="flex items-start justify-between gap-3 border-b border-white/8 pb-3 mb-3">
+        <a
+          v-if="readonly"
+          :href="eventPath"
+          class="min-w-0 flex-1 space-y-1"
+        >
+          <p :class="titleClass">
+            {{ event.name }}
+          </p>
+          <p class="text-[13px] text-muted">
+            {{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}
+          </p>
+        </a>
+        <NuxtLink
+          v-else
+          :to="eventPath"
+          class="min-w-0 flex-1 space-y-1"
+        >
+          <p :class="titleClass">
+            {{ event.name }}
+          </p>
+          <p class="text-[13px] text-muted">
+            {{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}
+          </p>
+        </NuxtLink>
+        <AppAttendanceChip
+          v-if="!readonly && event.kind === 'single_night' && concerts.length > 0"
+          :status="eventsStore.eventGoingStatus(event.id)"
+          :is-past="concerts.length > 0 && concerts.every(row => eventsStore.concertIsPast(row))"
+          :disabled="eventsStore.isEventGoingBusy(event.id)"
+          @click="void eventsStore.cycleEventGoing(event.id)"
+        />
+      </div>
       <template v-if="concerts.length">
         <div
           v-for="(group, index) in groups"
@@ -152,7 +161,7 @@ const eventPath = computed(() => `/e/${props.event.id}`);
               </p>
             </div>
             <AppAttendanceChip
-              v-if="!readonly"
+              v-if="!readonly && event.kind === 'festival'"
               :status="eventsStore.attendanceStatus(row.id)"
               :is-past="eventsStore.concertIsPast(row)"
               :disabled="eventsStore.isAttendanceBusy(row.id)"

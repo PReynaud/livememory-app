@@ -184,7 +184,7 @@ if (import.meta.server) {
               {{ homeStats.going }}
             </p>
             <p class="mt-1.5 text-xs tracking-wide text-muted">
-              Going
+              Upcoming
             </p>
           </div>
         </div>

@@ -906,7 +906,7 @@ const slideoverUi = {
           </div>
 
           <UFormField
-            label="Place"
+            label="City"
             name="place"
             required
             :error="placeFieldInvalid"

@@ -134,6 +134,10 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   });
   const futureEventPath = new URL(authenticatedPage.url()).pathname;
 
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
+
+  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const goingChip = authenticatedPage.getByRole('button', { name: 'Mark as going' });
   await expect(goingChip).toHaveAttribute('aria-pressed', 'false');
   await goingChip.click();
@@ -142,17 +146,17 @@ test('marks a future concert Going and a past concert Attended, then clear stays
 
   await authenticatedPage.reload();
   await waitForNuxtHydration(authenticatedPage);
-  await expect(authenticatedPage).toHaveURL(new RegExp(`${futureEventPath}$`));
   const reloadedGoing = authenticatedPage.getByRole('button', { name: 'Mark as going' });
   await expect(reloadedGoing).toHaveAttribute('aria-pressed', 'true');
   await expect(reloadedGoing).toHaveText('Going');
+  await reloadedGoing.click();
+  await expect(reloadedGoing).toHaveAttribute('aria-pressed', 'false');
 
-  await gotoConcertsPeriod(authenticatedPage, 'upcoming');
-  const concertsGoing = authenticatedPage.getByRole('button', { name: 'Mark as going' });
-  await expect(concertsGoing).toHaveAttribute('aria-pressed', 'true');
-  await expect(concertsGoing).toHaveText('Going');
-  await concertsGoing.click();
-  await expect(concertsGoing).toHaveAttribute('aria-pressed', 'false');
+  await authenticatedPage.goto(futureEventPath);
+  await waitForNuxtHydration(authenticatedPage);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'false');
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await createNightFromAddSheet(authenticatedPage, {
     name: 'Past Night',
@@ -161,25 +165,19 @@ test('marks a future concert Going and a past concert Attended, then clear stays
     artist: 'Fontaines D.C.'
   });
 
-  const attendedChip = authenticatedPage.getByRole('button', { name: 'Mark as attended' });
-  await expect(attendedChip).toHaveAttribute('aria-pressed', 'false');
-  await attendedChip.click();
-  await expect(attendedChip).toHaveAttribute('aria-pressed', 'true');
-  await expect(attendedChip).toHaveText('Attended');
-
   await gotoConcertsPeriod(authenticatedPage, 'past');
   const pastGroup = authenticatedPage.locator('section').filter({ hasText: 'Past Night' });
   const concertsAttended = pastGroup.getByRole('button', { name: 'Mark as attended' });
+  await expect(concertsAttended).toHaveAttribute('aria-pressed', 'false');
+  await concertsAttended.click();
   await expect(concertsAttended).toHaveAttribute('aria-pressed', 'true');
   await expect(concertsAttended).toHaveText('Attended');
 
   await pastGroup.getByRole('link', { name: /Past Night/ }).click();
   await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  const eventAttended = authenticatedPage.getByRole('button', { name: 'Mark as attended' });
-  await expect(eventAttended).toHaveAttribute('aria-pressed', 'true');
-  await eventAttended.click();
-  await expect(eventAttended).toHaveAttribute('aria-pressed', 'false');
-  await expect(eventAttended).toHaveText('Attended');
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 });
 
 test('hides another user attendance over REST and coerces past going to attended', async ({ page: _page }, testInfo) => {

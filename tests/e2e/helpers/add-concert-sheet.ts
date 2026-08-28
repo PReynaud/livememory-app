@@ -7,7 +7,7 @@ export const addSheetArtist = (sheet: Locator, label = 'Artist') => {
   return sheet.getByRole('combobox', { name: label });
 };
 
-export const addSheetPlace = (sheet: Locator) => sheet.getByRole('combobox', { name: 'Place' });
+export const addSheetPlace = (sheet: Locator) => sheet.getByRole('combobox', { name: 'City' });
 
 export const selectAddSheetEvent = async (page: Page, sheet: Locator, option: string) => {
   await addSheetEventControl(sheet).click();

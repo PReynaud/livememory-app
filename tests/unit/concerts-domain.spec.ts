@@ -24,6 +24,7 @@ import {
   EVENTS_LIST_WINDOW,
   nextEventsListWindowEnd,
   listConcertsForEvent,
+  listConcertEventIds,
   listConcertsForEventIds,
   listOwnedConcerts,
   moveConcert,
@@ -112,6 +113,7 @@ const createMockConcertsClient = (options?: {
   concertUpdateError?: QueryError;
   missFirstIdentityLookup?: boolean;
   attendanceInsertError?: QueryError;
+  attendance?: AttendanceRecord[];
   members?: EventMemberRecord[];
 }) => {
   const events = [...(options?.events ?? [])];
@@ -124,7 +126,7 @@ const createMockConcertsClient = (options?: {
   const eventInserts: Record<string, unknown>[] = [];
   const eventDeletes: { column: string; value: string }[] = [];
   const stageInserts: Record<string, unknown>[] = [];
-  const attendanceRows: AttendanceRecord[] = [];
+  const attendanceRows: AttendanceRecord[] = [...(options?.attendance ?? [])];
   const attendanceInserts: Record<string, unknown>[] = [];
   let identityLookups = 0;
 
@@ -642,6 +644,104 @@ describe('createConcert', () => {
       time: null,
       place: 'Berlin'
     });
+    expect(attendanceInserts).toHaveLength(0);
+  });
+
+  it('inherits night Going when a sibling concert is already going', async () => {
+    const { client, attendanceInserts } = createMockConcertsClient({
+      events: [{
+        ...nightRow,
+        start_date: '2026-12-01',
+        end_date: '2026-12-01'
+      }],
+      concerts: [{
+        ...timedJustice,
+        date: '2026-12-01',
+        time: null
+      }],
+      attendance: [{
+        id: 'dddddddd-dddd-4ddd-8ddd-000000000000',
+        user_id: 'user-1',
+        concert_id: timedJustice.id,
+        status: 'going'
+      }]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Fontaines D.C.',
+      date: '2026-12-01'
+    });
+
+    expect(result.error).toBeNull();
+    expect(attendanceInserts).toHaveLength(1);
+    expect(attendanceInserts[0]).toMatchObject({
+      concert_id: result.data?.id,
+      status: ATTENDANCE_STATUS.going
+    });
+  });
+
+  it('inherits night Attended when a sibling concert is already attended', async () => {
+    const { client, attendanceInserts } = createMockConcertsClient({
+      events: [{
+        ...nightRow,
+        start_date: '2026-08-10',
+        end_date: '2026-08-10'
+      }],
+      concerts: [{
+        ...timedJustice,
+        date: '2026-08-10',
+        time: null
+      }],
+      attendance: [{
+        id: 'dddddddd-dddd-4ddd-8ddd-000000000000',
+        user_id: 'user-1',
+        concert_id: timedJustice.id,
+        status: 'attended'
+      }]
+    });
+
+    const result = await createConcert(client, {
+      eventId: nightRow.id,
+      artist: 'Fontaines D.C.',
+      date: '2026-08-10'
+    });
+
+    expect(result.error).toBeNull();
+    expect(attendanceInserts).toHaveLength(1);
+    expect(attendanceInserts[0]).toMatchObject({
+      concert_id: result.data?.id,
+      status: ATTENDANCE_STATUS.attended
+    });
+  });
+
+  it('does not inherit Going onto a festival bill', async () => {
+    const { client, attendanceInserts } = createMockConcertsClient({
+      events: [festivalRow],
+      concerts: [{
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        event_id: festivalRow.id,
+        owner_id: festivalRow.owner_id,
+        artist: 'Justice',
+        date: '2026-08-20',
+        time: null,
+        place: 'Paris'
+      }],
+      attendance: [{
+        id: 'dddddddd-dddd-4ddd-8ddd-000000000000',
+        user_id: 'user-1',
+        concert_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        status: 'going'
+      }]
+    });
+
+    const result = await createConcert(client, {
+      eventId: festivalRow.id,
+      artist: 'Fontaines D.C.',
+      date: '2026-08-20'
+    });
+
+    expect(result.error).toBeNull();
     expect(attendanceInserts).toHaveLength(0);
   });
 
@@ -2245,6 +2345,27 @@ describe('moveConcert', () => {
     expect(okMove.data?.stage_id).toBe(mainStage.id);
   });
 
+  it('writes a submitted stageName onto the moved Concert', async () => {
+    const existing: ConcertRecord = { ...timedJustice, stage_id: null, stage_name: null };
+    const { client, concertUpdates } = createMockConcertsClient({
+      events: [nightRow, otherNightRow],
+      concerts: [existing]
+    });
+
+    const result = await moveConcert(client, {
+      concertId: existing.id,
+      targetEventId: otherNightRow.id,
+      stageName: 'Marché Gare'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.stage_name).toBe('Marché Gare');
+    expect(concertUpdates[0]).toMatchObject({
+      event_id: otherNightRow.id,
+      stage_name: 'Marché Gare'
+    });
+  });
+
   it('rejects a target Event the owner cannot see', async () => {
     const { client, concertUpdates } = createMockConcertsClient({
       events: [nightRow],
@@ -2410,6 +2531,39 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     expect(windowed.error).toBeNull();
     expect(windowed.data?.map(concert => concert.artist)).toEqual(['The Last Dinner Party']);
   });
+
+  it('lists concert ids and event ids for souvenir stats without requiring a window', async () => {
+    const first: ConcertRecord = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      event_id: festivalRow.id,
+      owner_id: festivalRow.owner_id,
+      artist: 'The Last Dinner Party',
+      date: '2026-08-20',
+      time: '20:15',
+      place: 'Paris'
+    };
+    const other: ConcertRecord = {
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      event_id: nightRow.id,
+      owner_id: nightRow.owner_id,
+      artist: 'Local Band',
+      date: '2026-08-18',
+      time: null,
+      place: 'Berlin'
+    };
+
+    const { client } = createMockConcertsClient({
+      events: [festivalRow, nightRow],
+      concerts: [first, other]
+    });
+
+    const indexed = await listConcertEventIds(client);
+    expect(indexed.error).toBeNull();
+    expect(indexed.data).toEqual([
+      { id: first.id, event_id: first.event_id },
+      { id: other.id, event_id: other.event_id }
+    ]);
+  });
 });
 
 describe('concerts store and pages use domain helpers only', () => {
@@ -2453,7 +2607,8 @@ describe('concerts store and pages use domain helpers only', () => {
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/Add to this night/);
     expect(eventPage).toMatch(/Add to this festival/);
-    expect(eventPage).toMatch(/Attend this night/);
+    expect(eventPage).toMatch(/cycleEventGoing/);
+    expect(eventPage).toMatch(/Bill/);
     expect(eventPage).toMatch(/billLoadFailed/);
     expect(eventPage).toMatch(/concertId/);
     expect(eventPage).toMatch(/Edit /);
@@ -2473,6 +2628,7 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(eventCard).toMatch(/isCompactBill/);
     expect(eventCard).toMatch(/formatConcertMetaLine/);
     expect(eventCard).toMatch(/cycleAttendance/);
+    expect(eventCard).toMatch(/cycleEventGoing/);
     expect(eventCard).not.toMatch(/openSheet|concertId/);
 
     const sheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');

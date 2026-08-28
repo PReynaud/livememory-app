@@ -269,6 +269,7 @@ const readCreateConcertInput = (args: Record<string, unknown>): CreateConcertInp
     time: asNullableString(args.time),
     place: asOptionalString(args.place),
     stageId: asNullableString(args.stageId),
+    stageName: asNullableString(args.stageName),
     eventId: asOptionalString(args.eventId),
     newEvent,
     confirm: asConfirmChoice(args.confirm)
@@ -284,6 +285,7 @@ const readUpdateConcertInput = (args: Record<string, unknown>): UpdateConcertInp
   confirm: asConfirmChoice(args.confirm),
   place: asOptionalString(args.place),
   stageId: asNullableString(args.stageId),
+  stageName: asNullableString(args.stageName),
   eventId: asOptionalString(args.eventId)
 });
 
@@ -291,7 +293,8 @@ const readMoveConcertInput = (args: Record<string, unknown>): MoveConcertInput =
   concertId: asString(args.concertId),
   targetEventId: asString(args.targetEventId),
   place: asOptionalString(args.place),
-  stageId: asNullableString(args.stageId)
+  stageId: asNullableString(args.stageId),
+  stageName: asNullableString(args.stageName)
 });
 
 const concertIdentityResult = (

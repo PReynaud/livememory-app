@@ -7,6 +7,14 @@ export const ATTENDANCE_STATUS = {
 
 export type AttendanceStatus = (typeof ATTENDANCE_STATUS)[keyof typeof ATTENDANCE_STATUS];
 
+export const isNightGoingPressed = (statuses: Array<AttendanceStatus | null | undefined>) => {
+  if (!statuses.length) {
+    return false;
+  }
+
+  return statuses.every(status => status === 'going' || status === 'attended');
+};
+
 export const ATTENDANCE_RULE = {
   futureAttended: 'future_attended',
   attendedToGoing: 'attended_to_going',
