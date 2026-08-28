@@ -105,7 +105,8 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await expect(authenticatedPage).toHaveURL(new RegExp(`${targetPath}$`));
   await expect(authenticatedPage.getByRole('heading', { name: 'Other Night' })).toBeVisible();
   await expect(authenticatedPage.getByText('Justice')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await waitForNuxtHydration(authenticatedPage);
