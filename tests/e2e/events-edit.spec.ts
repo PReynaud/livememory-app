@@ -1,25 +1,11 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { createFestivalFromAddSheet } from './helpers/add-concert-sheet';
 
 const createFestivalWithConcert = async (
   page: import('@playwright/test').Page,
   input: { name: string; start: string; end: string; place: string; artist: string; date: string }
 ) => {
-  await page.getByRole('link', { name: 'Concerts' }).click();
-  await page.getByRole('button', { name: 'New festival' }).click();
-  await page.getByLabel('Name').fill(input.name);
-  await page.getByLabel('Start date').fill(input.start);
-  await page.getByLabel('End date').fill(input.end);
-  await page.getByLabel('Place').fill(input.place);
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-
-  await page.getByRole('button', { name: 'Add to this festival' }).click();
-  const sheet = page.getByRole('dialog');
-  await sheet.getByLabel('Artist').fill(input.artist);
-  await sheet.getByRole('button', { name: input.date }).click();
-  await sheet.getByRole('button', { name: 'Save' }).click();
-  await expect(sheet).toHaveCount(0);
-  await expect(page.getByText(input.artist)).toBeVisible();
+  await createFestivalFromAddSheet(page, input);
 };
 
 test('owner edits Event name and Place from the glass sheet', async ({ authenticatedPage }) => {

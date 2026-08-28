@@ -169,6 +169,7 @@ describe('add concert sheet open/close state', () => {
     expect(sheet).toMatch(/sheet-eyebrow/);
     expect(sheet).toMatch(/isEdit \? undefined : 'New'/);
     expect(sheet).toMatch(/field-row/);
+    expect(sheet).toMatch(/timeOnly/);
     expect(sheet).toMatch(/time-only/);
     expect(sheet).toMatch(/id="add-concert-form"/);
     expect(sheet).toMatch(/#footer|name="footer"/);

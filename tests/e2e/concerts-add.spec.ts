@@ -4,27 +4,37 @@ import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import {
   addSheetArtist,
   addSheetPlace,
+  gotoConcertsPeriod,
   selectAddSheetEvent
 } from './helpers/add-concert-sheet';
+import { createOwnedEventRest } from './helpers/owned-event-rest';
 
 const expectConcertAddedToast = async (page: Page) => {
   await expect(
     page.getByText('Concert added.', { exact: true }).or(page.getByText('Concerts added.', { exact: true }))
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 10000 });
 };
 
 const expectConcertAddedToastGone = async (page: Page) => {
   await expect(page.getByText('Concert added.', { exact: true })).toHaveCount(0, { timeout: 15000 });
 };
 
-test('adds a concert to an owned night with locked date and Place', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Club Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-08-18');
-  await authenticatedPage.getByLabel('Place').fill('Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+const openAddOnThisNight = async (page: Page, date = '2026-08-18') => {
+  await page.getByRole('button', { name: 'Add to this night' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('textbox', { name: 'Date' })).toHaveValue(date);
+  return sheet;
+};
+
+test('adds a concert to an owned night with locked date and Place', async ({ authenticatedPage, account }) => {
+  const created = await createOwnedEventRest(account, {
+    name: 'Club Night',
+    start: '2026-08-18',
+    place: 'Berlin'
+  });
+  await authenticatedPage.goto(created.path);
+  await waitForNuxtHydration(authenticatedPage);
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toBeVisible();
 
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
@@ -59,7 +69,7 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' })).toHaveCount(2);
   await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' }).first()).toHaveAttribute('aria-pressed', 'false');
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   const nightGroup = authenticatedPage.getByRole('link', { name: /Club Night/ });
   await expect(nightGroup).toBeVisible();
   await expect(authenticatedPage.getByText('Justice').first()).toBeVisible();
@@ -68,15 +78,16 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(authenticatedPage.getByRole('button', { name: 'Mark as attended' }).first()).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('adds a festival concert on a picked day and groups it', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New festival' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Rock Week');
-  await authenticatedPage.getByLabel('Start date').fill('2026-08-20');
-  await authenticatedPage.getByLabel('End date').fill('2026-08-22');
-  await authenticatedPage.getByLabel('Place').fill('Paris');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+test('adds a festival concert on a picked day and groups it', async ({ authenticatedPage, account }) => {
+  const created = await createOwnedEventRest(account, {
+    kind: 'festival',
+    name: 'Rock Week',
+    start: '2026-08-20',
+    end: '2026-08-22',
+    place: 'Paris'
+  });
+  await authenticatedPage.goto(created.path);
+  await waitForNuxtHydration(authenticatedPage);
 
   await authenticatedPage.getByRole('button', { name: 'Add to this festival' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
@@ -90,7 +101,7 @@ test('adds a festival concert on a picked day and groups it', async ({ authentic
   await expect(authenticatedPage.getByText('Saturday 22 Aug')).toBeVisible();
   await expect(authenticatedPage.getByText('Paris').first()).toBeVisible();
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
   await expect(compact.getByText('The Last Dinner Party')).toBeVisible();
@@ -166,20 +177,20 @@ test('creates a New festival from the Add sheet on a non-start day', async ({ au
   await sheet.getByRole('button', { name: 'Save' }).click();
 
   await expectConcertAddedToast(authenticatedPage);
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await authenticatedPage.getByRole('link', { name: /Rock en Seine/ }).click();
   await expect(authenticatedPage.getByText('Justice')).toBeVisible();
   await expect(authenticatedPage.getByText('Friday 21 Aug')).toBeVisible();
 });
 
-test('nav Add onto an existing Event stores the concert', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Club Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-08-18');
-  await authenticatedPage.getByLabel('Place').fill('Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+test('nav Add onto an existing Event stores the concert', async ({ authenticatedPage, account }) => {
+  const created = await createOwnedEventRest(account, {
+    name: 'Club Night',
+    start: '2026-08-18',
+    place: 'Berlin'
+  });
+  await authenticatedPage.goto(created.path);
+  await waitForNuxtHydration(authenticatedPage);
 
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add concert' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
@@ -194,24 +205,21 @@ test('nav Add onto an existing Event stores the concert', async ({ authenticated
 
 const createOwnedNight = async (
   page: Page,
+  account: { email: string; password: string },
   name: string,
   date: string,
   place: string
 ) => {
-  await page.getByRole('link', { name: 'Concerts' }).click();
-  await page.getByRole('button', { name: 'New night' }).click();
-  await page.getByLabel('Name').fill(name);
-  await page.getByLabel('Date').fill(date);
-  await page.getByLabel('Place').fill(place);
-  await page.getByRole('button', { name: 'Save' }).click();
+  const created = await createOwnedEventRest(account, { name, start: date, place });
+  await page.goto(created.path);
+  await waitForNuxtHydration(page);
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  return new URL(page.url()).pathname;
+  return created.path;
 };
 
-test('attaches a timed concert on the same Event without inserting', async ({ authenticatedPage }) => {
-  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const sheet = authenticatedPage.getByRole('dialog');
+test('attaches a timed concert on the same Event without inserting', async ({ authenticatedPage, account }) => {
+  await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
+  const sheet = await openAddOnThisNight(authenticatedPage);
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Time').fill('20:15');
   await sheet.getByRole('button', { name: 'Save' }).click();
@@ -219,8 +227,7 @@ test('attaches a timed concert on the same Event without inserting', async ({ au
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
   await expectConcertAddedToastGone(authenticatedPage);
 
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const again = authenticatedPage.getByRole('dialog');
+  const again = await openAddOnThisNight(authenticatedPage);
   await again.getByLabel('Artist').fill('Justice');
   await again.getByLabel('Time').fill('20:15');
   await again.getByRole('button', { name: 'Save' }).click();
@@ -231,8 +238,8 @@ test('attaches a timed concert on the same Event without inserting', async ({ au
   await expect(authenticatedPage.getByText('This concert already exists on another Event.')).toHaveCount(0);
 });
 
-test('attaches onto another Event and shows the other-Event copy', async ({ authenticatedPage }) => {
-  const firstPath = await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+test('attaches onto another Event and shows the other-Event copy', async ({ authenticatedPage, account }) => {
+  const firstPath = await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
   const firstSheet = authenticatedPage.getByRole('dialog');
   await firstSheet.getByLabel('Artist').fill('Justice');
@@ -240,7 +247,7 @@ test('attaches onto another Event and shows the other-Event copy', async ({ auth
   await firstSheet.getByRole('button', { name: 'Save' }).click();
   await expect(authenticatedPage.getByText('Justice')).toBeVisible();
 
-  await createOwnedNight(authenticatedPage, 'Other Night', '2026-08-18', 'Berlin');
+  await createOwnedNight(authenticatedPage, account, 'Other Night', '2026-08-18', 'Berlin');
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await sheet.getByLabel('Artist').fill('Justice');
@@ -253,18 +260,16 @@ test('attaches onto another Event and shows the other-Event copy', async ({ auth
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
 });
 
-test('refuses a timed match at a different Place and stays in the sheet', async ({ authenticatedPage }) => {
-  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const firstSheet = authenticatedPage.getByRole('dialog');
+test('refuses a timed match at a different Place and stays in the sheet', async ({ authenticatedPage, account }) => {
+  await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
+  const firstSheet = await openAddOnThisNight(authenticatedPage);
   await firstSheet.getByLabel('Artist').fill('Justice');
   await firstSheet.getByLabel('Time').fill('20:15');
   await firstSheet.getByRole('button', { name: 'Save' }).click();
   await expect(authenticatedPage.getByText('Justice')).toBeVisible();
 
-  const parisPath = await createOwnedNight(authenticatedPage, 'Paris Night', '2026-08-18', 'Paris');
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const sheet = authenticatedPage.getByRole('dialog');
+  const parisPath = await createOwnedNight(authenticatedPage, account, 'Paris Night', '2026-08-18', 'Paris');
+  const sheet = await openAddOnThisNight(authenticatedPage);
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByLabel('Time').fill('20:15');
   await sheet.getByRole('button', { name: 'Save' }).click();
@@ -275,8 +280,8 @@ test('refuses a timed match at a different Place and stays in the sheet', async 
   await expect(sheet.getByRole('combobox', { name: 'Artist' })).toHaveValue('Justice');
 });
 
-test('keeps the Add draft when needs_choice is cancelled', async ({ authenticatedPage }) => {
-  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+test('keeps the Add draft when needs_choice is cancelled', async ({ authenticatedPage, account }) => {
+  await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await sheet.getByLabel('Artist').fill('Justice');
@@ -297,8 +302,8 @@ test('keeps the Add draft when needs_choice is cancelled', async ({ authenticate
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
 });
 
-test('attaches after needs_choice and writes the draft clock', async ({ authenticatedPage }) => {
-  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+test('attaches after needs_choice and writes the draft clock', async ({ authenticatedPage, account }) => {
+  await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await sheet.getByLabel('Artist').fill('Justice');
@@ -322,10 +327,9 @@ test('attaches after needs_choice and writes the draft clock', async ({ authenti
   await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toHaveCount(0);
 });
 
-test('creates a second row after needs_choice', async ({ authenticatedPage }) => {
-  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const sheet = authenticatedPage.getByRole('dialog');
+test('creates a second row after needs_choice', async ({ authenticatedPage, account }) => {
+  await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
+  const sheet = await openAddOnThisNight(authenticatedPage);
   await sheet.getByLabel('Artist').fill('Justice');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expectConcertAddedToast(authenticatedPage);
@@ -345,8 +349,8 @@ test('creates a second row after needs_choice', async ({ authenticatedPage }) =>
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(2);
 });
 
-test('Escape dismisses needs_choice and keeps the Add draft', async ({ authenticatedPage }) => {
-  await createOwnedNight(authenticatedPage, 'Club Night', '2026-08-18', 'Berlin');
+test('Escape dismisses needs_choice and keeps the Add draft', async ({ authenticatedPage, account }) => {
+  await createOwnedNight(authenticatedPage, account, 'Club Night', '2026-08-18', 'Berlin');
   await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
   const sheet = authenticatedPage.getByRole('dialog');
   await sheet.getByLabel('Artist').fill('Justice');

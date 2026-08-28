@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
+import { createNightFromAddSheet } from './helpers/add-concert-sheet';
+import { createOwnedEventRest } from './helpers/owned-event-rest';
 
 const chipFor = (page: Page, artist: string) => {
   return page
@@ -12,15 +14,15 @@ const createNightWithArtists = async (
   page: Page,
   input: { name: string; date: string; place: string; artists: string[] }
 ) => {
-  await page.getByRole('link', { name: 'Concerts' }).click();
-  await page.getByRole('button', { name: 'New night' }).click();
-  await page.getByLabel('Name').fill(input.name);
-  await page.getByLabel('Date').fill(input.date);
-  await page.getByLabel('Place').fill(input.place);
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  const [first, ...rest] = input.artists;
+  await createNightFromAddSheet(page, {
+    name: input.name,
+    date: input.date,
+    place: input.place,
+    artist: first ?? 'Justice'
+  });
 
-  for (const artist of input.artists) {
+  for (const artist of rest) {
     await page.getByRole('button', { name: 'Add to this night' }).click();
     const sheet = page.getByRole('dialog');
     await sheet.getByLabel('Artist').fill(artist);
@@ -80,14 +82,15 @@ test('past night attend-all marks Attended', async ({ authenticatedPage }) => {
   await expect(chipFor(authenticatedPage, 'Fontaines D.C.')).toHaveText('Attended');
 });
 
-test('festival Event hides Attend this night', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New festival' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Rock Week');
-  await authenticatedPage.getByLabel('Start date').fill('2026-08-20');
-  await authenticatedPage.getByLabel('End date').fill('2026-08-22');
-  await authenticatedPage.getByLabel('Place').fill('Paris');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
+test('festival Event hides Attend this night', async ({ authenticatedPage, account }) => {
+  const created = await createOwnedEventRest(account, {
+    kind: 'festival',
+    name: 'Rock Week',
+    start: '2026-08-20',
+    end: '2026-08-22',
+    place: 'Paris'
+  });
+  await authenticatedPage.goto(created.path);
   await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
 
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);

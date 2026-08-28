@@ -1,0 +1,2063 @@
+<!doctype html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LiveMemory — Concerts / Profil public</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #1a1a1a;
+      --fg: #ffffff;
+      --muted: #a3a3a3;
+      --border: #2e2e2e;
+      --accent: #ff4d8a;
+      --well: color-mix(in oklch, var(--bg) 88%, var(--surface));
+      --glass: color-mix(in oklch, var(--surface) 58%, transparent);
+      --sheet-glass: color-mix(in oklch, var(--surface) 64%, transparent);
+      --panel-glass: color-mix(in oklch, var(--surface) 72%, transparent);
+      --well-glass: color-mix(in oklch, var(--bg) 55%, var(--surface));
+      --well-border: color-mix(in oklch, var(--fg) 10%, transparent);
+      --font-display: 'Public Sans', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      --font-body: 'Public Sans', system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+      --page-x: 16px;
+      --max-w: 768px;
+      --chrome-safe: 88px;
+      --nav-h: 64px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    h1, p { margin: 0; }
+    h1 {
+      font-family: var(--font-display);
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      text-wrap: balance;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* —— Dev bar —— */
+    .dev-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px var(--page-x) 0;
+      max-width: var(--max-w);
+      margin-inline: auto;
+    }
+    .dev-chip {
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .dev-chip[aria-pressed="true"] {
+      color: var(--fg);
+      border-color: color-mix(in oklch, var(--fg) 28%, var(--border));
+    }
+    .dev-chip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .dev-sep {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      margin-inline: 2px;
+    }
+
+    .app-shell {
+      max-width: var(--max-w);
+      margin-inline: auto;
+      min-height: 100dvh;
+    }
+    .app-shell.is-concerts {
+      padding-bottom: calc(var(--chrome-safe) + 16px);
+    }
+
+    /* —— Public header (AppHeader) —— */
+    .site-header.is-hidden { display: none; }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in oklch, var(--bg) 82%, transparent);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .site-header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding: 12px var(--page-x);
+      min-height: 56px;
+    }
+    .brand-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      color: var(--fg);
+    }
+    .brand-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+    .brand-name {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-header {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--fg);
+      transition: background-color 0.15s ease;
+    }
+    .btn-header:hover {
+      background: color-mix(in oklch, var(--surface) 70%, var(--fg));
+    }
+    .btn-header:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn-header svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* —— Page —— */
+    .page {
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding: 32px var(--page-x) 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .empty-copy {
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* —— Event cards (readonly, source AppEventCard) —— */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .card-interactive:hover {
+      border-color: color-mix(in oklch, var(--fg) 18%, var(--border));
+      background: color-mix(in oklch, var(--surface) 92%, var(--fg));
+    }
+    .card-interactive:focus-within {
+      border-color: color-mix(in oklch, var(--fg) 22%, var(--border));
+    }
+
+    .card-compact .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .card-compact .event-link {
+      display: block;
+      min-width: 0;
+      flex: 1;
+    }
+    .card-compact .card-title-lg {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      line-height: 1.15;
+      margin-bottom: 4px;
+    }
+    .card-compact .meta {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .card-compact .event-name-sub {
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .card-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card-head {
+      padding-bottom: 12px;
+      border-bottom: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+    }
+    .card-head .event-link { display: block; }
+    .card-title-md {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+      margin-bottom: 4px;
+    }
+    .day-group + .day-group {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+    }
+    .day-label {
+      margin-bottom: 6px;
+      padding-inline: 2px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .bill-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .concert-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: var(--well);
+      border: 1px solid transparent;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .concert-row:hover {
+      border-color: color-mix(in oklch, var(--fg) 10%, transparent);
+      background: color-mix(in oklch, var(--well) 88%, var(--fg));
+    }
+    .concert-artist {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .concert-time {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .event-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      min-width: 44px;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .chip-going {
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      box-shadow: 0 0 8px color-mix(in oklch, var(--accent) 40%, transparent);
+    }
+    .chip-attended {
+      color: var(--muted);
+      border: 1px solid var(--muted);
+    }
+    .chip-attended:hover {
+      background: color-mix(in oklch, var(--muted) 10%, transparent);
+    }
+    .chip-quiet-going {
+      color: var(--accent);
+      border: 1px dashed var(--accent);
+      background: transparent;
+    }
+    .chip-quiet-going:hover {
+      background: color-mix(in oklch, var(--accent) 12%, transparent);
+      border-style: solid;
+    }
+    .chip-quiet-going:active {
+      background: color-mix(in oklch, var(--accent) 18%, transparent);
+    }
+    .chip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* —— List controls (tabs + filtres) —— */
+    .list-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .list-tabs {
+      display: flex;
+      gap: 8px;
+    }
+    .list-tab {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+    }
+    .list-tab:hover:not([aria-selected="true"]) {
+      color: var(--fg);
+      border-color: color-mix(in oklch, var(--fg) 18%, var(--border));
+    }
+    .list-tab[aria-selected="true"] {
+      border: 2px solid var(--accent);
+      color: var(--fg);
+      background: var(--surface);
+      padding: 0 13px;
+    }
+    .list-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .list-tab-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      min-height: 22px;
+      padding: 0 6px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border: 1px solid var(--border);
+      background: var(--well);
+      color: var(--muted);
+    }
+    .list-tab[aria-selected="true"] .list-tab-count {
+      border-color: color-mix(in oklch, var(--accent) 45%, var(--border));
+      color: var(--accent);
+      background: color-mix(in oklch, var(--accent) 10%, var(--surface));
+    }
+    .list-tabs.is-skeleton .list-tab {
+      pointer-events: none;
+      opacity: 0.45;
+    }
+
+    /* —— Filter bar (extensible v2) —— */
+    .list-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-filter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--fg);
+      font-size: 14px;
+      font-weight: 600;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+    .btn-filter:hover {
+      border-color: color-mix(in oklch, var(--fg) 18%, var(--border));
+      background: color-mix(in oklch, var(--fg) 4%, var(--surface));
+    }
+    .btn-filter:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn-filter svg {
+      width: 18px;
+      height: 18px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .btn-filter:hover svg {
+      color: var(--fg);
+    }
+    .filter-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      min-height: 20px;
+      padding: 0 5px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid color-mix(in oklch, var(--accent) 45%, var(--border));
+      color: var(--accent);
+      background: color-mix(in oklch, var(--accent) 10%, var(--surface));
+    }
+    .filter-active {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 36px;
+      padding: 0 4px 0 12px;
+      border-radius: var(--radius-full);
+      border: 1px dashed color-mix(in oklch, var(--accent) 55%, var(--border));
+      background: color-mix(in oklch, var(--accent) 8%, var(--surface));
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .filter-chip:hover {
+      background: color-mix(in oklch, var(--accent) 14%, var(--surface));
+    }
+    .filter-chip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .filter-chip-remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-full);
+      color: var(--accent);
+      transition: background-color 0.15s ease;
+    }
+    .filter-chip-remove:hover {
+      background: color-mix(in oklch, var(--accent) 16%, transparent);
+    }
+    .filter-chip-remove:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .filter-chip-remove svg {
+      width: 14px;
+      height: 14px;
+    }
+    .filter-hint {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .btn-filter-clear {
+      min-height: 36px;
+      padding: 0 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      border-radius: 8px;
+    }
+    .btn-filter-clear:hover {
+      color: var(--fg);
+    }
+    .btn-filter-clear:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .tab-empty {
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    .tab-empty-cta {
+      margin-top: 16px;
+    }
+
+    .owner-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: var(--radius-full);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .btn-outline:hover {
+      background: color-mix(in oklch, var(--accent) 12%, transparent);
+    }
+    .btn-outline:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .empty-owner {
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .empty-owner-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .empty-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      align-self: flex-start;
+      min-height: 44px;
+      padding: 0 20px;
+      border: 2px solid var(--accent);
+      border-radius: var(--radius-full);
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 600;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .empty-cta:hover {
+      background: color-mix(in oklch, var(--accent) 12%, transparent);
+    }
+    .empty-cta:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .btn-load-more {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 44px;
+      border-radius: var(--radius-md);
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+    .btn-load-more:hover {
+      color: var(--fg);
+      background: color-mix(in oklch, var(--surface) 70%, var(--fg));
+    }
+    .btn-load-more:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .glass-nav {
+      position: fixed;
+      z-index: 40;
+      inset-inline: 12px;
+      bottom: 10px;
+      max-width: calc(var(--max-w) - 24px);
+      margin-inline: auto;
+      height: var(--nav-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding-inline: 6px;
+      background: var(--glass);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+      border-radius: var(--radius-xl);
+    }
+    .glass-nav.is-hidden { display: none; }
+    @media (min-width: 768px) {
+      .glass-nav {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: calc(var(--max-w) - 24px);
+      }
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-width: 64px;
+      min-height: 44px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--fg);
+      transition: color 0.15s ease;
+    }
+    .nav-item:hover:not(.active):not(.nav-add) {
+      color: color-mix(in oklch, var(--fg) 82%, var(--muted));
+    }
+    .nav-item:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 12px;
+    }
+    .nav-item.active { color: var(--accent); }
+    .nav-icon {
+      width: 48px;
+      height: 28px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .nav-item.active .nav-icon {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .nav-add .nav-icon {
+      width: 44px;
+      height: 32px;
+      background: var(--fg);
+      color: var(--bg);
+    }
+    .nav-add:hover .nav-icon {
+      background: color-mix(in oklch, var(--fg) 88%, var(--muted));
+    }
+    .nav-add { color: var(--fg); }
+
+    /* —— Skeleton —— */
+    .skeleton-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .skeleton {
+      height: 96px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(
+        90deg,
+        var(--surface) 0%,
+        color-mix(in oklch, var(--surface) 80%, var(--fg)) 50%,
+        var(--surface) 100%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+
+    /* —— Error —— */
+    .error-block {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .error-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .btn-retry {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      align-self: flex-start;
+      min-height: 44px;
+      padding: 0 20px;
+      border-radius: 9999px;
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 600;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .btn-retry:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .btn-retry:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn-retry[aria-busy="true"] {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    /* —— Toast —— */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border-radius: 9999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 100;
+    }
+    .toast.is-visible { opacity: 1; }
+
+    /* —— Filter sheet —— */
+    .scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: color-mix(in oklch, var(--fg) 8%, transparent);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .scrim.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .filter-sheet {
+      position: fixed;
+      z-index: 60;
+      inset-inline: 0;
+      bottom: 0;
+      max-width: var(--max-w);
+      margin-inline: auto;
+      max-height: min(85dvh, 36rem);
+      display: flex;
+      flex-direction: column;
+      background: var(--sheet-glass);
+      backdrop-filter: blur(28px) saturate(1.15);
+      -webkit-backdrop-filter: blur(28px) saturate(1.15);
+      border: 1px solid color-mix(in oklch, var(--fg) 10%, transparent);
+      border-bottom: 0;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      transform: translateY(110%);
+      transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+      overflow: hidden;
+    }
+    .filter-sheet.open { transform: translateY(0); }
+    .app-shell.is-concerts .filter-sheet {
+      bottom: calc(var(--nav-h) + 10px);
+      max-width: calc(var(--max-w) - 24px);
+    }
+    @media (min-width: 768px) {
+      .filter-sheet {
+        inset-inline: auto;
+        left: 50%;
+        width: 28rem;
+        transform: translate(-50%, 110%);
+        border-radius: var(--radius-xl);
+        border-bottom: 1px solid color-mix(in oklch, var(--fg) 10%, transparent);
+        bottom: 24px;
+      }
+      .filter-sheet.open { transform: translate(-50%, 0); }
+      .app-shell.is-concerts .filter-sheet {
+        bottom: calc(var(--nav-h) + 24px);
+      }
+    }
+
+    .sheet-head {
+      padding: 12px 16px 0;
+      flex-shrink: 0;
+      border-bottom: 1px solid color-mix(in oklch, var(--fg) 6%, transparent);
+    }
+    .sheet-handle {
+      width: 36px;
+      height: 5px;
+      border-radius: 9999px;
+      background: color-mix(in oklch, var(--fg) 28%, transparent);
+      margin: 0 auto 10px;
+    }
+    .sheet-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+    .sheet-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+      padding-bottom: 12px;
+    }
+
+    .sheet-body {
+      padding: 12px 16px 8px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overscroll-behavior: contain;
+    }
+
+    .form-panel {
+      padding: 12px;
+      border-radius: var(--radius-lg);
+      background: var(--panel-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+    }
+    .panel-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .option-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .option-chip {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--well-border);
+      background: var(--well-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: var(--fg);
+      font-size: 14px;
+      font-weight: 500;
+      transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+    }
+    .option-chip:hover:not([aria-pressed="true"]) {
+      border-color: color-mix(in oklch, var(--fg) 18%, transparent);
+    }
+    .option-chip[aria-pressed="true"] {
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      background: color-mix(in oklch, var(--accent) 8%, var(--surface));
+      padding-inline: 13px;
+    }
+    .option-chip:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid var(--well-border);
+      border-radius: var(--radius-md);
+      background: var(--well-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: var(--fg);
+      font-size: 15px;
+      line-height: 1.4;
+      transition: border-color 0.15s ease;
+    }
+    .input::placeholder {
+      color: color-mix(in oklch, var(--muted) 82%, transparent);
+    }
+    .input:hover {
+      border-color: color-mix(in oklch, var(--fg) 18%, transparent);
+    }
+    .input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 0;
+      border-color: transparent;
+    }
+
+    .sheet-foot {
+      padding: 12px 16px 16px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-top: 1px solid color-mix(in oklch, var(--fg) 6%, transparent);
+      background: color-mix(in oklch, var(--sheet-glass) 88%, var(--bg));
+    }
+    .sheet-foot-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .btn-sheet-reset {
+      min-height: 44px;
+      padding: 0 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      border-radius: 8px;
+    }
+    .btn-sheet-reset:hover { color: var(--fg); }
+    .btn-sheet-reset:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn-sheet-apply {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 24px;
+      border-radius: var(--radius-full);
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 600;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .btn-sheet-apply:hover {
+      background: color-mix(in oklch, var(--accent) 12%, transparent);
+    }
+    .btn-sheet-apply:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .sheet-context {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton { animation: none; }
+      .card, .btn-retry, .btn-header, .concert-row, .chip, .btn-outline, .empty-cta, .btn-load-more, .nav-item, .list-tab, .btn-filter, .filter-chip, .scrim, .filter-sheet, .option-chip, .input, .btn-sheet-apply { transition: none; }
+    }
+
+    @media (min-width: 768px) {
+      :root { --page-x: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dev-bar" data-od-id="dev-bar" aria-label="États de démonstration">
+    <button type="button" class="dev-chip" data-view="concerts" aria-pressed="false">Concerts</button>
+    <button type="button" class="dev-chip" data-view="public" aria-pressed="true">Profil public</button>
+    <span class="dev-sep" aria-hidden="true"></span>
+    <button type="button" class="dev-chip" data-state="content" aria-pressed="true">Contenu</button>
+    <button type="button" class="dev-chip" data-state="empty" aria-pressed="false">Vide</button>
+    <button type="button" class="dev-chip" data-state="loading" aria-pressed="false">Chargement</button>
+    <button type="button" class="dev-chip" data-state="error" aria-pressed="false">Erreur</button>
+    <button type="button" class="dev-chip" data-state="not-found" aria-pressed="false">Introuvable</button>
+  </div>
+
+  <header class="site-header" data-od-id="site-header">
+    <div class="site-header-inner">
+      <a href="/" class="brand-link" data-od-id="brand-link">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="24" height="24" rx="6" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 22V10h5.5a4 4 0 0 1 0 8H10" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand-name">LiveMemory App</span>
+      </a>
+      <div class="header-actions">
+        <a href="/login" class="btn-header" data-od-id="sign-in-link">Se connecter</a>
+        <button type="button" class="btn-header" aria-label="Ouvrir le menu" data-od-id="menu-button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-shell" data-od-id="app-shell">
+    <main class="page" data-od-id="profile-page">
+    </main>
+  </div>
+
+  <nav class="glass-nav is-hidden" aria-label="Principal" data-od-id="glass-nav">
+    <a href="#" class="nav-item" data-od-id="nav-home">
+      <span class="nav-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21H3z"/></svg>
+      </span>
+      Accueil
+    </a>
+    <a href="#" class="nav-item active" data-od-id="nav-concerts" aria-current="page">
+      <span class="nav-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg>
+      </span>
+      Concerts
+    </a>
+    <button type="button" class="nav-item nav-add" data-od-id="nav-add" aria-label="Ajouter">
+      <span class="nav-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      </span>
+      Add
+    </button>
+    <a href="#" class="nav-item" data-od-id="nav-profile">
+      <span class="nav-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+      </span>
+      Profil
+    </a>
+  </nav>
+
+  <div class="toast" role="status" aria-live="polite" data-od-id="toast"></div>
+
+  <div class="scrim" id="filter-scrim" data-od-id="filter-scrim" aria-hidden="true"></div>
+  <aside
+    class="filter-sheet"
+    id="filter-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="filter-sheet-title"
+    aria-hidden="true"
+    data-od-id="filter-sheet"
+  >
+    <div class="sheet-head">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <p class="sheet-eyebrow" id="filter-sheet-eyebrow"></p>
+      <h2 class="sheet-title" id="filter-sheet-title">Filtrer</h2>
+    </div>
+    <div class="sheet-body" id="filter-sheet-body" data-od-id="filter-sheet-body"></div>
+    <footer class="sheet-foot" data-od-id="filter-sheet-foot">
+      <p class="sheet-context" id="filter-sheet-context" aria-live="polite"></p>
+      <div class="sheet-foot-row">
+        <button type="button" class="btn-sheet-reset" id="filter-reset" data-od-id="filter-reset">Réinitialiser</button>
+        <button type="button" class="btn-sheet-apply" id="filter-apply" data-od-id="filter-apply">Appliquer</button>
+      </div>
+    </footer>
+  </aside>
+
+  <script>
+    const COPY = {
+      empty: 'Rien à afficher pour le moment.',
+      emptyConcerts: 'Pas de concerts pour le moment.',
+      notFound: 'Introuvable.',
+      errorTitle: 'Impossible de charger.',
+      retry: 'Réessayer',
+      sharedListFor: (name) => `Liste partagée de ${name}`,
+      concertsTitle: 'Concerts',
+      newNight: 'Nouvelle soirée',
+      newFestival: 'Nouveau festival',
+      addConcert: 'Ajouter un concert',
+      loadMore: 'Charger plus',
+      tabUpcoming: 'À venir',
+      tabPast: 'Souvenirs',
+      emptyUpcoming: 'Rien à venir pour le moment.',
+      emptyPast: 'Aucun souvenir enregistré.',
+      emptyUpcomingPublic: 'Aucun concert à venir sur cette liste.',
+      filter: 'Filtrer',
+      filterHintUpcoming: 'Artiste, lieu, statut Going…',
+      filterHintPast: 'Année, artiste, lieu, statut…',
+      filterClearAll: 'Tout effacer',
+      filterApply: 'Appliquer',
+      filterReset: 'Réinitialiser',
+      filterSheetTitle: 'Filtrer',
+      filterEmptyResults: 'Aucun concert ne correspond à vos filtres.',
+      filterApplied: (n) => n === 0 ? 'Filtres effacés' : `${n} filtre${n !== 1 ? 's' : ''} appliqué${n !== 1 ? 's' : ''}`,
+      filterContext: (n) => n === 0 ? 'Aucun filtre sélectionné' : `${n} critère${n !== 1 ? 's' : ''} sélectionné${n !== 1 ? 's' : ''}`
+    };
+
+    const FILTER_SECTIONS = {
+      upcoming: [
+        {
+          id: 'status',
+          label: 'Statut',
+          options: [
+            { id: 'going', label: 'Going' },
+            { id: 'attended', label: 'Attended' }
+          ]
+        },
+        {
+          id: 'type',
+          label: 'Type',
+          options: [
+            { id: 'festival', label: 'Festival' },
+            { id: 'night', label: 'Soirée' }
+          ]
+        },
+        {
+          id: 'place',
+          label: 'Lieu',
+          options: [
+            { id: 'place-paris', label: 'Paris' },
+            { id: 'place-lyon', label: 'Lyon' },
+            { id: 'place-bristol', label: 'Bristol' }
+          ]
+        },
+        {
+          id: 'period',
+          label: 'Période',
+          options: [
+            { id: 'month', label: 'Ce mois-ci' }
+          ]
+        }
+      ],
+      past: [
+        {
+          id: 'year',
+          label: 'Année',
+          options: [
+            { id: 'year-2025', label: '2025' },
+            { id: 'year-2024', label: '2024' },
+            { id: 'year-1993', label: '1993' }
+          ]
+        },
+        {
+          id: 'status',
+          label: 'Statut',
+          options: [
+            { id: 'attended', label: 'Attended' },
+            { id: 'going', label: 'Going' }
+          ]
+        },
+        {
+          id: 'type',
+          label: 'Type',
+          options: [
+            { id: 'festival', label: 'Festival' },
+            { id: 'night', label: 'Soirée' }
+          ]
+        },
+        {
+          id: 'place',
+          label: 'Lieu',
+          options: [
+            { id: 'place-paris', label: 'Paris' },
+            { id: 'place-lyon', label: 'Lyon' },
+            { id: 'place-bristol', label: 'Bristol' }
+          ]
+        }
+      ]
+    };
+
+    const TODAY = '2026-08-28';
+
+    const GROUPS = [
+      {
+        id: 'test',
+        startDate: '1993-12-30',
+        compact: true,
+        artist: 'Test',
+        meta: '30/12/1993 · Théâtre de Lyon',
+        eventName: 'Super soirée',
+        showEventName: true,
+        attendance: 'attended'
+      },
+      {
+        id: 'justice',
+        startDate: '2024-08-25',
+        compact: true,
+        artist: 'Justice',
+        meta: '25/08/2024 · Rock en Seine · Paris',
+        eventName: 'Rock en Seine',
+        showEventName: true,
+        attendance: 'attended'
+      },
+      {
+        id: 'fontaines',
+        startDate: '2025-03-12',
+        compact: true,
+        artist: 'Fontaines D.C.',
+        meta: '12/03/2025 · Bataclan · Paris',
+        eventName: 'Romance',
+        showEventName: true,
+        attendance: 'attended'
+      },
+      {
+        id: 'khruangbin',
+        startDate: '2025-06-15',
+        compact: true,
+        artist: 'Khruangbin',
+        meta: '15/06/2025 · Olympia · Paris',
+        eventName: 'A LA SALA',
+        showEventName: true,
+        attendance: 'attended'
+      },
+      {
+        id: 'zeta',
+        startDate: '2026-08-20',
+        compact: true,
+        artist: 'Zeta',
+        meta: '20/08/2026 · Yohkai · Bristol',
+        eventName: 'Arctangent',
+        showEventName: true,
+        attendance: 'going'
+      },
+      {
+        id: 'hypno5e',
+        startDate: '2026-10-10',
+        compact: false,
+        eventName: 'Hypno5e + Hippotraktor',
+        meta: '10/10/2026 · Marché Gare',
+        days: [
+          {
+            label: 'Samedi 10 oct.',
+            concerts: [
+              { id: 'hypno-h', artist: 'Hippotraktor', attendance: 'unset' },
+              { id: 'hypno-e', artist: 'Hypno5e', time: '20:30', attendance: 'going' }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'currents',
+        startDate: '2026-11-17',
+        compact: false,
+        eventName: 'Currents + Erra',
+        meta: '17/11/2026 · Bataclan',
+        days: [
+          {
+            label: 'Mardi 17 nov.',
+            concerts: [
+              { id: 'cur-a', artist: 'Aviana', attendance: 'attended' },
+              { id: 'cur-c', artist: 'Caskets', attendance: 'attended' },
+              { id: 'cur-cu', artist: 'Currents', time: '19:00', attendance: 'going' },
+              { id: 'cur-e', artist: 'Erra', attendance: 'going' }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'lost',
+        startDate: '2026-12-07',
+        compact: true,
+        artist: 'Lost in Kyiv',
+        meta: '07/12/2026 · Rock N\'Eat · 20:00',
+        eventName: 'Lost In Kyiv + Guest',
+        showEventName: true,
+        attendance: 'unset'
+      },
+      {
+        id: 'inflames',
+        startDate: '2027-04-07',
+        compact: false,
+        eventName: 'In Flames x Trivium',
+        meta: '07/04/2027 · Zénith Paris - La Villette',
+        days: [
+          {
+            label: 'Mercredi 7 avr.',
+            concerts: [
+              { id: 'inf-i', artist: 'In Flames', time: '18:00', attendance: 'going' },
+              { id: 'inf-p', artist: 'Paleface Swiss', attendance: 'unset' },
+              { id: 'inf-t', artist: 'Trivium', attendance: 'going' },
+              { id: 'inf-v', artist: 'Vola', attendance: 'unset' }
+            ]
+          }
+        ]
+      }
+    ];
+
+    const USERNAME = 'Pierre';
+    let viewMode = 'public';
+    let listTab = 'upcoming';
+    let pageState = 'content';
+    let retryBusy = false;
+    let activeFilters = { upcoming: [], past: [] };
+    let filterArtistQuery = { upcoming: '', past: '' };
+    let draftFilters = [];
+    let draftArtistQuery = '';
+    let filterSheetOpen = false;
+    let filterTriggerEl = null;
+
+    function isUpcoming(group) {
+      return group.startDate >= TODAY;
+    }
+
+    function getUpcomingGroups() {
+      return GROUPS.filter(isUpcoming).sort((a, b) => a.startDate.localeCompare(b.startDate));
+    }
+
+    function getPastGroups() {
+      return GROUPS.filter((g) => !isUpcoming(g)).sort((a, b) => b.startDate.localeCompare(a.startDate));
+    }
+
+    function groupHasStatus(group, status) {
+      if (group.compact) return group.attendance === status;
+      return group.days.some((day) => day.concerts.some((row) => row.attendance === status));
+    }
+
+    function groupMetaText(group) {
+      return `${group.meta || ''} ${group.artist || ''} ${group.eventName || ''}`.toLowerCase();
+    }
+
+    function groupArtistsText(group) {
+      if (group.compact) return group.artist.toLowerCase();
+      return group.days.flatMap((d) => d.concerts.map((c) => c.artist)).join(' ').toLowerCase();
+    }
+
+    function matchesFilter(group, filterId) {
+      switch (filterId) {
+        case 'going':
+          return groupHasStatus(group, 'going');
+        case 'attended':
+          return groupHasStatus(group, 'attended');
+        case 'year-2025':
+          return group.startDate.startsWith('2025');
+        case 'year-2024':
+          return group.startDate.startsWith('2024');
+        case 'year-1993':
+          return group.startDate.startsWith('1993');
+        case 'place-paris':
+          return groupMetaText(group).includes('paris');
+        case 'place-lyon':
+          return groupMetaText(group).includes('lyon');
+        case 'place-bristol':
+          return groupMetaText(group).includes('bristol');
+        case 'festival':
+          return !group.compact;
+        case 'night':
+          return group.compact;
+        case 'month':
+          return group.startDate.startsWith(TODAY.slice(0, 7));
+        default:
+          return true;
+      }
+    }
+
+    function matchesArtistQuery(group, query) {
+      if (!query.trim()) return true;
+      const q = query.trim().toLowerCase();
+      return groupArtistsText(group).includes(q)
+        || (group.eventName && group.eventName.toLowerCase().includes(q));
+    }
+
+    function applyFiltersToGroups(groups) {
+      const filters = getActiveFilterIds();
+      const artistQ = filterArtistQuery[listTab] || '';
+      if (!filters.length && !artistQ.trim()) return groups;
+      return groups.filter((group) => {
+        if (!matchesArtistQuery(group, artistQ)) return false;
+        if (!filters.length) return true;
+        return filters.every((id) => matchesFilter(group, id));
+      });
+    }
+
+    function getActiveGroups() {
+      const base = listTab === 'upcoming' ? getUpcomingGroups() : getPastGroups();
+      return applyFiltersToGroups(base);
+    }
+
+    function getUnfilteredCount() {
+      return listTab === 'upcoming' ? getUpcomingGroups().length : getPastGroups().length;
+    }
+
+    const main = document.querySelector('[data-od-id="profile-page"]');
+    const appShell = document.querySelector('[data-od-id="app-shell"]');
+    const siteHeader = document.querySelector('[data-od-id="site-header"]');
+    const glassNav = document.querySelector('[data-od-id="glass-nav"]');
+    const toastEl = document.querySelector('[data-od-id="toast"]');
+    const filterScrim = document.getElementById('filter-scrim');
+    const filterSheet = document.getElementById('filter-sheet');
+    const filterSheetBody = document.getElementById('filter-sheet-body');
+    const filterSheetEyebrow = document.getElementById('filter-sheet-eyebrow');
+    const filterSheetContext = document.getElementById('filter-sheet-context');
+    const filterApplyBtn = document.getElementById('filter-apply');
+    const filterResetBtn = document.getElementById('filter-reset');
+    let toastTimer = null;
+    let lastFocusEl = null;
+
+    function updateFilterSheetContext() {
+      const count = draftFilters.length + (draftArtistQuery.trim() ? 1 : 0);
+      filterSheetContext.textContent = COPY.filterContext(count);
+    }
+
+    function renderFilterSheetBody() {
+      const sections = FILTER_SECTIONS[listTab];
+      const panels = sections.map((section) => {
+        const chips = section.options.map((opt) => {
+          const selected = draftFilters.includes(opt.id);
+          return `
+            <button type="button" class="option-chip" data-action="toggle-filter-option" data-filter-id="${opt.id}" aria-pressed="${selected ? 'true' : 'false'}" data-od-id="filter-opt-${opt.id}">
+              ${opt.label}
+            </button>
+          `;
+        }).join('');
+        return `
+          <section class="form-panel" data-od-id="filter-panel-${section.id}">
+            <p class="panel-label">${section.label}</p>
+            <div class="option-chips" role="group" aria-label="${section.label}">${chips}</div>
+          </section>
+        `;
+      }).join('');
+
+      const artistPanel = `
+        <section class="form-panel" data-od-id="filter-panel-artist">
+          <div class="field">
+            <label class="field-label" for="filter-artist-input">Artiste</label>
+            <input type="search" class="input" id="filter-artist-input" data-od-id="filter-artist-input" placeholder="Ex. Khruangbin, Currents…" value="${draftArtistQuery.replace(/"/g, '&quot;')}" autocomplete="off" />
+          </div>
+        </section>
+      `;
+
+      filterSheetBody.innerHTML = panels + artistPanel;
+      updateFilterSheetContext();
+    }
+
+    function getSheetFocusables() {
+      return Array.from(filterSheet.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      )).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    }
+
+    function trapFilterFocus(event) {
+      if (!filterSheetOpen || event.key !== 'Tab') return;
+      const focusables = getSheetFocusables();
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function openFilterSheet(triggerEl) {
+      filterTriggerEl = triggerEl || filterTriggerEl;
+      lastFocusEl = document.activeElement;
+      draftFilters = [...getActiveFilterIds()];
+      draftArtistQuery = filterArtistQuery[listTab] || '';
+      filterSheetEyebrow.textContent = listTab === 'upcoming' ? COPY.tabUpcoming : COPY.tabPast;
+      renderFilterSheetBody();
+      filterSheetOpen = true;
+      filterScrim.classList.add('open');
+      filterScrim.setAttribute('aria-hidden', 'false');
+      filterSheet.classList.add('open');
+      filterSheet.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      const first = filterSheet.querySelector('.option-chip, #filter-artist-input, #filter-apply');
+      if (first) first.focus();
+    }
+
+    function closeFilterSheet(restoreFocus = true) {
+      filterSheetOpen = false;
+      filterScrim.classList.remove('open');
+      filterScrim.setAttribute('aria-hidden', 'true');
+      filterSheet.classList.remove('open');
+      filterSheet.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      if (restoreFocus) {
+        const target = filterTriggerEl || lastFocusEl;
+        if (target && typeof target.focus === 'function') target.focus();
+      }
+    }
+
+    function applyFilterSheet() {
+      const artistInput = document.getElementById('filter-artist-input');
+      if (artistInput) draftArtistQuery = artistInput.value;
+      activeFilters[listTab] = [...draftFilters];
+      filterArtistQuery[listTab] = draftArtistQuery.trim();
+      const count = getFilterCount();
+      closeFilterSheet(true);
+      render();
+      showToast(COPY.filterApplied(count));
+    }
+
+    function resetFilterSheet() {
+      draftFilters = [];
+      draftArtistQuery = '';
+      renderFilterSheetBody();
+      const input = document.getElementById('filter-artist-input');
+      if (input) input.focus();
+    }
+
+    function toggleDraftFilter(id) {
+      if (draftFilters.includes(id)) {
+        draftFilters = draftFilters.filter((f) => f !== id);
+      } else {
+        draftFilters = [...draftFilters, id];
+      }
+      renderFilterSheetBody();
+      const btn = filterSheet.querySelector(`[data-filter-id="${id}"]`);
+      if (btn) btn.focus();
+    }
+
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('is-visible'), 2200);
+    }
+
+    function chipClass(status) {
+      if (status === 'going') return 'chip chip-going';
+      if (status === 'attended') return 'chip chip-attended';
+      return 'chip chip-quiet-going';
+    }
+
+    function chipLabel(status) {
+      if (status === 'going') return 'Going';
+      if (status === 'attended') return 'Attended';
+      return 'Going';
+    }
+
+    function renderChipHtml(status, chipId, interactive) {
+      if (!interactive) return '';
+      const pressed = status === 'going' || status === 'attended';
+      const ariaLabel = status === 'going'
+        ? 'Going confirmé'
+        : status === 'attended'
+          ? 'Attended'
+          : 'Marquer Going';
+      return `<button type="button" class="${chipClass(status)}" data-action="cycle-chip" data-chip-id="${chipId}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${ariaLabel}" title="${ariaLabel}">${chipLabel(status)}</button>`;
+    }
+
+    function cycleAttendance(current) {
+      if (current === 'unset') return 'going';
+      if (current === 'going') return 'attended';
+      return 'unset';
+    }
+
+    function findChipTarget(chipId) {
+      for (const group of GROUPS) {
+        if (group.compact && group.id === chipId) return group;
+        if (!group.compact && group.days) {
+          for (const day of group.days) {
+            for (const row of day.concerts) {
+              if (row.id === chipId) return row;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    function renderCompactCard(group, interactive) {
+      const eventNameLine = group.showEventName
+        ? `<p class="event-name-sub">${group.eventName}</p>`
+        : '';
+      const chip = interactive ? renderChipHtml(group.attendance, group.id, true) : '';
+      return `
+        <article class="card card-compact card-interactive" data-od-id="event-card-${group.id}">
+          <div class="card-top">
+            <a href="#" class="event-link" data-action="open-event" aria-label="${group.artist}, ${group.meta}">
+              <p class="card-title-lg">${group.artist}</p>
+              <p class="meta">${group.meta}</p>
+              ${eventNameLine}
+            </a>
+            ${chip}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderGroupCard(group, interactive) {
+      const days = group.days.map((day) => `
+        <div class="day-group">
+          <p class="day-label">${day.label}</p>
+          <div class="bill-rows">
+            ${day.concerts.map((row) => `
+              <div class="concert-row">
+                <div>
+                  <p class="concert-artist">${row.artist}</p>
+                  ${row.time ? `<p class="concert-time">${row.time}</p>` : ''}
+                </div>
+                ${interactive ? renderChipHtml(row.attendance, row.id, true) : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+
+      return `
+        <article class="card card-group card-interactive" data-od-id="event-card-${group.id}">
+          <div class="card-head">
+            <a href="#" class="event-link" data-action="open-event" aria-label="${group.eventName}, ${group.meta}">
+              <p class="card-title-md">${group.eventName}</p>
+              <p class="meta">${group.meta}</p>
+            </a>
+          </div>
+          ${days}
+        </article>
+      `;
+    }
+
+    const FILTER_LABELS = {
+      'year-2025': '2025',
+      'year-2024': '2024',
+      'year-1993': '1993',
+      'place-paris': 'Paris',
+      'place-lyon': 'Lyon',
+      'place-bristol': 'Bristol',
+      going: 'Going',
+      attended: 'Attended',
+      month: 'Ce mois-ci',
+      festival: 'Festival',
+      night: 'Soirée'
+    };
+
+    function getFilterCount() {
+      const ids = getActiveFilterIds();
+      const artistQ = (filterArtistQuery[listTab] || '').trim();
+      return ids.length + (artistQ ? 1 : 0);
+    }
+
+    function getActiveFilterChips() {
+      const chips = getActiveFilterIds().map((id) => ({ id, label: FILTER_LABELS[id] || id }));
+      const artistQ = (filterArtistQuery[listTab] || '').trim();
+      if (artistQ) chips.push({ id: '__artist__', label: `« ${artistQ} »` });
+      return chips;
+    }
+
+    function getActiveFilterIds() {
+      return activeFilters[listTab] || [];
+    }
+
+    function renderFilterChip(chip) {
+      const { id, label } = chip;
+      return `
+        <button type="button" class="filter-chip" data-action="remove-filter" data-filter-id="${id}" data-od-id="filter-chip-${id.replace(/[^a-z0-9-]/gi, '')}" aria-label="Retirer le filtre ${label}">
+          ${label}
+          <span class="filter-chip-remove" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </span>
+        </button>
+      `;
+    }
+
+    function renderListControls() {
+      const upcomingCount = getUpcomingGroups().length;
+      const pastCount = getPastGroups().length;
+      const upcomingSelected = listTab === 'upcoming';
+      const pastSelected = listTab === 'past';
+      const filterCount = getFilterCount();
+      const hint = listTab === 'upcoming' ? COPY.filterHintUpcoming : COPY.filterHintPast;
+      const chips = getActiveFilterChips().map(renderFilterChip).join('');
+      const clearAll = filterCount > 1
+        ? `<button type="button" class="btn-filter-clear" data-action="clear-filters" data-od-id="filter-clear-all">${COPY.filterClearAll}</button>`
+        : '';
+
+      return `
+        <div class="list-controls" data-od-id="list-controls">
+          <div class="list-tabs" role="tablist" aria-label="Période" data-od-id="list-tabs">
+            <button type="button" class="list-tab" role="tab" id="tab-upcoming" data-action="list-tab" data-tab="upcoming" aria-selected="${upcomingSelected ? 'true' : 'false'}" aria-controls="list-panel" tabindex="${upcomingSelected ? '0' : '-1'}">
+              ${COPY.tabUpcoming}
+              <span class="list-tab-count" aria-hidden="true">${upcomingCount}</span>
+              <span class="sr-only">, ${upcomingCount} concert${upcomingCount !== 1 ? 's' : ''}</span>
+            </button>
+            <button type="button" class="list-tab" role="tab" id="tab-past" data-action="list-tab" data-tab="past" aria-selected="${pastSelected ? 'true' : 'false'}" aria-controls="list-panel" tabindex="${pastSelected ? '0' : '-1'}">
+              ${COPY.tabPast}
+              <span class="list-tab-count" aria-hidden="true">${pastCount}</span>
+              <span class="sr-only">, ${pastCount} concert${pastCount !== 1 ? 's' : ''}</span>
+            </button>
+          </div>
+          <div class="list-filter-bar" data-od-id="list-filter-bar">
+            <button type="button" class="btn-filter" data-action="open-filters" data-od-id="filter-trigger" aria-label="${COPY.filter} — ${hint}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+              ${COPY.filter}
+              ${filterCount ? `<span class="filter-badge" aria-hidden="true">${filterCount}</span><span class="sr-only">, ${filterCount} actif${filterCount !== 1 ? 's' : ''}</span>` : ''}
+            </button>
+            <div class="filter-active" role="list" aria-label="Filtres actifs" data-od-id="filter-active-chips">
+              ${chips || `<span class="filter-hint">${hint}</span>`}
+            </div>
+            ${clearAll}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFilterEmpty(isConcerts) {
+      const message = COPY.filterEmptyResults;
+      const cta = isConcerts && listTab === 'upcoming'
+        ? `<div class="tab-empty-cta"><button type="button" class="empty-cta" data-action="open-filters" data-od-id="filter-empty-retry">${COPY.filter}</button></div>`
+        : '';
+      return `
+        <section class="tab-empty" data-od-id="filter-empty" role="tabpanel" id="list-panel" aria-labelledby="${listTab === 'upcoming' ? 'tab-upcoming' : 'tab-past'}">
+          <p>${message}</p>
+          ${cta}
+        </section>
+      `;
+    }
+
+    function renderTabEmpty(isConcerts) {
+      const isUpcoming = listTab === 'upcoming';
+      const message = isUpcoming
+        ? (isConcerts ? COPY.emptyUpcoming : COPY.emptyUpcomingPublic)
+        : COPY.emptyPast;
+      const cta = isUpcoming && isConcerts
+        ? `<div class="tab-empty-cta"><button type="button" class="empty-cta" data-action="add-concert">${COPY.addConcert}</button></div>`
+        : '';
+      return `
+        <section class="tab-empty" data-od-id="tab-empty" role="tabpanel" id="list-panel" aria-labelledby="${isUpcoming ? 'tab-upcoming' : 'tab-past'}">
+          <p>${message}</p>
+          ${cta}
+        </section>
+      `;
+    }
+
+    function renderList(interactive) {
+      const groups = getActiveGroups();
+      const hasFilters = getFilterCount() > 0;
+      const unfiltered = getUnfilteredCount();
+
+      if (groups.length === 0 && hasFilters && unfiltered > 0) {
+        return renderFilterEmpty(interactive);
+      }
+      if (groups.length === 0) {
+        return renderTabEmpty(interactive);
+      }
+      const cards = groups.map((g) => g.compact ? renderCompactCard(g, interactive) : renderGroupCard(g, interactive)).join('');
+      const loadMore = interactive && listTab === 'past'
+        ? `<button type="button" class="btn-load-more" data-action="load-more" data-od-id="load-more">${COPY.loadMore}</button>`
+        : '';
+      return `
+        <div class="card-list" role="tabpanel" id="list-panel" aria-labelledby="${listTab === 'upcoming' ? 'tab-upcoming' : 'tab-past'}" data-od-id="shared-list-groups" data-testid="shared-list-groups">
+          ${cards}
+        </div>
+        ${loadMore}
+      `;
+    }
+
+    function renderContent() {
+      const isConcerts = viewMode === 'concerts';
+      const title = isConcerts ? COPY.concertsTitle : USERNAME;
+      const live = isConcerts ? '' : `<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">${COPY.sharedListFor(USERNAME)}</div>`;
+      const controls = renderListControls();
+      const list = renderList(isConcerts);
+      return `
+        ${live}
+        <h1 data-od-id="page-title">${title}</h1>
+        ${controls}
+        ${list}
+      `;
+    }
+
+    function renderEmpty() {
+      const isConcerts = viewMode === 'concerts';
+      const title = isConcerts ? COPY.concertsTitle : USERNAME;
+      const live = isConcerts ? '' : `<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">${COPY.sharedListFor(USERNAME)}</div>`;
+      const controls = renderListControls();
+      const emptyPanel = `
+        <section class="tab-empty" data-od-id="tab-empty" role="tabpanel" id="list-panel" aria-labelledby="${listTab === 'upcoming' ? 'tab-upcoming' : 'tab-past'}">
+          <p>${isConcerts ? COPY.emptyConcerts : COPY.empty}</p>
+          ${isConcerts ? `<div class="tab-empty-cta"><button type="button" class="empty-cta" data-action="add-concert">${COPY.addConcert}</button></div>` : ''}
+        </section>
+      `;
+      return `
+        ${live}
+        <h1 data-od-id="page-title">${title}</h1>
+        ${controls}
+        ${emptyPanel}
+      `;
+    }
+
+    function renderLoading() {
+      const isConcerts = viewMode === 'concerts';
+      const title = isConcerts ? COPY.concertsTitle : USERNAME;
+      const testid = viewMode === 'concerts' ? 'list-skeleton' : 'list-skeleton';
+      return `
+        <h1 data-od-id="page-title">${title}</h1>
+        <div class="list-controls" aria-hidden="true" data-od-id="list-controls-skeleton">
+          <div class="list-tabs is-skeleton" data-od-id="list-tabs-skeleton">
+            <div class="list-tab">${COPY.tabUpcoming}</div>
+            <div class="list-tab">${COPY.tabPast}</div>
+          </div>
+          <div class="list-filter-bar">
+            <div class="btn-filter" style="opacity:0.45;">${COPY.filter}</div>
+          </div>
+        </div>
+        <div class="skeleton-list" aria-busy="true" aria-label="Chargement" data-od-id="list-skeleton" data-testid="${testid}">
+          <div class="skeleton" role="alert" aria-label="chargement"></div>
+          <div class="skeleton" role="alert" aria-label="chargement"></div>
+          <div class="skeleton" role="alert" aria-label="chargement"></div>
+        </div>
+      `;
+    }
+
+    function renderError() {
+      const testid = viewMode === 'concerts' ? 'concerts-load-error' : 'shared-list-load-error';
+      return `
+        <div class="error-block" data-od-id="shared-list-load-error" data-testid="${testid}">
+          <p class="error-title">${COPY.errorTitle}</p>
+          <button type="button" class="btn-retry" data-action="retry" ${retryBusy ? 'aria-busy="true"' : ''}>${COPY.retry}</button>
+        </div>
+      `;
+    }
+
+    function renderNotFound() {
+      return `<h1 data-od-id="profile-not-found">${COPY.notFound}</h1>`;
+    }
+
+    function updateChrome() {
+      const isConcerts = viewMode === 'concerts';
+      siteHeader.classList.toggle('is-hidden', isConcerts);
+      glassNav.classList.toggle('is-hidden', !isConcerts);
+      appShell.classList.toggle('is-concerts', isConcerts);
+    }
+
+    function render() {
+      updateChrome();
+      if (pageState === 'content') main.innerHTML = renderContent();
+      else if (pageState === 'empty') main.innerHTML = renderEmpty();
+      else if (pageState === 'loading') main.innerHTML = renderLoading();
+      else if (pageState === 'error') main.innerHTML = renderError();
+      else if (pageState === 'not-found') main.innerHTML = renderNotFound();
+    }
+
+    document.querySelector('[data-od-id="dev-bar"]').addEventListener('click', (event) => {
+      const viewChip = event.target.closest('[data-view]');
+      if (viewChip) {
+        if (filterSheetOpen) closeFilterSheet(false);
+        viewMode = viewChip.dataset.view;
+        document.querySelectorAll('[data-view]').forEach((btn) => {
+          btn.setAttribute('aria-pressed', btn === viewChip ? 'true' : 'false');
+        });
+        render();
+        return;
+      }
+      const chip = event.target.closest('[data-state]');
+      if (!chip) return;
+      pageState = chip.dataset.state;
+      retryBusy = false;
+      document.querySelectorAll('[data-state]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', btn === chip ? 'true' : 'false');
+      });
+      render();
+    });
+
+    main.addEventListener('click', (event) => {
+      const tabBtn = event.target.closest('[data-action="list-tab"]');
+      if (tabBtn) {
+        if (filterSheetOpen) closeFilterSheet(false);
+        listTab = tabBtn.dataset.tab;
+        render();
+        return;
+      }
+
+      const removeFilter = event.target.closest('[data-action="remove-filter"]');
+      if (removeFilter) {
+        const id = removeFilter.dataset.filterId;
+        if (id === '__artist__') {
+          filterArtistQuery[listTab] = '';
+        } else {
+          activeFilters[listTab] = getActiveFilterIds().filter((f) => f !== id);
+        }
+        render();
+        showToast('Filtre retiré');
+        return;
+      }
+
+      if (event.target.closest('[data-action="clear-filters"]')) {
+        activeFilters[listTab] = [];
+        filterArtistQuery[listTab] = '';
+        render();
+        showToast('Filtres effacés');
+        return;
+      }
+
+      const openFilters = event.target.closest('[data-action="open-filters"]');
+      if (openFilters) {
+        openFilterSheet(openFilters);
+        return;
+      }
+
+      const chipBtn = event.target.closest('[data-action="cycle-chip"]');
+      if (chipBtn) {
+        const target = findChipTarget(chipBtn.dataset.chipId);
+        if (target) {
+          target.attendance = cycleAttendance(target.attendance);
+          render();
+        }
+        return;
+      }
+
+      const retry = event.target.closest('[data-action="retry"]');
+      if (retry) {
+        retryBusy = true;
+        render();
+        setTimeout(() => {
+          retryBusy = false;
+          pageState = 'content';
+          document.querySelectorAll('[data-state]').forEach((btn) => {
+            btn.setAttribute('aria-pressed', btn.dataset.state === 'content' ? 'true' : 'false');
+          });
+          render();
+          showToast('Contenu chargé');
+        }, 900);
+        return;
+      }
+
+      const action = event.target.closest('[data-action]');
+      if (!action) return;
+
+      const map = {
+        'open-event': 'Ouverture Event (prototype)',
+        'new-night': 'Nouvelle soirée (prototype)',
+        'new-festival': 'Nouveau festival (prototype)',
+        'add-concert': 'Ajouter un concert (prototype)',
+        'load-more': 'Charger plus (prototype)'
+      };
+      const key = action.dataset.action;
+      if (map[key]) {
+        event.preventDefault();
+        showToast(map[key]);
+      }
+    });
+
+    document.querySelector('[data-od-id="menu-button"]').addEventListener('click', () => {
+      showToast('Menu (prototype)');
+    });
+
+    glassNav.addEventListener('click', (event) => {
+      const add = event.target.closest('[data-od-id="nav-add"]');
+      if (add) {
+        event.preventDefault();
+        showToast('Ajouter un concert (prototype)');
+      }
+    });
+
+    main.addEventListener('keydown', (event) => {
+      const tabs = main.querySelector('[data-od-id="list-tabs"]');
+      if (!tabs || !tabs.contains(document.activeElement)) return;
+      const upcoming = tabs.querySelector('[data-tab="upcoming"]');
+      const past = tabs.querySelector('[data-tab="past"]');
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        listTab = listTab === 'upcoming' ? 'past' : 'upcoming';
+        render();
+        const next = listTab === 'upcoming' ? upcoming : past;
+        if (next) next.focus();
+      }
+    });
+
+    filterScrim.addEventListener('click', () => closeFilterSheet(true));
+    filterApplyBtn.addEventListener('click', applyFilterSheet);
+    filterResetBtn.addEventListener('click', resetFilterSheet);
+
+    filterSheet.addEventListener('click', (event) => {
+      const toggle = event.target.closest('[data-action="toggle-filter-option"]');
+      if (toggle) {
+        toggleDraftFilter(toggle.dataset.filterId);
+      }
+    });
+
+    filterSheetBody.addEventListener('input', (event) => {
+      if (event.target.id === 'filter-artist-input') {
+        draftArtistQuery = event.target.value;
+        updateFilterSheetContext();
+      }
+    });
+
+    filterSheetBody.addEventListener('keydown', (event) => {
+      if (event.target.id === 'filter-artist-input' && event.key === 'Enter') {
+        event.preventDefault();
+        applyFilterSheet();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (!filterSheetOpen) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeFilterSheet(true);
+        return;
+      }
+      trapFilterFocus(event);
+    });
+
+    render();
+  </script>
+</body>
+</html>

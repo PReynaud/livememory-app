@@ -330,6 +330,10 @@ test('enabled Shared List shows going/attended groups and omits notes, unset, an
     await expect(page.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add concert' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Edit event' })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /Coming up/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Souvenirs/ })).toBeVisible();
+    await expect(page.getByTestId('concert-filter-open')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
 
     const groupCard = page.locator('[data-event-card="group"]');
     await expect(groupCard).toHaveCount(1);

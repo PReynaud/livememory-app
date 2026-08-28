@@ -148,6 +148,8 @@ describe('Home featured and stats surfaces', () => {
     expect(home).toMatch(/UIcon/);
     expect(home).toMatch(/i-lucide-music/);
     expect(home).toMatch(/border-l/);
+    expect(home).toMatch(/max-w-3xl/);
+    expect(home).not.toMatch(/max-w-lg/);
     expect(home).not.toMatch(/card-spotlight/);
     expect(home).not.toMatch(/How was it\?/);
     expect(home).not.toMatch(/for you|Pour vous|album/i);

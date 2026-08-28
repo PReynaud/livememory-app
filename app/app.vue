@@ -69,7 +69,7 @@ useSeoMeta({
       class="min-h-dvh bg-default"
     >
       <AppGlassNav />
-      <UMain class="pb-24 lg:pb-8 lg:pl-24">
+      <UMain class="pb-[calc(var(--chrome-safe)+16px)] lg:pb-8 lg:pl-24">
         <ClientOnly>
           <AppRouteAnnouncer />
         </ClientOnly>

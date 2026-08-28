@@ -157,6 +157,7 @@ const festivalDays = computed(() => {
 });
 
 const showDayPicker = computed(() => festivalDays.value.length > 0);
+const timeOnly = computed(() => isNewFestival.value || showDayPicker.value);
 
 const findConcert = (concertId: string) => {
   return eventsStore.currentConcerts.find(item => item.id === concertId)
@@ -625,7 +626,7 @@ const removeConcert = async () => {
 
 const slideoverUi = {
   overlay: 'bg-elevated/0',
-  content: 'lm-chrome lm-sheet-shell bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:w-[28rem] max-h-[min(85dvh,36rem)]',
+  content: 'lm-chrome lm-sheet-shell bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-3 mx-auto max-w-[calc(var(--max-w)-24px)] bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:mx-0 lg:max-w-none lg:w-[28rem] max-h-[min(85dvh,36rem)]',
   header: 'lm-sheet-head relative flex-col items-stretch gap-0 px-4 pt-6 pb-0 sm:px-4 min-h-0',
   body: 'min-h-0 overflow-y-auto px-4 py-3 sm:px-4 sm:py-3',
   footer: 'lm-sheet-foot px-4 pb-4 sm:px-4',
@@ -836,7 +837,7 @@ const slideoverUi = {
                 class="min-h-11 min-w-14 flex-1 rounded-xl border px-2 py-1.5 text-[13px] font-medium leading-tight"
                 :class="concertDate === day
                   ? 'border-primary bg-primary text-black'
-                  : 'border-white/16 bg-[rgba(10,10,10,0.88)] text-white'"
+                  : 'border-[var(--well-border)] bg-[var(--well-glass)] text-white backdrop-blur-[12px]'"
                 :aria-pressed="concertDate === day"
                 :aria-label="day"
                 :disabled="pendingChoice"
@@ -855,7 +856,7 @@ const slideoverUi = {
 
           <div
             class="field-row"
-            :class="{ 'time-only': isNewFestival }"
+            :class="{ 'time-only': timeOnly }"
           >
             <UFormField
               v-if="isNewNight || isExistingNight"
@@ -875,7 +876,7 @@ const slideoverUi = {
               />
             </UFormField>
             <UFormField
-              v-else-if="!isNewFestival"
+              v-else-if="!timeOnly"
               label="Date"
               name="date"
               required

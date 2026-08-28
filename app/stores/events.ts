@@ -12,6 +12,7 @@ import {
   listOwnedEvents,
   listOwnedStages,
   selectFeaturedEvents,
+  splitEventsForConcerts,
   updateEvent,
   type CreateEventInput,
   type EventKind,
@@ -221,9 +222,13 @@ export const useEventsStore = defineStore('events', () => {
 
       events.value = result.data ?? [];
 
-      const nextWindowEnd = nextEventsListWindowEnd(
+      const { upcoming } = splitEventsForConcerts(events.value);
+      const nextWindowEnd = Math.min(
         events.value.length,
-        eventWindowEnd.value
+        Math.max(
+          nextEventsListWindowEnd(events.value.length, eventWindowEnd.value),
+          upcoming.length + EVENTS_LIST_WINDOW
+        )
       );
       allConcertsLoaded.value = false;
       const listedConcertsError = await loadConcertsForEventSlice(0, nextWindowEnd);

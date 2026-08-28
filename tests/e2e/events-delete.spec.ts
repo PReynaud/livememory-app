@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { test as authTest, expect as authExpect } from './fixtures/auth.fixture';
+import { createNightFromAddSheet } from './helpers/add-concert-sheet';
+import { createOwnedEventRest } from './helpers/owned-event-rest';
+import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { concertNotesRest, concertsRest } from './helpers/concert-rest';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
@@ -29,34 +32,29 @@ const signIn = async (email: string, password: string) => {
 
 const createEmptyNight = async (
   page: import('@playwright/test').Page,
+  account: { email: string; password: string },
   input: { name: string; date: string; place: string }
 ) => {
-  await page.getByRole('link', { name: 'Concerts' }).click();
-  await page.getByRole('button', { name: 'New night' }).click();
-  await page.getByLabel('Name').fill(input.name);
-  await page.getByLabel('Date').fill(input.date);
-  await page.getByLabel('Place').fill(input.place);
-  await page.getByRole('button', { name: 'Save' }).click();
+  const created = await createOwnedEventRest(account, {
+    name: input.name,
+    start: input.date,
+    place: input.place
+  });
+  await page.goto(created.path);
+  await waitForNuxtHydration(page);
   await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  return new URL(page.url()).pathname;
+  return created.path;
 };
 
 const createNightWithConcert = async (
   page: import('@playwright/test').Page,
   input: { name: string; date: string; place: string; artist: string }
 ) => {
-  const eventPath = await createEmptyNight(page, input);
-  await page.getByRole('button', { name: 'Add to this night' }).click();
-  const sheet = page.getByRole('dialog');
-  await sheet.getByLabel('Artist').fill(input.artist);
-  await sheet.getByRole('button', { name: 'Save' }).click();
-  await expect(sheet).toHaveCount(0);
-  await expect(page.getByText(input.artist)).toBeVisible();
-  return eventPath;
+  return createNightFromAddSheet(page, input);
 };
 
-authTest('owner deletes an empty Event immediately with no Concert warning', async ({ authenticatedPage }) => {
-  const eventPath = await createEmptyNight(authenticatedPage, {
+authTest('owner deletes an empty Event immediately with no Concert warning', async ({ authenticatedPage, account }) => {
+  const eventPath = await createEmptyNight(authenticatedPage, account, {
     name: 'Empty Night',
     date: '2026-08-12',
     place: 'Lyon'

@@ -1,16 +1,41 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { definePageMeta, navigateTo } from '#imports';
+import { computed } from 'vue';
+import { definePageMeta, useToast } from '#imports';
 import { storeToRefs } from 'pinia';
-import { useEventsStore, type EventKind } from '@/stores/events';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
+import { useEventsStore } from '@/stores/events';
+import { useConcertListFilters } from '@/composables/useConcertListFilters';
+import { useEventListTabs } from '@/composables/useEventListTabs';
+import { CONCERT_LIST_COPY } from '@/utils/concert-list-copy';
+import {
+  buildConcertFilterCatalog,
+  concertFilterChips,
+  filterEventsByConcertFilters,
+  splitEventsForConcerts,
+  type ListTab
+} from '@/utils/concert-list-filters';
 
 definePageMeta({
   middleware: 'auth'
 });
 
-const eventsStore = useEventsStore();
 const addSheet = useAddConcertSheetStore();
+const eventsStore = useEventsStore();
+const toast = useToast();
+const { tab, setTab } = useEventListTabs();
+const {
+  draft,
+  sheetOpen,
+  sheetTab,
+  filtersFor,
+  activeCount,
+  openSheet,
+  resetDraft,
+  applyDraft,
+  removeCriterion,
+  clearAll,
+  draftCount
+} = useConcertListFilters();
 const {
   events,
   visibleEvents,
@@ -20,55 +45,69 @@ const {
   hasMoreEvents
 } = storeToRefs(eventsStore);
 
-const createKind = ref<EventKind | null>(null);
-const name = ref('');
-const startDate = ref('');
-const endDate = ref('');
-const place = ref('');
-const formError = ref('');
-const saving = ref(false);
-
 const hasEvents = computed(() => events.value.length > 0);
-const isFestival = computed(() => createKind.value === 'festival');
 const showSkeleton = computed(() => loading.value && !error.value && !hasEvents.value);
-
-const openCreate = (kind: EventKind) => {
-  createKind.value = kind;
-  formError.value = '';
-};
-
-const submitCreate = async () => {
-  if (!createKind.value || saving.value) {
-    return;
+const buckets = computed(() => splitEventsForConcerts(events.value));
+const upcomingEvents = computed(() => buckets.value.upcoming);
+const pastEvents = computed(() => {
+  const windowIds = new Set(visibleEvents.value.map(event => event.id));
+  return buckets.value.past.filter(event => windowIds.has(event.id));
+});
+const sourceEvents = computed(() => {
+  return tab.value === 'upcoming' ? upcomingEvents.value : pastEvents.value;
+});
+const activeFilters = computed(() => filtersFor(tab.value));
+const listedEvents = computed(() => filterEventsByConcertFilters(
+  sourceEvents.value,
+  eventsStore.concertsForEvent,
+  eventsStore.attendanceByConcertId,
+  activeFilters.value
+));
+const filterCount = computed(() => activeCount(tab.value));
+const catalog = computed(() => {
+  const bucket = tab.value === 'upcoming' ? upcomingEvents.value : buckets.value.past;
+  return buildConcertFilterCatalog(bucket, tab.value);
+});
+const sheetCatalog = computed(() => {
+  const bucket = sheetTab.value === 'upcoming' ? upcomingEvents.value : buckets.value.past;
+  return buildConcertFilterCatalog(bucket, sheetTab.value);
+});
+const chips = computed(() => concertFilterChips(activeFilters.value, catalog.value));
+const filterHint = computed(() => {
+  return tab.value === 'past'
+    ? CONCERT_LIST_COPY.filterHintPast
+    : CONCERT_LIST_COPY.filterHintUpcoming;
+});
+const isFilteredEmpty = computed(() => {
+  return sourceEvents.value.length > 0 && listedEvents.value.length === 0;
+});
+const showLoadMore = computed(() => {
+  return tab.value === 'past' && hasMoreEvents.value && !error.value && !isFilteredEmpty.value;
+});
+const emptyCopy = computed(() => {
+  if (isFilteredEmpty.value) {
+    return CONCERT_LIST_COPY.emptyFiltered;
   }
 
-  saving.value = true;
-  formError.value = '';
-
-  try {
-    const result = await eventsStore.createOwnedEvent({
-      kind: createKind.value,
-      name: name.value,
-      startDate: startDate.value,
-      endDate: isFestival.value ? endDate.value : startDate.value,
-      place: place.value
-    });
-
-    if (result.error) {
-      formError.value = result.error;
-      return;
-    }
-
-    if (result.data) {
-      await navigateTo(`/e/${result.data.id}`);
-    }
-  } finally {
-    saving.value = false;
-  }
-};
+  return tab.value === 'past'
+    ? CONCERT_LIST_COPY.emptyPast
+    : CONCERT_LIST_COPY.emptyUpcoming;
+});
+const showAddCta = computed(() => {
+  return tab.value === 'upcoming' && !isFilteredEmpty.value && listedEvents.value.length === 0;
+});
 
 const retryLoad = () => {
   void eventsStore.fetchEvents();
+};
+
+const onTabChange = (next: ListTab) => {
+  setTab(next);
+};
+
+const applyFilters = () => {
+  const count = applyDraft();
+  toast.add({ title: CONCERT_LIST_COPY.filtersApplied(count) });
 };
 
 if (import.meta.server) {
@@ -79,109 +118,10 @@ if (import.meta.server) {
 </script>
 
 <template>
-  <UContainer class="py-8 max-w-lg space-y-4">
+  <UContainer class="py-8 max-w-3xl space-y-4">
     <h1 class="text-[34px] font-bold tracking-tight leading-tight">
       Concerts
     </h1>
-
-    <div class="flex flex-wrap gap-2">
-      <UButton
-        label="New night"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        @click="openCreate('single_night')"
-      />
-      <UButton
-        label="New festival"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        @click="openCreate('festival')"
-      />
-    </div>
-
-    <form
-      v-if="createKind"
-      class="rounded-2xl bg-[#1A1A1A] p-4 space-y-3"
-      novalidate
-      @submit.prevent="submitCreate"
-    >
-      <p class="text-base font-semibold">
-        {{ isFestival ? 'New festival' : 'New night' }}
-      </p>
-
-      <UFormField
-        label="Name"
-        name="name"
-      >
-        <UInput
-          v-model="name"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UFormField
-        v-if="!isFestival"
-        label="Date"
-        name="date"
-      >
-        <UInput
-          v-model="startDate"
-          type="date"
-          class="w-full"
-        />
-      </UFormField>
-
-      <template v-else>
-        <UFormField
-          label="Start date"
-          name="startDate"
-        >
-          <UInput
-            v-model="startDate"
-            type="date"
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField
-          label="End date"
-          name="endDate"
-        >
-          <UInput
-            v-model="endDate"
-            type="date"
-            class="w-full"
-          />
-        </UFormField>
-      </template>
-
-      <UFormField
-        label="Place"
-        name="place"
-      >
-        <UInput
-          v-model="place"
-          class="w-full"
-        />
-      </UFormField>
-
-      <UAlert
-        v-if="formError"
-        color="error"
-        variant="subtle"
-        :title="formError"
-      />
-
-      <UButton
-        type="submit"
-        label="Save"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        :loading="saving"
-      />
-    </form>
 
     <AppListSkeleton
       v-if="showSkeleton"
@@ -189,52 +129,86 @@ if (import.meta.server) {
     />
 
     <AppLoadError
-      v-else-if="error && !formError"
+      v-else-if="error"
       testid="concerts-load-error"
       @retry="retryLoad"
     />
 
-    <section
-      v-else-if="!hasEvents"
-      class="rounded-2xl bg-[#1A1A1A] p-4 space-y-3"
-    >
-      <p class="text-lg font-semibold">
-        No shows yet.
-      </p>
-      <UButton
-        label="Add concert"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        @click="addSheet.openSheet()"
+    <template v-else>
+      <AppEventListControls
+        :tab="tab"
+        :upcoming-count="upcomingEvents.length"
+        :past-count="buckets.past.length"
+        :filter-count="filterCount"
+        :chips="chips"
+        :hint="filterHint"
+        @update:tab="onTabChange"
+        @open-filter="openSheet(tab)"
+        @remove-filter="removeCriterion(tab, $event)"
+        @clear-filters="clearAll(tab)"
       />
-    </section>
 
-    <div
-      v-else
-      class="space-y-2.5"
-    >
-      <AppEventCard
-        v-for="event in visibleEvents"
-        :key="event.id"
-        :event="event"
-        :concerts="eventsStore.concertsForEvent(event.id)"
-      />
-      <p
-        v-if="loadingMore"
-        data-testid="loading-more"
-        class="text-sm text-muted"
+      <div
+        id="concert-list-panel"
+        role="tabpanel"
+        :aria-labelledby="tab === 'past' ? 'concert-tab-past' : 'concert-tab-upcoming'"
       >
-        Loading more
-      </p>
-      <UButton
-        v-else-if="hasMoreEvents && !error"
-        label="Load more"
-        color="neutral"
-        variant="ghost"
-        class="w-full"
-        @click="void eventsStore.loadMoreEvents()"
-      />
-    </div>
+        <section
+          v-if="listedEvents.length === 0"
+          class="lm-card px-5 py-7 text-center space-y-3"
+          :data-testid="isFilteredEmpty ? 'concerts-filter-empty' : 'concerts-tab-empty'"
+        >
+          <p class="text-[22px] font-bold tracking-tight leading-[1.15]">
+            {{ emptyCopy }}
+          </p>
+          <UButton
+            v-if="showAddCta"
+            :label="CONCERT_LIST_COPY.addConcert"
+            color="primary"
+            variant="outline"
+            class="h-11 rounded-full ring-2"
+            @click="addSheet.openSheet()"
+          />
+        </section>
+
+        <div
+          v-else
+          class="space-y-2.5"
+        >
+          <AppEventCard
+            v-for="event in listedEvents"
+            :key="event.id"
+            :event="event"
+            :concerts="eventsStore.concertsForEvent(event.id)"
+          />
+          <p
+            v-if="loadingMore"
+            data-testid="loading-more"
+            class="text-sm text-muted"
+          >
+            {{ CONCERT_LIST_COPY.loadingMore }}
+          </p>
+          <UButton
+            v-else-if="showLoadMore"
+            :label="CONCERT_LIST_COPY.loadMore"
+            color="neutral"
+            variant="ghost"
+            class="w-full"
+            @click="void eventsStore.loadMoreEvents()"
+          />
+        </div>
+      </div>
+    </template>
+
+    <AppFilterConcertSheet
+      v-model:open="sheetOpen"
+      :tab="sheetTab"
+      :draft="draft"
+      :catalog="sheetCatalog"
+      :draft-count="draftCount"
+      @update:draft="draft = $event"
+      @apply="applyFilters"
+      @reset="resetDraft()"
+    />
   </UContainer>
 </template>

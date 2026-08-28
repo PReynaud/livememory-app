@@ -43,7 +43,8 @@ export default defineConfig({
       NUXT_PUBLIC_SUPABASE_URL: supabaseUrl,
       NUXT_PUBLIC_SUPABASE_KEY: supabaseKey,
       SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
-      NUXT_DEVTOOLS: '0'
+      NUXT_DEVTOOLS: '0',
+      NUXT_IGNORE_LOCK: '1'
     }
   }
 });

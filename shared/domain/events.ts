@@ -231,7 +231,10 @@ const compareUpcomingStart = (left: EventRecord, right: EventRecord) => {
   return left.id.localeCompare(right.id);
 };
 
-export const sortEventsForConcerts = (events: EventRecord[], now = new Date()): EventRecord[] => {
+export const splitEventsForConcerts = (
+  events: EventRecord[],
+  now = new Date()
+): { upcoming: EventRecord[]; past: EventRecord[] } => {
   const today = civilDateInTimeZone(now, PARIS_TIME_ZONE);
   const upcoming = events
     .filter(event => event.start_date >= today)
@@ -240,6 +243,11 @@ export const sortEventsForConcerts = (events: EventRecord[], now = new Date()): 
     .filter(event => event.start_date < today)
     .sort((left, right) => right.start_date.localeCompare(left.start_date));
 
+  return { upcoming, past };
+};
+
+export const sortEventsForConcerts = (events: EventRecord[], now = new Date()): EventRecord[] => {
+  const { upcoming, past } = splitEventsForConcerts(events, now);
   return [...upcoming, ...past];
 };
 

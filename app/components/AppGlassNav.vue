@@ -19,8 +19,8 @@ const profileActive = computed(() => isActive('/profile'));
   <nav
     aria-label="Main"
     class="lm-chrome fixed z-50 flex border border-[color-mix(in_oklch,white_8%,transparent)] bg-[var(--glass)] backdrop-blur-[24px]
-      inset-x-3 bottom-2.5 h-16 flex-row items-center justify-around rounded-3xl px-1.5
-      lg:inset-auto lg:bottom-auto lg:left-0 lg:top-0 lg:h-dvh lg:w-20 lg:flex-col lg:justify-start lg:gap-4 lg:rounded-none lg:border-0 lg:border-r lg:py-8"
+      inset-x-3 bottom-2.5 mx-auto h-16 w-auto max-w-[calc(var(--max-w)-24px)] flex-row items-center justify-around rounded-3xl px-1.5
+      lg:inset-auto lg:bottom-auto lg:left-0 lg:top-0 lg:mx-0 lg:h-dvh lg:w-20 lg:max-w-none lg:flex-col lg:justify-start lg:gap-4 lg:rounded-none lg:border-0 lg:border-r lg:py-8"
   >
     <NuxtLink
       v-for="link in links"

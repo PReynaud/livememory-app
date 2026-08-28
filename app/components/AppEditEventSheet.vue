@@ -219,7 +219,7 @@ const removeEvent = async () => {
 
 const slideoverUi = {
   overlay: 'bg-elevated/0',
-  content: 'lm-chrome bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-0 bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:w-[28rem] max-h-[min(85dvh,36rem)]',
+  content: 'lm-chrome bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl inset-x-3 mx-auto max-w-[calc(var(--max-w)-24px)] bottom-[4.75rem] lg:bottom-8 lg:inset-x-auto lg:left-[calc(50%-14rem)] lg:mx-0 lg:max-w-none lg:w-[28rem] max-h-[min(85dvh,36rem)]',
   header: 'px-4 pt-4 pb-0 sm:px-4',
   body: 'px-4 py-3 sm:px-4 sm:py-3',
   footer: 'px-4 pb-4 sm:px-4',
