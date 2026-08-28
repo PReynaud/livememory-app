@@ -2,7 +2,6 @@ import { civilDateInTimeZone, PARIS_TIME_ZONE, splitEventsForConcerts, type Even
 import type { ConcertRecord } from '#shared/domain/concerts';
 import { CONCERT_LIST_COPY } from '@/utils/concert-list-copy';
 
-export { EVENTS_LIST_WINDOW } from '#shared/domain/concerts';
 export { splitEventsForConcerts };
 
 export type ListTab = 'upcoming' | 'past';
@@ -230,8 +229,4 @@ export const filterEventsByConcertFilters = (
     filters,
     now
   ));
-};
-
-export const paginateConcertEvents = (events: EventRecord[], limit: number) => {
-  return events.slice(0, Math.max(0, limit));
 };

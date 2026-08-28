@@ -10,9 +10,7 @@ import { CONCERT_LIST_COPY } from '@/utils/concert-list-copy';
 import {
   buildConcertFilterCatalog,
   concertFilterChips,
-  EVENTS_LIST_WINDOW,
   filterEventsByConcertFilters,
-  paginateConcertEvents,
   splitEventsForConcerts,
   type ListTab
 } from '@/utils/concert-list-filters';
@@ -43,36 +41,28 @@ const {
   visibleEvents,
   loading,
   loadingMore,
-  error
+  error,
+  hasMoreEvents
 } = storeToRefs(eventsStore);
 
 const hasEvents = computed(() => events.value.length > 0);
 const showSkeleton = computed(() => loading.value && !error.value && !hasEvents.value);
 const buckets = computed(() => splitEventsForConcerts(events.value));
 const upcomingEvents = computed(() => buckets.value.upcoming);
+const pastEvents = computed(() => {
+  const windowIds = new Set(visibleEvents.value.map(event => event.id));
+  return buckets.value.past.filter(event => windowIds.has(event.id));
+});
 const sourceEvents = computed(() => {
-  return tab.value === 'upcoming' ? upcomingEvents.value : buckets.value.past;
+  return tab.value === 'upcoming' ? upcomingEvents.value : pastEvents.value;
 });
 const activeFilters = computed(() => filtersFor(tab.value));
-const filteredEvents = computed(() => filterEventsByConcertFilters(
+const listedEvents = computed(() => filterEventsByConcertFilters(
   sourceEvents.value,
   eventsStore.concertsForEvent,
   eventsStore.attendanceByConcertId,
   activeFilters.value
 ));
-const pastPageSize = computed(() => {
-  return Math.max(
-    EVENTS_LIST_WINDOW,
-    visibleEvents.value.length - upcomingEvents.value.length
-  );
-});
-const listedEvents = computed(() => {
-  if (tab.value !== 'past') {
-    return filteredEvents.value;
-  }
-
-  return paginateConcertEvents(filteredEvents.value, pastPageSize.value);
-});
 const filterCount = computed(() => activeCount(tab.value));
 const catalog = computed(() => {
   const bucket = tab.value === 'upcoming' ? upcomingEvents.value : buckets.value.past;
@@ -89,10 +79,10 @@ const filterHint = computed(() => {
     : CONCERT_LIST_COPY.filterHintUpcoming;
 });
 const isFilteredEmpty = computed(() => {
-  return sourceEvents.value.length > 0 && filteredEvents.value.length === 0;
+  return sourceEvents.value.length > 0 && listedEvents.value.length === 0;
 });
 const showLoadMore = computed(() => {
-  return tab.value === 'past' && !error.value && listedEvents.value.length < filteredEvents.value.length;
+  return tab.value === 'past' && hasMoreEvents.value && !error.value && !isFilteredEmpty.value;
 });
 const emptyCopy = computed(() => {
   if (isFilteredEmpty.value) {

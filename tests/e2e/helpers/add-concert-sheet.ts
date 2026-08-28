@@ -7,7 +7,7 @@ export const addSheetArtist = (sheet: Locator, label = 'Artist') => {
   return sheet.getByRole('combobox', { name: label });
 };
 
-export const addSheetPlace = (sheet: Locator) => sheet.getByRole('combobox', { name: 'City' });
+export const addSheetPlace = (sheet: Locator) => sheet.getByRole('combobox', { name: 'Place' });
 
 export const selectAddSheetEvent = async (page: Page, sheet: Locator, option: string) => {
   await addSheetEventControl(sheet).click();
@@ -21,44 +21,6 @@ export const openAddSheetFromNav = async (page: Page) => {
   return sheet;
 };
 
-const parisToday = () => {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Paris',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date());
-};
-
-export const selectConcertsPeriodTab = async (page: Page, tab: 'upcoming' | 'past') => {
-  const label = tab === 'past' ? /Souvenirs/ : /Coming up/;
-  await page.getByRole('tab', { name: label }).click();
-};
-
-export const gotoConcertsPeriod = async (page: Page, tab: 'upcoming' | 'past' = 'upcoming') => {
-  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts' }).click();
-  await expect(page).toHaveURL(/\/concerts/);
-  await selectConcertsPeriodTab(page, tab);
-};
-
-const concertAddedToast = (page: Page) => {
-  return page.getByText('Concert added.', { exact: true }).or(page.getByText('Concerts added.', { exact: true }));
-};
-
-const openCreatedEventFromConcerts = async (
-  page: Page,
-  input: { name: string; date: string; artist: string }
-) => {
-  await expect(concertAddedToast(page)).toBeVisible();
-  await gotoConcertsPeriod(page, input.date >= parisToday() ? 'upcoming' : 'past');
-  const eventLink = page.getByRole('link', { name: new RegExp(input.name) });
-  await expect(eventLink).toBeVisible();
-  await eventLink.click();
-  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  await expect(page.getByText(input.artist)).toBeVisible();
-  return new URL(page.url()).pathname;
-};
-
 export const createNightFromAddSheet = async (
   page: Page,
   input: { name: string; date: string; place: string; artist: string }
@@ -70,7 +32,20 @@ export const createNightFromAddSheet = async (
   await sheet.getByLabel('Date').fill(input.date);
   await addSheetPlace(sheet).fill(input.place);
   await sheet.getByRole('button', { name: 'Save' }).click();
-  return openCreatedEventFromConcerts(page, input);
+  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  await expect(page.getByText(input.artist)).toBeVisible();
+  return new URL(page.url()).pathname;
+};
+
+export const selectConcertsPeriodTab = async (page: Page, tab: 'upcoming' | 'past') => {
+  const label = tab === 'past' ? /Souvenirs/ : /Coming up/;
+  await page.getByRole('tab', { name: label }).click();
+};
+
+export const gotoConcertsPeriod = async (page: Page, tab: 'upcoming' | 'past' = 'upcoming') => {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts' }).click();
+  await expect(page).toHaveURL(/\/concerts/);
+  await selectConcertsPeriodTab(page, tab);
 };
 
 export const createFestivalFromAddSheet = async (
@@ -87,9 +62,7 @@ export const createFestivalFromAddSheet = async (
   await expect(sheet.getByRole('button', { name: input.date })).toBeVisible();
   await sheet.getByRole('button', { name: input.date }).click();
   await sheet.getByRole('button', { name: 'Save' }).click();
-  return openCreatedEventFromConcerts(page, {
-    name: input.name,
-    date: input.start,
-    artist: input.artist
-  });
+  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  await expect(page.getByText(input.artist)).toBeVisible();
+  return new URL(page.url()).pathname;
 };
