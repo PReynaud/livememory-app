@@ -226,9 +226,11 @@ describe('shared list surfaces', () => {
     expect(publicPage).toMatch(/AppEventCard/);
     expect(publicPage).toMatch(/readonly/);
     expect(publicPage).toMatch(/shared-list-empty/);
+    expect(publicPage).toMatch(/AppEventListControls/);
     expect(publicPage).not.toMatch(/from\('events'\)|from\('concerts'\)|from\('profiles'\)|from\('attendance'\)/);
     expect(publicPage).not.toMatch(/Add concert|label="Add"/);
     expect(publicPage).not.toMatch(/AppAttendanceChip|cycleAttendance|Edit event|Delete/);
+    expect(publicPage).not.toMatch(/loadMoreEvents/);
     expect(publicPage).toMatch(/Shared list for \{\{ profile\.username \}\}/);
     expect(publicPage).toMatch(/shared-list-load-error/);
     expect(publicPage).not.toMatch(/bill-only|missing notes|no notes/i);

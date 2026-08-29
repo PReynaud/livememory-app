@@ -16,9 +16,17 @@ test('shows empty Home and Concerts copy; Add concert opens the sheet', async ({
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
-  await expect(authenticatedPage.getByText('No shows yet.')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: 'New night' })).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: 'New festival' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Nothing upcoming right now.')).toBeVisible();
+  await expect(authenticatedPage.getByRole('tab', { name: /Coming up/ })).toBeVisible();
+  await expect(authenticatedPage.getByRole('tab', { name: /Souvenirs/ })).toBeVisible();
+  await expect(authenticatedPage.getByRole('button', { name: 'New night' })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: 'New festival' })).toHaveCount(0);
+  await expect(authenticatedPage.getByTestId('concert-filter-open')).toBeVisible();
+
+  await authenticatedPage.getByTestId('concert-filter-open').click();
+  await expect(authenticatedPage.getByRole('dialog').getByRole('heading', { name: 'Filter' })).toBeVisible();
+  await authenticatedPage.getByRole('button', { name: 'Apply' }).click();
+  await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
 
   await authenticatedPage.locator('main').getByRole('button', { name: 'Add concert' }).click();
   await expect(authenticatedPage.getByRole('dialog')).toBeVisible();
@@ -26,9 +34,4 @@ test('shows empty Home and Concerts copy; Add concert opens the sheet', async ({
   await authenticatedPage.keyboard.press('Escape');
   await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
-
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await expect(authenticatedPage.getByLabel('Name')).toBeVisible();
-  await expect(authenticatedPage.getByLabel('Date')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: 'Save' })).toBeVisible();
 });

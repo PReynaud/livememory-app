@@ -130,5 +130,5 @@ test('blocks an offline Concert write with a toast and does not create the night
   await authenticatedPage.keyboard.press('Escape');
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
-  await expect(authenticatedPage.getByText('No shows yet.')).toBeVisible();
+  await expect(authenticatedPage.getByText('Nothing upcoming right now.')).toBeVisible();
 });

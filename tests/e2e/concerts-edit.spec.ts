@@ -1,27 +1,13 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { addSheetArtist, addSheetEventControl, createNightFromAddSheet, gotoConcertsPeriod } from './helpers/add-concert-sheet';
+import { createOwnedEventRest } from './helpers/owned-event-rest';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
-import { addSheetArtist, addSheetEventControl } from './helpers/add-concert-sheet';
 
 const addOwnedNightWithConcert = async (
   page: import('@playwright/test').Page,
   input: { name: string; date: string; place: string; artist: string }
 ) => {
-  await page.getByRole('link', { name: 'Concerts' }).click();
-  await page.getByRole('button', { name: 'New night' }).click();
-  await page.getByLabel('Name').fill(input.name);
-  await page.getByLabel('Date').fill(input.date);
-  await page.getByLabel('City').fill(input.place);
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-
-  await page.getByRole('button', { name: 'Add to this night' }).click();
-  const sheet = page.getByRole('dialog');
-  await sheet.getByLabel('Artist').fill(input.artist);
-  await sheet.getByRole('button', { name: 'Save' }).click();
-  await expect(sheet).toHaveCount(0);
-  await expect(page.getByText(input.artist)).toBeVisible();
-
-  return new URL(page.url()).pathname;
+  return createNightFromAddSheet(page, input);
 };
 
 test('owner opens the glass edit sheet from the Event row, saves notes, and deletes the last Concert', async ({ authenticatedPage }) => {
@@ -59,7 +45,7 @@ test('owner opens the glass edit sheet from the Event row, saves notes, and dele
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(0);
 });
 
-test('owner moves a Concert between two owned Events without duplicating', async ({ authenticatedPage }) => {
+test('owner moves a Concert between two owned Events without duplicating', async ({ authenticatedPage, account }) => {
   const sourcePath = await addOwnedNightWithConcert(authenticatedPage, {
     name: 'Club Night',
     date: '2026-08-18',
@@ -75,19 +61,16 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await notesSheet.getByRole('button', { name: 'Save' }).click();
   await expect(notesSheet).toHaveCount(0);
   await expect(authenticatedPage.getByText('Concert saved.', { exact: true })).toBeVisible();
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
-  await authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' }).click();
   await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Other Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-08-18');
-  await authenticatedPage.getByLabel('City').fill('Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  const targetPath = new URL(authenticatedPage.url()).pathname;
+  const other = await createOwnedEventRest(account, {
+    name: 'Other Night',
+    start: '2026-08-18',
+    place: 'Berlin'
+  });
+  const targetPath = other.path;
 
   await authenticatedPage.goto(sourcePath);
   await waitForNuxtHydration(authenticatedPage);
@@ -108,7 +91,7 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
   await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -134,12 +117,13 @@ test('compact card chip cycles Attendance and does not open Edit', async ({ auth
     artist: 'Justice'
   });
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
+  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
   await compact.getByRole('button', { name: 'Mark as attended' }).click();
   await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
-  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'false');
 });

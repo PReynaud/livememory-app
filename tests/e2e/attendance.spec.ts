@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures/auth.fixture';
 import { concertsRest } from './helpers/concert-rest';
+import { createNightFromAddSheet, gotoConcertsPeriod } from './helpers/add-concert-sheet';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import { LOCAL_SUPABASE_ANON_KEY, LOCAL_SUPABASE_URL } from './local-supabase';
@@ -125,27 +126,19 @@ const patchConcertDate = async (
 };
 
 test('marks a future concert Going and a past concert Attended, then clear stays unset', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Future Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-12-01');
-  await authenticatedPage.getByLabel('City').fill('Lyon');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  await createNightFromAddSheet(authenticatedPage, {
+    name: 'Future Night',
+    date: '2026-12-01',
+    place: 'Lyon',
+    artist: 'Justice'
+  });
   const futureEventPath = new URL(authenticatedPage.url()).pathname;
-
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const futureSheet = authenticatedPage.getByRole('dialog');
-  await futureSheet.getByLabel('Artist').fill('Justice');
-  await futureSheet.getByRole('button', { name: 'Save' }).click();
 
   await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const goingChip = authenticatedPage.getByRole('button', { name: 'Mark as going' });
-  await expect(goingChip).toHaveAttribute('aria-pressed', 'false');
-  await goingChip.click();
   await expect(goingChip).toHaveAttribute('aria-pressed', 'true');
   await expect(goingChip).toHaveText('Going');
 
@@ -163,24 +156,16 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'false');
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Past Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-08-18');
-  await authenticatedPage.getByLabel('City').fill('Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
+  await createNightFromAddSheet(authenticatedPage, {
+    name: 'Past Night',
+    date: '2026-08-18',
+    place: 'Berlin',
+    artist: 'Fontaines D.C.'
+  });
 
-  await authenticatedPage.getByRole('button', { name: 'Add to this night' }).click();
-  const pastSheet = authenticatedPage.getByRole('dialog');
-  await pastSheet.getByLabel('Artist').fill('Fontaines D.C.');
-  await pastSheet.getByRole('button', { name: 'Save' }).click();
-
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   const pastGroup = authenticatedPage.locator('section').filter({ hasText: 'Past Night' });
   const concertsAttended = pastGroup.getByRole('button', { name: 'Mark as attended' });
-  await expect(concertsAttended).toHaveAttribute('aria-pressed', 'false');
-  await concertsAttended.click();
   await expect(concertsAttended).toHaveAttribute('aria-pressed', 'true');
   await expect(concertsAttended).toHaveText('Attended');
 

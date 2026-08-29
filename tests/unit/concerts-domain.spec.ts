@@ -8,6 +8,7 @@ import {
 import {
   createEvent,
   EVENT_RULE,
+  EVENT_RULE_MESSAGE,
   type EventRecord,
   type EventStageRecord,
   type EventMemberRecord,
@@ -1256,6 +1257,28 @@ describe('createConcert', () => {
     expect(concertInserts).toHaveLength(0);
     expect(eventDeletes).toHaveLength(0);
     expect(events).toHaveLength(0);
+  });
+
+  it('rejects inverted newEvent festival dates before a missing Concert date', async () => {
+    const { client, eventInserts, concertInserts } = createMockConcertsClient();
+
+    const result = await createConcert(client, {
+      artist: 'Justice',
+      date: '',
+      newEvent: {
+        kind: 'festival',
+        name: 'Bad Range',
+        startDate: '2026-08-22',
+        endDate: '2026-08-20',
+        place: 'Paris'
+      }
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(EVENT_RULE.dateOrder);
+    expect(result.error?.message).toBe(EVENT_RULE_MESSAGE.dateOrder);
+    expect(eventInserts).toHaveLength(0);
+    expect(concertInserts).toHaveLength(0);
   });
 
   it('rejects a newEvent single_night Concert date that does not match the Event date without persisting', async () => {
@@ -2567,7 +2590,9 @@ describe('concerts store and pages use domain helpers only', () => {
       'app/pages/home.vue',
       'app/components/AppAddConcertSheet.vue',
       'app/components/AppGlassNav.vue',
-      'app/components/AppEventCard.vue'
+      'app/components/AppEventCard.vue',
+      'app/components/AppEventListControls.vue',
+      'app/components/AppFilterConcertSheet.vue'
     ];
 
     for (const file of pageFiles) {
@@ -2590,10 +2615,13 @@ describe('concerts store and pages use domain helpers only', () => {
     expect(eventPage).not.toMatch(/label="Add concert"|label='Add concert'/);
 
     const concertsPage = readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8');
-    expect(concertsPage).toMatch(/New night/);
-    expect(concertsPage).toMatch(/New festival/);
+    expect(concertsPage).not.toMatch(/New night/);
+    expect(concertsPage).not.toMatch(/New festival/);
     expect(concertsPage).toMatch(/openSheet|openAddSheet/);
     expect(concertsPage).toMatch(/AppEventCard/);
+    expect(concertsPage).toMatch(/AppEventListControls/);
+    expect(concertsPage).toMatch(/tab === 'past'/);
+    expect(concertsPage).toMatch(/loadMoreEvents/);
 
     const eventCard = readFileSync(resolve(process.cwd(), 'app/components/AppEventCard.vue'), 'utf8');
     expect(eventCard).toMatch(/data-event-card/);

@@ -1,6 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { test as authTest, expect as authExpect } from './fixtures/auth.fixture';
 import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-account';
+import {
+  addSheetPlace,
+  gotoConcertsPeriod,
+  openAddSheetFromNav,
+  selectAddSheetEvent
+} from './helpers/add-concert-sheet';
+import { createOwnedEventRest } from './helpers/owned-event-rest';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 
 const UNKNOWN_EVENT_ID = '00000000-0000-4000-8000-000000000000';
@@ -21,22 +28,17 @@ test('unsigned Concerts URL redirects to Sign in with redirect', async ({ page }
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });
 
-authTest('creates a festival, lists it on Concerts, and opens an empty Bill', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authExpect(authenticatedPage).toHaveURL(/\/concerts/);
-  await authExpect(authenticatedPage.getByText('No shows yet.')).toBeVisible();
-
-  await authenticatedPage.getByRole('button', { name: 'New festival' }).click();
-  await authExpect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
-  await authenticatedPage.getByLabel('Name').fill('Rock Week');
-  await authenticatedPage.getByLabel('Start date').fill('2026-08-20');
-  await authenticatedPage.getByLabel('End date').fill('2026-08-22');
-  await authenticatedPage.getByLabel('City').fill('Paris');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-
-  await authExpect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  const festivalUrl = authenticatedPage.url();
-  const festivalId = festivalUrl.split('/e/')[1];
+authTest('creates a festival, lists it on Concerts, and opens an empty Bill', async ({ authenticatedPage, account }) => {
+  const created = await createOwnedEventRest(account, {
+    kind: 'festival',
+    name: 'Rock Week',
+    start: '2026-08-20',
+    end: '2026-08-22',
+    place: 'Paris'
+  });
+  await authenticatedPage.goto(created.path);
+  await waitForNuxtHydration(authenticatedPage);
+  const festivalId = created.id;
   authExpect(festivalId).not.toMatch(/rock/i);
   await authExpect(authenticatedPage.getByRole('heading', { name: 'Rock Week' })).toBeVisible();
   await authExpect(authenticatedPage.getByText('20/08/2026 – 22/08/2026')).toBeVisible();
@@ -44,8 +46,7 @@ authTest('creates a festival, lists it on Concerts, and opens an empty Bill', as
   await authExpect(authenticatedPage.getByText('No concerts on this bill.')).toBeVisible();
   await authExpect(authenticatedPage.getByRole('link', { name: 'Concerts' })).toBeVisible();
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authExpect(authenticatedPage).toHaveURL(/\/concerts/);
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   const festivalGroup = authenticatedPage.getByRole('link', { name: /Rock Week/ });
   await authExpect(festivalGroup).toBeVisible();
   await authExpect(festivalGroup.getByText('20/08/2026 – 22/08/2026')).toBeVisible();
@@ -56,20 +57,21 @@ authTest('creates a festival, lists it on Concerts, and opens an empty Bill', as
   await authExpect(authenticatedPage.getByText('No concerts on this bill.')).toBeVisible();
 });
 
-authTest('creates a single_night with one date and lists a header-only group', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Club Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-08-10');
-  await authenticatedPage.getByLabel('City').fill('Berlin');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
+authTest('creates a single_night with one date and lists a header-only group', async ({ authenticatedPage, account }) => {
+  const created = await createOwnedEventRest(account, {
+    name: 'Club Night',
+    start: '2026-08-10',
+    place: 'Berlin'
+  });
+  await authenticatedPage.goto(created.path);
+  await waitForNuxtHydration(authenticatedPage);
 
   await authExpect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
   await authExpect(authenticatedPage.getByRole('heading', { name: 'Club Night' })).toBeVisible();
   await authExpect(authenticatedPage.getByText('10/08/2026')).toBeVisible();
   await authExpect(authenticatedPage.getByText('No concerts on this bill.')).toBeVisible();
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   const nightGroup = authenticatedPage.getByRole('link', { name: /Club Night/ });
   await authExpect(nightGroup).toBeVisible();
   await authExpect(nightGroup.getByText('10/08/2026')).toBeVisible();
@@ -77,37 +79,36 @@ authTest('creates a single_night with one date and lists a header-only group', a
 });
 
 authTest('stays on the festival form for inverted dates and missing required fields', async ({ authenticatedPage }) => {
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New festival' }).click();
+  const sheet = await openAddSheetFromNav(authenticatedPage);
+  await selectAddSheetEvent(authenticatedPage, sheet, 'New festival');
+  await sheet.getByLabel('Artist').fill('Justice');
+  await sheet.getByLabel('Name').fill('Bad Range');
+  await sheet.getByLabel('Start date').fill('2026-08-22');
+  await sheet.getByLabel('End date').fill('2026-08-20');
+  await addSheetPlace(sheet).fill('Paris');
+  await sheet.getByRole('button', { name: 'Save' }).click();
 
-  await authenticatedPage.getByLabel('Name').fill('Bad Range');
-  await authenticatedPage.getByLabel('Start date').fill('2026-08-22');
-  await authenticatedPage.getByLabel('End date').fill('2026-08-20');
-  await authenticatedPage.getByLabel('City').fill('Paris');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
+  await authExpect(authenticatedPage).toHaveURL(/\/home|\/concerts/);
+  await authExpect(sheet.getByText('End date cannot be before the start date.')).toBeVisible();
+  await authExpect(sheet).toBeVisible();
 
-  await authExpect(authenticatedPage).toHaveURL(/\/concerts/);
-  await authExpect(authenticatedPage.getByText('End date cannot be before the start date.')).toBeVisible();
-  await authExpect(authenticatedPage.getByRole('link', { name: /Bad Range/ })).toHaveCount(0);
+  await sheet.getByLabel('Name').fill('');
+  await sheet.getByLabel('End date').fill('2026-08-24');
+  await sheet.getByRole('button', { name: 'Save' }).click();
 
-  await authenticatedPage.getByLabel('Name').fill('');
-  await authenticatedPage.getByLabel('End date').fill('2026-08-24');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-
-  await authExpect(authenticatedPage).toHaveURL(/\/concerts/);
-  await authExpect(authenticatedPage.getByText('Name is required.')).toBeVisible();
+  await authExpect(sheet.getByText('Name is required.')).toBeVisible();
 });
 
-authTest('unknown Event URLs are quiet not-found and a stranger joins via the URL', async ({ authenticatedPage }, testInfo) => {
+authTest('unknown Event URLs are quiet not-found and a stranger joins via the URL', async ({ authenticatedPage, account }, testInfo) => {
   await authExpect(authenticatedPage.getByRole('heading', { name: 'Home' })).toBeVisible();
-  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts' }).click();
-  await authenticatedPage.getByRole('button', { name: 'New night' }).click();
-  await authenticatedPage.getByLabel('Name').fill('Private Night');
-  await authenticatedPage.getByLabel('Date').fill('2026-08-12');
-  await authenticatedPage.getByLabel('City').fill('Lyon');
-  await authenticatedPage.getByRole('button', { name: 'Save' }).click();
-  await authExpect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  const ownedPath = new URL(authenticatedPage.url()).pathname;
+  const created = await createOwnedEventRest(account, {
+    name: 'Private Night',
+    start: '2026-08-12',
+    place: 'Lyon'
+  });
+  await authenticatedPage.goto(created.path);
+  await waitForNuxtHydration(authenticatedPage);
+  const ownedPath = created.path;
 
   await authenticatedPage.goto(`/e/${UNKNOWN_EVENT_ID}`);
   await authExpect(authenticatedPage.getByRole('heading', { name: 'Event not found.' })).toBeVisible();

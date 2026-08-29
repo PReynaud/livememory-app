@@ -68,7 +68,7 @@ describe('list polish source guards', () => {
     expect(concerts).toMatch(/const retryLoad = \(\) => \{\s*void eventsStore\.fetchEvents\(\);/);
     expect(concerts).not.toMatch(/loadMoreEvents\(\);\s*return;/);
     expect(concerts).not.toMatch(/\{\{\s*error\s*\}\}/);
-    expect(concerts).toMatch(/v-else-if="error && !formError"/);
+    expect(concerts).toMatch(/v-else-if="error"/);
     expect(concerts).toMatch(/v-else$/m);
     expect(eventPage).toMatch(/AppLoadError/);
   });
@@ -87,11 +87,35 @@ describe('list polish source guards', () => {
     expect(store).toMatch(/hasMoreEvents/);
     expect(store).not.toMatch(/from\('concerts'\)/);
     expect(concerts).toMatch(/visibleEvents/);
-    expect(concerts).toMatch(/Loading more/);
-    expect(concerts).toMatch(/Load more/);
+    expect(concerts).toMatch(/paginateConcertEvents/);
+    expect(concerts).toMatch(/filteredEvents/);
+    expect(concerts).not.toMatch(/windowIds/);
+    expect(concerts).toMatch(/loadingMore/);
+    expect(concerts).toMatch(/loadMore/);
     expect(concerts).toMatch(/loadMoreEvents/);
     expect(concerts).not.toMatch(/IntersectionObserver|infinite scroll|@scroll/);
     expect(concerts).not.toMatch(/v-for="event in events"/);
+  });
+
+  it('uses max-w-3xl on list, Event, Profile, and public pages', () => {
+    const home = read('app/pages/home.vue');
+    const concerts = read('app/pages/concerts.vue');
+    const eventPage = read('app/pages/e/[id].vue');
+    const shared = read('app/pages/u/[username].vue');
+    const profile = read('app/pages/profile.vue');
+    const app = read('app/app.vue');
+
+    expect(home).toMatch(/max-w-3xl/);
+    expect(concerts).toMatch(/max-w-3xl/);
+    expect(eventPage).toMatch(/max-w-3xl/);
+    expect(shared).toMatch(/max-w-3xl/);
+    expect(profile).toMatch(/max-w-3xl/);
+    expect(home).not.toMatch(/max-w-lg/);
+    expect(concerts).not.toMatch(/max-w-lg/);
+    expect(eventPage).not.toMatch(/max-w-lg/);
+    expect(shared).not.toMatch(/max-w-lg/);
+    expect(profile).not.toMatch(/max-w-lg/);
+    expect(app).toMatch(/chrome-safe/);
   });
 
   it('announces surfaces, keeps focus rings on black, and drops glow plus blur animation under reduced motion', () => {
@@ -122,6 +146,10 @@ describe('list polish source guards', () => {
     expect(chip).toMatch(/motion-reduce:outline/);
     expect(nav).toMatch(/lm-chrome|motion-reduce/);
     expect(nav).toMatch(/--glass|var\(--glass\)/);
+    expect(nav).toMatch(/max-w-\[calc\(var\(--max-w\)-24px\)\]/);
+    expect(css).toMatch(/--max-w:\s*768px/);
+    expect(css).toMatch(/--chrome-safe:\s*88px/);
+    expect(css).toMatch(/\.lm-concert-row[\s\S]{0,200}align-items:\s*center/);
   });
 
   it('blocks offline writes in the store with a toast and no queue', () => {

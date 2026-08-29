@@ -855,6 +855,21 @@ export const createConcert = async (
     return failCreate(CONCERT_RULE.requiredArtist, CONCERT_RULE_MESSAGE.requiredArtist);
   }
 
+  const festival = input.newEvent;
+  if (festival?.kind === 'festival') {
+    const startDate = trim(festival.startDate);
+    const endDate = trim(festival.endDate);
+    if (
+      startDate
+      && CIVIL_DATE.test(startDate)
+      && endDate
+      && CIVIL_DATE.test(endDate)
+      && endDate < startDate
+    ) {
+      return failCreate(EVENT_RULE.dateOrder, EVENT_RULE_MESSAGE.dateOrder);
+    }
+  }
+
   const date = trim(input.date);
   if (!date || !CIVIL_DATE.test(date)) {
     return failCreate(CONCERT_RULE.requiredDate, CONCERT_RULE_MESSAGE.requiredDate);

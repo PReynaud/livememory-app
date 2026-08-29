@@ -784,8 +784,8 @@ describe('events store and pages use domain helpers only', () => {
     }
 
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/useEventsStore/);
-    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/New night/);
-    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/New festival/);
+    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).not.toMatch(/New night/);
+    expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).not.toMatch(/New festival/);
     expect(readFileSync(resolve(process.cwd(), 'app/pages/concerts.vue'), 'utf8')).toMatch(/openSheet/);
     const eventPage = readFileSync(resolve(process.cwd(), 'app/pages/e/[id].vue'), 'utf8');
     expect(eventPage).toMatch(/useEventsStore/);
