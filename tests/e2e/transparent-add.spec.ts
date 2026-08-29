@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/auth.fixture';
-import { selectAddSheetEvent } from './helpers/add-concert-sheet';
+import { gotoConcertsPeriod, selectAddSheetEvent } from './helpers/add-concert-sheet';
 
 test('logs a past one-performer show from nav Add without picking an Event', async ({ authenticatedPage }) => {
   await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Add concert' }).click();
@@ -15,7 +15,7 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
   await sheet.getByRole('button', { name: 'Save' }).click();
 
   await expect(authenticatedPage.getByText('Concert added.', { exact: true })).toBeVisible();
-  await authenticatedPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Concerts', exact: true }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
 
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();

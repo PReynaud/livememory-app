@@ -139,8 +139,6 @@ test('marks a future concert Going and a past concert Attended, then clear stays
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const goingChip = authenticatedPage.getByRole('button', { name: 'Mark as going' });
-  await expect(goingChip).toHaveAttribute('aria-pressed', 'false');
-  await goingChip.click();
   await expect(goingChip).toHaveAttribute('aria-pressed', 'true');
   await expect(goingChip).toHaveText('Going');
 
@@ -168,8 +166,6 @@ test('marks a future concert Going and a past concert Attended, then clear stays
   await gotoConcertsPeriod(authenticatedPage, 'past');
   const pastGroup = authenticatedPage.locator('section').filter({ hasText: 'Past Night' });
   const concertsAttended = pastGroup.getByRole('button', { name: 'Mark as attended' });
-  await expect(concertsAttended).toHaveAttribute('aria-pressed', 'false');
-  await concertsAttended.click();
   await expect(concertsAttended).toHaveAttribute('aria-pressed', 'true');
   await expect(concertsAttended).toHaveText('Attended');
 

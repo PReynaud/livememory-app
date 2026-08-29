@@ -87,6 +87,9 @@ describe('list polish source guards', () => {
     expect(store).toMatch(/hasMoreEvents/);
     expect(store).not.toMatch(/from\('concerts'\)/);
     expect(concerts).toMatch(/visibleEvents/);
+    expect(concerts).toMatch(/paginateConcertEvents/);
+    expect(concerts).toMatch(/filteredEvents/);
+    expect(concerts).not.toMatch(/windowIds/);
     expect(concerts).toMatch(/loadingMore/);
     expect(concerts).toMatch(/loadMore/);
     expect(concerts).toMatch(/loadMoreEvents/);

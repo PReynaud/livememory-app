@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
-import { createNightFromAddSheet } from './helpers/add-concert-sheet';
+import { createNightFromAddSheet, gotoConcertsPeriod } from './helpers/add-concert-sheet';
 import { createOwnedEventRest } from './helpers/owned-event-rest';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 
@@ -41,9 +41,8 @@ test('future night attend-all marks Going, later add inherits, clear stays unset
   const attend = authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ });
   await expect(attend).toBeVisible();
   await expect(attend).toHaveCount(1);
+  await expect(attend).toHaveAttribute('aria-pressed', 'true');
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
-
-  await attend.click();
 
   await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
   const group = authenticatedPage.locator('[data-event-card="group"]');
@@ -84,11 +83,10 @@ test('past night attend-all marks Attended', async ({ authenticatedPage }) => {
     artists: ['Justice', 'Fontaines D.C.']
   });
 
-  await authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ }).click();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
   await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await expect(goingChipOnConcerts(authenticatedPage)).toHaveAttribute('aria-pressed', 'true');
   await expect(goingChipOnConcerts(authenticatedPage)).toHaveText('Attended');
 });

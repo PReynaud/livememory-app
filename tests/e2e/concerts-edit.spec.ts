@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/auth.fixture';
-import { addSheetArtist, addSheetEventControl, createNightFromAddSheet } from './helpers/add-concert-sheet';
+import { addSheetArtist, addSheetEventControl, createNightFromAddSheet, gotoConcertsPeriod } from './helpers/add-concert-sheet';
 import { createOwnedEventRest } from './helpers/owned-event-rest';
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 
@@ -61,9 +61,8 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await notesSheet.getByRole('button', { name: 'Save' }).click();
   await expect(notesSheet).toHaveCount(0);
   await expect(authenticatedPage.getByText('Concert saved.', { exact: true })).toBeVisible();
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
-  await authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' }).click();
   await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
   const other = await createOwnedEventRest(account, {
@@ -92,7 +91,7 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
   await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -118,12 +117,13 @@ test('compact card chip cycles Attendance and does not open Edit', async ({ auth
     artist: 'Justice'
   });
 
-  await authenticatedPage.getByRole('link', { name: 'Concerts' }).click();
+  await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
+  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
 
   await compact.getByRole('button', { name: 'Mark as attended' }).click();
   await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
-  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'false');
 });

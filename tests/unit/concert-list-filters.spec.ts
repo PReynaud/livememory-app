@@ -7,7 +7,9 @@ import {
   concertListFilterCount,
   emptyConcertListFilters,
   eventMatchesConcertFilters,
+  EVENTS_LIST_WINDOW,
   filterEventsByConcertFilters,
+  paginateConcertEvents,
   placeFilterId
 } from '../../app/utils/concert-list-filters';
 
@@ -107,5 +109,44 @@ describe('concert list filters', () => {
     const publicCatalog = buildConcertFilterCatalog([night], 'upcoming', { includeStatus: false });
     expect(publicCatalog.some(section => section.id === 'status')).toBe(false);
     expect(buildConcertFilterCatalog([night], 'upcoming').some(section => section.id === 'status')).toBe(true);
+  });
+
+  it('filters the full past bucket then paginates so a later year still matches', () => {
+    const past = Array.from({ length: EVENTS_LIST_WINDOW + 1 }, (_, index) => {
+      const isOlder = index === EVENTS_LIST_WINDOW;
+      return eventAt(
+        `p${index}`,
+        isOlder ? 'Lyon 2024' : `Paris ${index}`,
+        isOlder ? '2024-06-01' : `2025-12-${String(31 - index).padStart(2, '0')}`,
+        { place: isOlder ? 'Lyon' : 'Paris' }
+      );
+    });
+
+    const filters = { ids: ['year:2024', placeFilterId('Lyon')], artistQuery: '' };
+    const filtered = filterEventsByConcertFilters(past, () => [], {}, filters);
+    expect(filtered.map(event => event.id)).toEqual(['p20']);
+
+    const listed = paginateConcertEvents(filtered, EVENTS_LIST_WINDOW);
+    expect(listed.map(event => event.id)).toEqual(['p20']);
+    expect(listed.length < filtered.length).toBe(false);
+
+    const windowedFirst = paginateConcertEvents(past, EVENTS_LIST_WINDOW);
+    expect(filterEventsByConcertFilters(windowedFirst, () => [], {}, filters)).toEqual([]);
+
+    const manyPast = Array.from({ length: 25 }, (_, index) => eventAt(
+      `y${index}`,
+      `Night ${index}`,
+      index < 21 ? '2024-06-01' : '2025-01-01'
+    ));
+    const yearFiltered = filterEventsByConcertFilters(
+      manyPast,
+      () => [],
+      {},
+      { ids: ['year:2024'], artistQuery: '' }
+    );
+    expect(yearFiltered).toHaveLength(21);
+    const yearListed = paginateConcertEvents(yearFiltered, EVENTS_LIST_WINDOW);
+    expect(yearListed).toHaveLength(EVENTS_LIST_WINDOW);
+    expect(yearListed.length < yearFiltered.length).toBe(true);
   });
 });
