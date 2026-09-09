@@ -882,7 +882,7 @@ export const useEventsStore = defineStore('events', () => {
 
       const lastNightBillError = await ensureLastNightBillLoaded();
       if (lastNightBillError) {
-        error.value = lastNightBillError;
+        attendanceError.value = lastNightBillError;
         return { data: result.data, error: lastNightBillError };
       }
 
@@ -927,7 +927,7 @@ export const useEventsStore = defineStore('events', () => {
 
       const lastNightBillError = await ensureLastNightBillLoaded();
       if (lastNightBillError) {
-        error.value = lastNightBillError;
+        attendanceError.value = lastNightBillError;
         return { data: result.data, error: lastNightBillError };
       }
 
@@ -991,7 +991,7 @@ export const useEventsStore = defineStore('events', () => {
       attendanceByConcertId.value = remaining;
       const lastNightBillError = await ensureLastNightBillLoaded();
       if (lastNightBillError) {
-        error.value = lastNightBillError;
+        attendanceError.value = lastNightBillError;
         return { data: null, error: lastNightBillError };
       }
 

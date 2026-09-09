@@ -466,7 +466,7 @@ describe('Home featured and stats surfaces', () => {
       store.indexOf('const attendThisNight =')
     );
     expect(cycleAttendance).toMatch(/ensureLastNightBillLoaded/);
-    expect(cycleAttendance).toMatch(/error\.value = lastNightBillError/);
+    expect(cycleAttendance).toMatch(/attendanceError\.value = lastNightBillError/);
 
     const attendThisNight = store.slice(
       store.indexOf('const attendThisNight ='),
