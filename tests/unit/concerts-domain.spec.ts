@@ -2560,8 +2560,31 @@ describe('listConcertsForEvent and listOwnedConcerts', () => {
     const indexed = await listConcertEventIds(client);
     expect(indexed.error).toBeNull();
     expect(indexed.data).toEqual([
-      { id: first.id, event_id: first.event_id },
-      { id: other.id, event_id: other.event_id }
+      { id: first.id, event_id: first.event_id, date: first.date, time: first.time },
+      { id: other.id, event_id: other.event_id, date: other.date, time: other.time }
+    ]);
+  });
+
+  it('normalizes blank concert time to null on the event-id index', async () => {
+    const blankTime: ConcertRecord = {
+      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      event_id: nightRow.id,
+      owner_id: nightRow.owner_id,
+      artist: 'Untimed Band',
+      date: '2026-08-19',
+      time: '',
+      place: 'Lyon'
+    };
+
+    const { client } = createMockConcertsClient({
+      events: [nightRow],
+      concerts: [blankTime]
+    });
+
+    const indexed = await listConcertEventIds(client);
+    expect(indexed.error).toBeNull();
+    expect(indexed.data).toEqual([
+      { id: blankTime.id, event_id: blankTime.event_id, date: blankTime.date, time: null }
     ]);
   });
 });

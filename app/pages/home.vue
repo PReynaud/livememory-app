@@ -12,7 +12,7 @@ definePageMeta({
 
 const addSheet = useAddConcertSheetStore();
 const eventsStore = useEventsStore();
-const { featuredEvents, homeStats, error, loading } = storeToRefs(eventsStore);
+const { featuredEvents, lastNightEvent, homeStats, error, loading } = storeToRefs(eventsStore);
 const hasFeatured = computed(() => featuredEvents.value.length > 0);
 const showSkeleton = computed(() => loading.value && !error.value);
 const homeEyebrow = computed(() => {
@@ -140,6 +140,24 @@ if (import.meta.server) {
             featured
           />
         </div>
+      </section>
+
+      <section
+        v-if="lastNightEvent"
+        data-testid="home-last-night"
+        aria-labelledby="home-last-night-heading"
+        class="space-y-3"
+      >
+        <h2
+          id="home-last-night-heading"
+          class="px-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+        >
+          Last night
+        </h2>
+        <AppEventCard
+          :event="lastNightEvent"
+          :concerts="eventsStore.concertsForEvent(lastNightEvent.id)"
+        />
       </section>
 
       <section
