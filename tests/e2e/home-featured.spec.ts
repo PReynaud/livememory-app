@@ -125,6 +125,7 @@ test('shows empty featured copy and zero souvenir stats that are not tappable', 
   await expect(authenticatedPage.getByTestId('home-featured-empty')).toContainText('Nothing upcoming.');
   await expect(authenticatedPage.getByTestId('home-featured-empty')).toContainText('Add a night or a concert.');
   await expect(authenticatedPage.getByTestId('home-featured')).toHaveCount(0);
+  await expect(authenticatedPage.getByTestId('home-last-night')).toHaveCount(0);
 
   const stats = authenticatedPage.getByTestId('home-stats');
   await expect(stats.getByText('Attended')).toBeVisible();
@@ -289,6 +290,7 @@ test('counts effective attended, owned Events, and going; past nights leave feat
   await expect(featured.getByText('Empty Future')).toBeVisible();
   await expect(featured.getByText('Past Night')).toHaveCount(0);
   await expect(featured.getByText('Fontaines D.C.')).toHaveCount(0);
+  await expect(authenticatedPage.getByTestId('home-last-night').getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('How was it?')).toHaveCount(0);
 
   const stats = authenticatedPage.getByTestId('home-stats');
@@ -301,4 +303,126 @@ test('counts effective attended, owned Events, and going; past nights leave feat
   await expect(authenticatedPage.getByText('Empty Future')).toBeVisible();
   await gotoConcertsPeriod(authenticatedPage, 'past');
   await expect(authenticatedPage.getByText('Past Night')).toBeVisible();
+});
+
+test('hides Last night until an attended Concert exists, then shows a compact Event card', async ({
+  authenticatedPage,
+  account
+}) => {
+  await expect(authenticatedPage.getByTestId('home-last-night')).toHaveCount(0);
+  await expect(authenticatedPage.getByTestId('home-stats')).toBeVisible();
+
+  const session = await signIn(account);
+  const today = parisToday();
+  const past = addUtcDays(today, -8);
+  const nightId = await createEvent(session, { name: 'Archive Night', start: past, place: 'Berlin' });
+  const concertId = await createConcert(session, {
+    eventId: nightId,
+    artist: 'Fontaines D.C.',
+    date: past,
+    place: 'Berlin',
+    time: '20:15'
+  });
+  await setAttendance(session, concertId, 'attended');
+
+  await reloadHome(authenticatedPage);
+
+  await expect(authenticatedPage.getByTestId('home-featured-empty')).toBeVisible();
+  const lastNight = authenticatedPage.getByTestId('home-last-night');
+  await expect(lastNight.getByRole('heading', { name: 'Last night' })).toBeVisible();
+  const compact = lastNight.locator('[data-event-card="compact"][data-featured="false"]');
+  await expect(compact).toBeVisible();
+  await expect(compact.getByRole('link')).toContainText('Fontaines D.C.');
+  await expect(compact.getByText('Archive Night')).toBeVisible();
+
+  await compact.getByRole('link').click();
+  await expect(authenticatedPage).toHaveURL(new RegExp(`/e/${nightId}$`));
+  await expect(authenticatedPage.getByRole('heading', { name: 'Archive Night' })).toBeVisible();
+});
+
+test('shows a grouped Last night card for the whole festival Bill', async ({
+  authenticatedPage,
+  account
+}) => {
+  const session = await signIn(account);
+  const today = parisToday();
+  const start = addUtcDays(today, -6);
+  const end = addUtcDays(today, -4);
+
+  const festId = await createEvent(session, {
+    kind: 'festival',
+    name: 'Archive Week',
+    start,
+    end,
+    place: 'Paris'
+  });
+  await createConcert(session, {
+    eventId: festId,
+    artist: 'The Last Dinner Party',
+    date: start,
+    place: 'Paris',
+    time: '22:00'
+  });
+  const later = await createConcert(session, {
+    eventId: festId,
+    artist: 'LCD Soundsystem',
+    date: end,
+    place: 'Paris',
+    time: '21:30'
+  });
+  await setAttendance(session, later, 'attended');
+
+  await reloadHome(authenticatedPage);
+
+  const lastNight = authenticatedPage.getByTestId('home-last-night');
+  const group = lastNight.locator('[data-event-card="group"][data-featured="false"]');
+  await expect(group).toBeVisible();
+  await expect(group.getByRole('link')).toContainText('Archive Week');
+  await expect(group.getByText('The Last Dinner Party')).toBeVisible();
+  await expect(group.getByText('LCD Soundsystem')).toBeVisible();
+  await expect(authenticatedPage.getByTestId('home-featured-empty')).toBeVisible();
+});
+
+test('keeps an in-progress festival in Coming up and Last night', async ({
+  authenticatedPage,
+  account
+}) => {
+  const session = await signIn(account);
+  const today = parisToday();
+  const end = addUtcDays(today, 2);
+
+  const festId = await createEvent(session, {
+    kind: 'festival',
+    name: 'Live Week',
+    start: today,
+    end,
+    place: 'Lyon'
+  });
+  const todayConcert = await createConcert(session, {
+    eventId: festId,
+    artist: 'Justice',
+    date: today,
+    place: 'Lyon',
+    time: '00:01'
+  });
+  await createConcert(session, {
+    eventId: festId,
+    artist: 'Phoenix',
+    date: end,
+    place: 'Lyon',
+    time: '21:00'
+  });
+  await setAttendance(session, todayConcert, 'attended');
+
+  await reloadHome(authenticatedPage);
+
+  const featured = authenticatedPage.getByTestId('home-featured');
+  await expect(featured.getByText('Live Week')).toBeVisible();
+  await expect(featured.locator('[data-event-card="group"][data-featured="true"]')).toBeVisible();
+
+  const lastNight = authenticatedPage.getByTestId('home-last-night');
+  await expect(lastNight.getByRole('heading', { name: 'Last night' })).toBeVisible();
+  await expect(lastNight.locator('[data-event-card="group"][data-featured="false"]')).toBeVisible();
+  await expect(lastNight.getByText('Justice')).toBeVisible();
+  await expect(lastNight.getByText('Phoenix')).toBeVisible();
 });

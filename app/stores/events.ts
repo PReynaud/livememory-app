@@ -27,7 +27,13 @@ import {
   joinEvent,
   leaveEvent
 } from '#shared/domain/membership';
-import { concertRefsForSouvenirs, souvenirStats } from '#shared/domain/home';
+import {
+  concertRefsForLastNight,
+  concertRefsForSouvenirs,
+  selectLastNightEvent,
+  souvenirStats,
+  type ConcertDateTimeRef
+} from '#shared/domain/home';
 import {
   createConcert,
   deleteConcert,
@@ -109,7 +115,7 @@ export const useEventsStore = defineStore('events', () => {
   const error = ref<string | null>(null);
   const eventWindowEnd = ref(0);
   const allConcertsLoaded = ref(false);
-  const concertEventIndex = ref<Array<{ id: string; event_id: string }>>([]);
+  const concertEventIndex = ref<ConcertDateTimeRef[]>([]);
 
   const offlineWriteError = () => {
     if (canWriteOnline()) {
@@ -231,6 +237,42 @@ export const useEventsStore = defineStore('events', () => {
     statuses: attendanceByConcertId.value
   }));
 
+  const lastNightEvent = computed(() => selectLastNightEvent(
+    events.value,
+    concertRefsForLastNight(concertEventIndex.value, concerts.value),
+    attendanceByConcertId.value
+  ));
+
+  const ensureLastNightBillLoaded = async () => {
+    const lastNight = lastNightEvent.value;
+    if (!lastNight) {
+      return null;
+    }
+
+    const union = concertRefsForLastNight(concertEventIndex.value, concerts.value);
+    const unionForEvent = union.filter(concert => concert.event_id === lastNight.id);
+    const loadedIds = new Set(
+      concerts.value.filter(concert => concert.event_id === lastNight.id).map(concert => concert.id)
+    );
+    const billIncomplete = unionForEvent.some(concert => !loadedIds.has(concert.id));
+    if (!billIncomplete) {
+      return null;
+    }
+
+    const listedBill = await listConcertsForEventIds(concertsClient(), [lastNight.id]);
+    if (listedBill.error) {
+      return listedBill.error.message;
+    }
+
+    const incoming = listedBill.data ?? [];
+    if (incoming.length === 0 && unionForEvent.length > 0) {
+      return null;
+    }
+
+    mergeConcertsForEvents([lastNight.id], incoming);
+    return null;
+  };
+
   const fetchEvents = async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
       loading.value = true;
@@ -281,6 +323,12 @@ export const useEventsStore = defineStore('events', () => {
       if (listedAttendanceError) {
         error.value = listedAttendanceError;
         return { data: events.value, error: listedAttendanceError };
+      }
+
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        error.value = lastNightBillError;
+        return { data: events.value, error: lastNightBillError };
       }
 
       return { data: events.value, error: null };
@@ -841,6 +889,12 @@ export const useEventsStore = defineStore('events', () => {
         };
       }
 
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        error.value = lastNightBillError;
+        return { data: result.data, error: lastNightBillError };
+      }
+
       return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update attendance');
@@ -879,6 +933,12 @@ export const useEventsStore = defineStore('events', () => {
         next[row.concert_id] = row.status;
       }
       attendanceByConcertId.value = next;
+
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        error.value = lastNightBillError;
+        return { data: result.data, error: lastNightBillError };
+      }
 
       return { data: result.data, error: null };
     } catch (err: unknown) {
@@ -938,6 +998,12 @@ export const useEventsStore = defineStore('events', () => {
       }
 
       attendanceByConcertId.value = remaining;
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        error.value = lastNightBillError;
+        return { data: null, error: lastNightBillError };
+      }
+
       return { data: null, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update attendance');
@@ -971,6 +1037,7 @@ export const useEventsStore = defineStore('events', () => {
     visibleEvents,
     hasMoreEvents,
     homeStats,
+    lastNightEvent,
     attendanceStatus,
     isAttendanceBusy,
     isAttendThisNightBusy,

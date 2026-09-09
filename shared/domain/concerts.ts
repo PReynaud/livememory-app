@@ -1578,10 +1578,10 @@ export const listOwnedConcerts = async (
 
 export const listConcertEventIds = async (
   client: ConcertsClient
-): Promise<DomainResult<Array<{ id: string; event_id: string }>>> => {
+): Promise<DomainResult<Array<{ id: string; event_id: string; date: string; time: string | null }>>> => {
   const { data, error } = await client
     .from('concerts')
-    .select('id, event_id')
+    .select('id, event_id, date, time')
     .order('date', { ascending: true });
 
   if (error) {
@@ -1594,5 +1594,10 @@ export const listConcertEventIds = async (
     };
   }
 
-  return ok((data ?? []).map(row => ({ id: row.id, event_id: row.event_id })));
+  return ok((data ?? []).map(row => ({
+    id: row.id,
+    event_id: row.event_id,
+    date: row.date,
+    time: (row.time ?? '').trim() || null
+  })));
 };
