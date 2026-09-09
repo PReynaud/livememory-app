@@ -68,11 +68,17 @@ describe('profile store', () => {
   it('loads own username through a user-scoped client and does not leave pages querying profiles', () => {
     const store = readFileSync(resolve(process.cwd(), 'app/stores/profile.ts'), 'utf8');
     expect(store).toMatch(/useSupabaseClient/);
-    expect(store).toMatch(/from\('profiles'\)/);
+    expect(store).toMatch(/#shared\/domain\/profiles/);
+    expect(store).toMatch(/getOwnProfile/);
+    expect(store).not.toMatch(/from\('profiles'\)/);
     expect(store).toMatch(/username/);
     expect(store).toMatch(/shared_list_enabled/);
     expect(store).toMatch(/\{ data, error \}|return \{[\s\S]*data:[\s\S]*error:/);
     expect(store).toMatch(/auth\.getUser/);
+
+    const domain = readFileSync(resolve(process.cwd(), 'shared/domain/profiles.ts'), 'utf8');
+    expect(domain).toMatch(/from\('profiles'\)/);
+    expect(domain).toMatch(/shared_list_enabled/);
 
     const pages = ['home', 'concerts', 'profile', 'login'].map((name) => {
       return readFileSync(resolve(process.cwd(), `app/pages/${name}.vue`), 'utf8');

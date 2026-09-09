@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useSupabaseClient, useToast } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
-import { canWriteOnline, OFFLINE_TOAST_TITLE } from '@/utils/online-write';
+import { notifyOfflineWrite } from '@/utils/online-write';
 import type { Database } from '@/types/database.types';
 import {
   createPersonalKey as createPersonalKeyRecord,
@@ -20,15 +20,6 @@ export const usePersonalKeysStore = defineStore('personalKeys', () => {
   const plaintext = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
-
-  const offlineWriteError = () => {
-    if (canWriteOnline()) {
-      return null;
-    }
-
-    toast.add({ title: OFFLINE_TOAST_TITLE });
-    return OFFLINE_TOAST_TITLE;
-  };
 
   const requireUserId = async () => {
     const { data: session } = await supabase.auth.getUser();
@@ -63,7 +54,7 @@ export const usePersonalKeysStore = defineStore('personalKeys', () => {
   };
 
   const createKey = async () => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -91,7 +82,7 @@ export const usePersonalKeysStore = defineStore('personalKeys', () => {
   };
 
   const revokeKey = async () => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }

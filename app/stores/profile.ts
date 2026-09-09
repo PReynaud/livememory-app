@@ -2,12 +2,18 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useSupabaseClient, useToast } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
-import { canWriteOnline, OFFLINE_TOAST_TITLE } from '@/utils/online-write';
+import { notifyOfflineWrite } from '@/utils/online-write';
 import type { Database } from '@/types/database.types';
+import {
+  getOwnProfile,
+  setSharedListEnabled as persistSharedListEnabled,
+  type ProfilesClient
+} from '#shared/domain/profiles';
 
 export const useProfileStore = defineStore('profile', () => {
   const supabase = useSupabaseClient<Database>();
   const toast = useToast();
+  const profilesClient = () => supabase as unknown as ProfilesClient;
 
   const username = ref<string | null>(null);
   const sharedListEnabled = ref(false);
@@ -18,13 +24,9 @@ export const useProfileStore = defineStore('profile', () => {
     username.value = value;
   };
 
-  const offlineWriteError = () => {
-    if (canWriteOnline()) {
-      return null;
-    }
-
-    toast.add({ title: OFFLINE_TOAST_TITLE });
-    return OFFLINE_TOAST_TITLE;
+  const applyProfile = (data: { username: string; shared_list_enabled: boolean }) => {
+    username.value = data.username;
+    sharedListEnabled.value = Boolean(data.shared_list_enabled);
   };
 
   const fetchOwnProfile = async () => {
@@ -38,23 +40,13 @@ export const useProfileStore = defineStore('profile', () => {
         throw new Error('Profile not found');
       }
 
-      const { data, error: queryError } = await supabase
-        .from('profiles')
-        .select('username, shared_list_enabled')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (queryError) {
-        throw new Error(queryError.message);
+      const result = await getOwnProfile(profilesClient(), userId);
+      if (result.error || !result.data) {
+        throw new Error(result.error?.message ?? 'Failed to load profile');
       }
 
-      if (!data?.username) {
-        throw new Error('Profile not found');
-      }
-
-      username.value = data.username;
-      sharedListEnabled.value = Boolean(data.shared_list_enabled);
-      return { data, error: null };
+      applyProfile(result.data);
+      return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to load profile');
       error.value = errorMessage;
@@ -65,7 +57,7 @@ export const useProfileStore = defineStore('profile', () => {
   };
 
   const setSharedListEnabled = async (enabled: boolean) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -80,20 +72,13 @@ export const useProfileStore = defineStore('profile', () => {
         throw new Error('Profile not found');
       }
 
-      const { data, error: queryError } = await supabase
-        .from('profiles')
-        .update({ shared_list_enabled: enabled })
-        .eq('id', userId)
-        .select('username, shared_list_enabled')
-        .single();
-
-      if (queryError) {
-        throw new Error(queryError.message);
+      const result = await persistSharedListEnabled(profilesClient(), userId, enabled);
+      if (result.error || !result.data) {
+        throw new Error(result.error?.message ?? 'Failed to update sharing');
       }
 
-      username.value = data.username;
-      sharedListEnabled.value = Boolean(data.shared_list_enabled);
-      return { data, error: null };
+      applyProfile(result.data);
+      return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update sharing');
       error.value = errorMessage;
