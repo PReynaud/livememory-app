@@ -212,10 +212,11 @@ describe('shared list surfaces', () => {
     expect(profilePage).not.toMatch(/directory|User search|find users/i);
 
     const store = read('app/stores/profile.ts');
-    expect(store).toMatch(/shared_list_enabled/);
+    expect(store).toMatch(/#shared\/domain\/profiles/);
     expect(store).toMatch(/setSharedListEnabled/);
     expect(store).toMatch(/auth\.getUser/);
     expect(store).toMatch(/finally/);
+    expect(store).not.toMatch(/from\('profiles'\)/);
 
     const publicPage = read('app/pages/u/[username].vue');
     expect(publicPage).toMatch(/SHARED_LIST_NOT_FOUND/);

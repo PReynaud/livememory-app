@@ -1,5 +1,5 @@
 import type { AttendanceStatus } from './attendance';
-import { civilDateInTimeZone, PARIS_TIME_ZONE } from './events';
+import { civilDateInTimeZone, PARIS_TIME_ZONE } from './dates';
 
 export type SouvenirStats = {
   attended: number;
