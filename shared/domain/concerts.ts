@@ -1,4 +1,11 @@
 import {
+  CIVIL_DATE,
+  DATE_OUTSIDE_EVENT,
+  dateOutsideEventMessage,
+  formatCivilDate,
+  formatEventDateRange
+} from './dates';
+import {
   isConcertPast,
   listMyAttendance,
   setAttendance,
@@ -10,13 +17,14 @@ import {
   EVENT_RULE,
   EVENT_RULE_MESSAGE,
   type CreateEventInput,
-  type DomainError,
-  type DomainResult,
   type EventMemberRecord,
   type EventRecord,
   type EventStageRecord,
   type EventsClient
 } from './events';
+import { fail, ok, type DomainError, type DomainResult } from './result';
+
+export { dateOutsideEventMessage, formatEventDateRange };
 
 export const CONCERT_RULE = {
   requiredArtist: 'required_artist',
@@ -39,7 +47,7 @@ export const CONCERT_RULE_MESSAGE = {
   requiredPlace: 'Place is required.',
   requiredStage: 'Stage or Scene is required.',
   stageNotOnEvent: 'Stage or Scene must be on this Event.',
-  dateOutsideEvent: 'This date is outside the Event.',
+  dateOutsideEvent: DATE_OUTSIDE_EVENT,
   placeConflict: 'This Place conflicts with the Event Place.',
   impossiblePlace: 'This concert already exists at a different Place.',
   needsChoice: 'This artist and date already exist. Attach to the existing concert or create another.',
@@ -182,28 +190,7 @@ export type ConcertsClient = {
   };
 };
 
-const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 const trim = (value: string | undefined | null) => (value ?? '').trim();
-
-const fail = <T>(ruleId: string, message: string): DomainResult<T> => ({
-  data: null,
-  error: { ruleId, message }
-});
-
-const ok = <T>(data: T): DomainResult<T> => ({
-  data,
-  error: null
-});
-
-const toDisplayDate = (iso: string): string => {
-  const [year, month, day] = iso.split('-');
-  if (!year || !month || !day) {
-    return iso;
-  }
-
-  return `${day}/${month}/${year}`;
-};
 
 export const transparentSingleNightName = (
   date: string,
@@ -212,24 +199,10 @@ export const transparentSingleNightName = (
 ): string => {
   const venue = trim(stage);
   if (venue) {
-    return `Concerts on ${toDisplayDate(date)} at ${venue}, ${place}`;
+    return `Concerts on ${formatCivilDate(date)} at ${venue}, ${place}`;
   }
 
-  return `Concerts on ${toDisplayDate(date)} at ${place}`;
-};
-
-export const formatEventDateRange = (startDate: string, endDate: string): string => {
-  if (startDate === endDate) {
-    return toDisplayDate(startDate);
-  }
-
-  return `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`;
-};
-
-export const dateOutsideEventMessage = (
-  event: Pick<EventRecord, 'start_date' | 'end_date'>
-): string => {
-  return `${CONCERT_RULE_MESSAGE.dateOutsideEvent} ${formatEventDateRange(event.start_date, event.end_date)}`;
+  return `Concerts on ${formatCivilDate(date)} at ${place}`;
 };
 
 const clockTime = (value: string | null | undefined): string | null => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canWriteOnline, OFFLINE_TOAST_TITLE } from '../../app/utils/online-write';
+import { canWriteOnline, notifyOfflineWrite, OFFLINE_TOAST_TITLE } from '../../app/utils/online-write';
 import { surfaceNameForRoute } from '../../app/utils/surface-name';
 import { EVENTS_LIST_WINDOW } from '../../shared/domain/concerts';
 
@@ -24,6 +24,26 @@ describe('offline writes', () => {
     expect(canWriteOnline(true)).toBe(true);
     expect(canWriteOnline(false)).toBe(false);
     expect(canWriteOnline(undefined)).toBe(true);
+
+    const titles: string[] = [];
+    const toast = {
+      add: ({ title }: { title: string }) => {
+        titles.push(title);
+      }
+    };
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, 'onLine');
+    Object.defineProperty(globalThis.navigator, 'onLine', {
+      configurable: true,
+      get: () => false
+    });
+    try {
+      expect(notifyOfflineWrite(toast)).toBe(OFFLINE_TOAST_TITLE);
+      expect(titles).toEqual([OFFLINE_TOAST_TITLE]);
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(globalThis.navigator, 'onLine', descriptor);
+      }
+    }
   });
 });
 
@@ -154,9 +174,7 @@ describe('list polish source guards', () => {
 
   it('blocks offline writes in the store with a toast and no queue', () => {
     const store = read('app/stores/events.ts');
-    expect(store).toMatch(/canWriteOnline/);
-    expect(store).toMatch(/OFFLINE_TOAST_TITLE/);
-    expect(store).toMatch(/toast\.add/);
+    expect(store).toMatch(/notifyOfflineWrite/);
     expect(store).not.toMatch(/offlineQueue|indexedDB|background-sync/);
     expect(store).toMatch(/createOwnedEvent/);
     expect(store).toMatch(/createOwnedConcert/);

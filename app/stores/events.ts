@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { useSupabaseClient, useToast } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
-import { canWriteOnline, OFFLINE_TOAST_TITLE } from '@/utils/online-write';
+import { notifyOfflineWrite } from '@/utils/online-write';
 import type { Database } from '@/types/database.types';
 import {
   createEvent,
@@ -116,15 +116,6 @@ export const useEventsStore = defineStore('events', () => {
   const eventWindowEnd = ref(0);
   const allConcertsLoaded = ref(false);
   const concertEventIndex = ref<ConcertDateTimeRef[]>([]);
-
-  const offlineWriteError = () => {
-    if (canWriteOnline()) {
-      return null;
-    }
-
-    toast.add({ title: OFFLINE_TOAST_TITLE });
-    return OFFLINE_TOAST_TITLE;
-  };
 
   const syncSessionUser = async () => {
     const { data } = await supabase.auth.getUser();
@@ -443,7 +434,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const createOwnedEvent = async (input: CreateEventInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -481,7 +472,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const updateOwnedEvent = async (input: UpdateEventInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline, conflicts: null };
     }
@@ -601,7 +592,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const createOwnedConcert = async (input: CreateConcertInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return mutationResult(null, offline);
     }
@@ -637,7 +628,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const updateOwnedConcert = async (input: UpdateConcertInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return mutationResult(null, offline);
     }
@@ -678,7 +669,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const moveOwnedConcert = async (input: MoveConcertInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return mutationResult(null, offline);
     }
@@ -710,7 +701,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const deleteOwnedConcert = async (concertId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -739,7 +730,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const deleteOwnedEvent = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -774,7 +765,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const leaveJoinedEvent = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -849,7 +840,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const cycleAttendance = async (concert: ConcertRecord) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -908,7 +899,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const attendThisNight = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -951,7 +942,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const cycleEventGoing = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }

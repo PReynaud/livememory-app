@@ -1,5 +1,6 @@
 import type { AttendanceStatus } from './attendance';
-import { civilDateInTimeZone, PARIS_TIME_ZONE, type EventRecord } from './events';
+import { civilDateInTimeZone, PARIS_TIME_ZONE } from './dates';
+import type { EventRecord } from './events';
 
 export type SouvenirStats = {
   attended: number;

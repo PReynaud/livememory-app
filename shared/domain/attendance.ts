@@ -1,4 +1,5 @@
-import { civilDateInTimeZone, PARIS_TIME_ZONE, type DomainError, type DomainResult } from './events';
+import { civilDateInTimeZone, PARIS_TIME_ZONE } from './dates';
+import { fail, ok, type DomainError, type DomainResult } from './result';
 
 export const ATTENDANCE_STATUS = {
   going: 'going',
@@ -126,16 +127,6 @@ export type AttendanceClient = {
 };
 
 const trim = (value: string | undefined | null) => (value ?? '').trim();
-
-const fail = <T>(ruleId: string, message: string): DomainResult<T> => ({
-  data: null,
-  error: { ruleId, message }
-});
-
-const ok = <T>(data: T): DomainResult<T> => ({
-  data,
-  error: null
-});
 
 const persistFailed = (error: QueryError): DomainError => ({
   ruleId: 'persist_failed',

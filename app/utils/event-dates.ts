@@ -1,18 +1,8 @@
 import type { EventRecord } from '#shared/domain/events';
+import { formatCivilDate, formatEventDateRange } from '#shared/domain/dates';
 
-export const formatCivilDate = (iso: string): string => {
-  const [year, month, day] = iso.split('-');
-  if (!year || !month || !day) {
-    return iso;
-  }
+export { formatCivilDate };
 
-  return `${day}/${month}/${year}`;
-};
-
-export const formatEventDateLabel = (event: EventRecord): string => {
-  if (event.start_date === event.end_date) {
-    return formatCivilDate(event.start_date);
-  }
-
-  return `${formatCivilDate(event.start_date)} – ${formatCivilDate(event.end_date)}`;
+export const formatEventDateLabel = (event: Pick<EventRecord, 'start_date' | 'end_date'>): string => {
+  return formatEventDateRange(event.start_date, event.end_date);
 };

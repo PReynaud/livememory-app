@@ -1,3 +1,22 @@
+import {
+  CIVIL_DATE,
+  PARIS_TIME_ZONE,
+  civilDateInTimeZone,
+  dateOutsideEventMessage,
+  formatCivilDate,
+  formatEventDateRange
+} from './dates';
+import { fail, ok, type DomainError, type DomainResult } from './result';
+
+export {
+  PARIS_TIME_ZONE,
+  civilDateInTimeZone,
+  dateOutsideEventMessage,
+  formatCivilDate,
+  formatEventDateRange
+};
+export type { DomainError, DomainResult };
+
 export const EVENT_RULE = {
   requiredName: 'required_name',
   requiredPlace: 'required_place',
@@ -28,8 +47,6 @@ export const EVENT_RULE_MESSAGE = {
   placeConflict: 'This Place conflicts with the Event Place.',
   concertIdentity: 'Concert identity is invalid.'
 } as const;
-
-export const PARIS_TIME_ZONE = 'Europe/Paris';
 
 export type EventKind = 'single_night' | 'festival';
 
@@ -73,12 +90,6 @@ export type EventConflict = {
   message: string;
 };
 
-export type DomainError = {
-  ruleId: string;
-  message: string;
-  conflicts?: EventConflict[];
-};
-
 export type UpdateEventInput = {
   eventId: string;
   name: string;
@@ -94,11 +105,6 @@ export const eventAllowsPlaceOverride = (
   event: Pick<EventRecord, 'allow_place_override'> | null | undefined
 ) => {
   return event?.allow_place_override === true;
-};
-
-export type DomainResult<T> = {
-  data: T | null;
-  error: DomainError | null;
 };
 
 export type CreateEventInput = {
@@ -193,31 +199,10 @@ export type EventsClient = {
   rpc: EventsRpc;
 };
 
-const CIVIL_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 const trim = (value: string | undefined) => (value ?? '').trim();
-
-const fail = <T>(ruleId: string, message: string): DomainResult<T> => ({
-  data: null,
-  error: { ruleId, message }
-});
-
-const ok = <T>(data: T): DomainResult<T> => ({
-  data,
-  error: null
-});
 
 const isEventKind = (value: string): value is EventKind => {
   return value === 'single_night' || value === 'festival';
-};
-
-export const civilDateInTimeZone = (now: Date, timeZone: string): string => {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(now);
 };
 
 export const FEATURED_LIMIT = 3;
@@ -375,29 +360,6 @@ export const createEvent = async (
   });
 };
 
-const toDisplayDate = (iso: string): string => {
-  const [year, month, day] = iso.split('-');
-  if (!year || !month || !day) {
-    return iso;
-  }
-
-  return `${day}/${month}/${year}`;
-};
-
-export const formatEventDateRange = (startDate: string, endDate: string): string => {
-  if (startDate === endDate) {
-    return toDisplayDate(startDate);
-  }
-
-  return `${toDisplayDate(startDate)} – ${toDisplayDate(endDate)}`;
-};
-
-export const dateOutsideEventMessage = (
-  event: Pick<EventRecord, 'start_date' | 'end_date'>
-): string => {
-  return `This date is outside the Event. ${formatEventDateRange(event.start_date, event.end_date)}`;
-};
-
 export const newStageId = () => crypto.randomUUID();
 
 const persistFailed = (error: QueryError): DomainError => ({
@@ -514,7 +476,7 @@ export const listOwnedStages = async (
 
 const formatConflictMessage = (conflicts: EventConflict[]): string => {
   const lines = conflicts.map(
-    conflict => `${conflict.artist} (${toDisplayDate(conflict.date)}): ${conflict.message}`
+    conflict => `${conflict.artist} (${formatCivilDate(conflict.date)}): ${conflict.message}`
   );
   return `${EVENT_RULE_MESSAGE.concertConflict}\n${lines.join('\n')}`;
 };

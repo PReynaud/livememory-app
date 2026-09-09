@@ -180,7 +180,7 @@ describe('leave surfaces', () => {
       store.indexOf('const cycleAttendance =')
     );
     expect(leaveFn).toMatch(/leaveEvent/);
-    expect(leaveFn).toMatch(/offlineWriteError/);
+    expect(leaveFn).toMatch(/notifyOfflineWrite/);
     expect(leaveFn).toMatch(/reloadOwnedConcertState/);
     expect(leaveFn).toMatch(/error: null/);
     expect(leaveFn).toMatch(/loading\.value = false/);
