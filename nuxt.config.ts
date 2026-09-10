@@ -26,6 +26,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    agentCredentialEncryptionKey: process.env.AGENT_CREDENTIAL_ENCRYPTION_KEY || '',
+    agentCapabilitySecret: process.env.AGENT_CAPABILITY_SECRET || '',
+    agentAllowedOrigin: process.env.AGENT_ALLOWED_ORIGIN || '',
     public: {
       appName: 'LiveMemory App'
     }

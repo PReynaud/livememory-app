@@ -24,6 +24,7 @@
     "secret-scan": "node scripts/secret-scan.mjs"
   },
   "dependencies": {
+    "@cursor/sdk": "^1.0.31",
     "@iconify-json/lucide": "^1.2.117",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@nuxt/ui": "^4.10.0",
