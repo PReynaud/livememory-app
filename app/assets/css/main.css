@@ -74,6 +74,67 @@ html {
   border-radius: 12px;
   background: var(--well);
   border: 1px solid transparent;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.lm-concert-row:hover {
+  border-color: color-mix(in oklch, var(--fg) 10%, transparent);
+  background: color-mix(in oklch, var(--well) 88%, var(--fg));
+}
+
+.lm-header-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0;
+  padding: 2px;
+  margin-top: 4px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--fg) 10%, var(--border));
+  background: color-mix(in oklch, var(--surface) 78%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.lm-header-actions .lm-header-icon + .lm-header-icon {
+  border-left: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+}
+
+.lm-header-icon {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.lm-header-icon:hover {
+  background: color-mix(in oklch, var(--fg) 10%, transparent);
+}
+
+.lm-header-icon:active {
+  background: color-mix(in oklch, var(--fg) 16%, transparent);
+}
+
+.lm-header-icon:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.lm-header-icon[aria-busy='true'] .lm-header-icon-spin {
+  animation: lm-header-icon-spin 0.8s linear infinite;
+}
+
+@keyframes lm-header-icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .lm-form-panel {
@@ -309,7 +370,13 @@ html {
   .lm-list-tab,
   .lm-btn-filter,
   .lm-filter-chip,
-  .lm-option-chip {
+  .lm-option-chip,
+  .lm-concert-row {
     transition: none;
+  }
+
+  .lm-header-icon[aria-busy='true'] .lm-header-icon-spin {
+    animation: none;
+    opacity: 0.5;
   }
 }
