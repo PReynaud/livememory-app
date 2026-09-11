@@ -35,8 +35,8 @@ A music fan needs one private record of the shows they plan to attend and attend
   - **intent:** A User can plan future Concerts, record Attendance, and mark every Concert currently on a single-night Bill in one action.
   - **success:** `going` becomes `attended` after optional time or Europe/Paris end-of-day; unset stays Bill-only; owner default `going`/`attended` applies only to transparent one-Concert create; attend-all is a one-shot on current `single_night` Concerts; past allows `attended` or unset, future allows `going` or unset.
 - **CAP-6**
-  - **intent:** An authenticated agent can read and manipulate the same Events, Concerts, and Attendance as the UI under the same product rules.
-  - **success:** After UI CRUD exists, MCP operations produce the same records, validation, Concert-identity outcomes (attach, refuse, or the same attach-or-create choice), and access control as the acting User's UI rights; unauthenticated callers cannot write.
+  - **intent:** An authenticated agent can read and manipulate the same Events, Concerts, and Attendance as the UI under the same product rules, either through the external MCP or an opt-in embedded assistant.
+  - **success:** After UI CRUD exists, MCP operations produce the same records, validation, Concert-identity outcomes (attach, refuse, or the same attach-or-create choice), and access control as the acting User's UI rights; unauthenticated callers cannot write. An embedded assistant displays a proposed change and requires a separate user confirmation before any mutation.
 - **CAP-7**
   - **intent:** A signed-in User can open an Event (via its URL or from a Shared List), see the shared Bill, record their own Attendance, and leave, without editing the Event or Bill.
   - **success:** The joiner sees the same Concerts as the Event owner, can set or clear only their Attendance (including one-shot soirée attend-all), cannot add/edit/delete Concerts or the Event, cannot write notes, does not see other Users' Attendance or owner notes, can leave (Event leaves Home and Concerts; their Attendance is deleted), and is not auto-joined when the owner moves a Concert to another Event.
@@ -62,7 +62,7 @@ A music fan needs one private record of the shows they plan to attend and attend
 - Moving a Concert does not auto-join source joiners to the target. Attendance follows the Concert id and remains visible only where that User may view the Concert.
 - Attendance is `going`, `attended`, or unset (Bill-only). There is no skipped value. Past: `attended` or unset (`going` on a past Concert stores `attended`). Future: `going` or unset (`attended` on a future Concert is rejected). `attended` cannot become `going`. Clear at the past boundary stays unset.
 - A single-night attend-all action is per User and updates only Concerts currently on that Bill. Festivals have no attend-all.
-- MCP authenticates as the acting User and follows UI validation and access rules. Screenshot or running-order interpretation happens outside LiveMemory.
+- MCP authenticates as the acting User and follows UI validation and access rules. The optional embedded assistant keeps its provider credential server-side, runs initial turns with read-only access, and may receive up to five transient PNG/JPEG/GIF/WebP images (15 MB each); neither image nor prompt content is stored by LiveMemory.
 - Factory stack is binding: Nuxt 4, Nuxt UI, Pinia for remote data, SQL migrations with RLS, no Prisma, no PWA. Playwright targets local Supabase only. Every story adds or updates tests.
 - Personal lists of about 1,000 concerts must remain usable (target: complete list within 2 seconds under normal use).
 - Validation copy must name the failed rule (dates, stage, required fields, ownership, or Concert identity).
@@ -74,8 +74,8 @@ A music fan needs one private record of the shows they plan to attend and attend
 - Collaborative Bill editing, household/band/org accounts, or public write access on the Bill.
 - PWA / installable app.
 - Import from old LiveMemory databases.
-- A global canonical festival database, Event search/directory, dedicated rapid-add festival page, or built-in AI running-order scan.
-- Ticket alerts, discovery feeds, crowdsourced setlists, ratings, photos, or seeing other Users' Attendance.
+- A global canonical festival database, Event search/directory, dedicated rapid-add festival page, or a guaranteed external research/search provider.
+- Ticket alerts, discovery feeds, crowdsourced setlists, ratings, persistent photos, or seeing other Users' Attendance.
 - Username rename and public-profile URL migration.
 - Event-link rotation, owner kick, and a joiner roster. Joiner leave is in v1.
 - Joiner notes.

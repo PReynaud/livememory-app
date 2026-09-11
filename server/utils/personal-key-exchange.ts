@@ -62,7 +62,7 @@ const lookupUserId = async (
   return typeof userId === 'string' && userId.length > 0 ? userId : null;
 };
 
-const mintUserSession = async (userId: string, env: PersonalKeyExchangeEnv): Promise<string> => {
+export const mintUserSession = async (userId: string, env: PersonalKeyExchangeEnv): Promise<string> => {
   const userResponse = await fetch(`${env.supabaseUrl}/auth/v1/admin/users/${userId}`, {
     headers: jsonHeaders(env.serviceRoleKey)
   });

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted } from 'vue';
 import { useHead, useRoute, useSeoMeta, useRuntimeConfig } from '#imports';
 import { useAuthStore } from '@/stores/auth';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
+import { useAgentChatStore } from '@/stores/agent-chat';
 import { shouldOpenAddSheetOnKeydown } from '@/utils/add-concert-shortcut';
 
 const config = useRuntimeConfig();
@@ -11,6 +12,7 @@ const title = config.public.appName;
 const description = 'A private concert log.';
 const authStore = useAuthStore();
 const addSheet = useAddConcertSheetStore();
+const agentChat = useAgentChatStore();
 const showAppChrome = computed(() => {
   if (!authStore.isAuthenticated) {
     return false;
@@ -34,6 +36,7 @@ const onKeydown = (event: KeyboardEvent) => {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown);
+  if (authStore.isAuthenticated) void agentChat.fetchStatus();
 });
 
 onUnmounted(() => {
@@ -77,6 +80,7 @@ useSeoMeta({
       </UMain>
       <AppAddConcertSheet />
       <AppEditEventSheet />
+      <AppAiChatSheet />
     </div>
     <template v-else>
       <AppHeader />
