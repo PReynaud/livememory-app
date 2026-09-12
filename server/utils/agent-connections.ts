@@ -1,6 +1,6 @@
 import { createError } from 'h3';
 import type { AgentSession } from './agent-session';
-import { decryptAgentCredential, encryptAgentCredential } from './agent-crypto';
+import { decryptAgentCredential, encryptAgentCredential, resolveAgentEncryptionSecret } from './agent-crypto';
 
 export type AgentConnectionRow = {
   user_id: string;
@@ -52,7 +52,18 @@ export const saveAgentConnection = async (
   encryptionSecret: string
 ) => {
   assertConfigured(session);
-  const encrypted = encryptAgentCredential(credential.trim(), encryptionSecret);
+  let encrypted;
+  try {
+    encrypted = encryptAgentCredential(
+      credential.trim(),
+      resolveAgentEncryptionSecret(encryptionSecret, session.env.serviceRoleKey)
+    );
+  } catch {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Agent credential encryption is not configured.'
+    });
+  }
   const response = await fetch(`${url(session)}?on_conflict=user_id`, {
     method: 'POST',
     headers: { ...headers(session), Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -98,9 +109,10 @@ export const updateAgentConnection = async (
 
 export const readAgentCredential = (
   connection: AgentConnectionRow,
-  encryptionSecret: string
+  encryptionSecret: string,
+  fallbackSecret = ''
 ) => decryptAgentCredential({
   ciphertext: connection.credential_ciphertext,
   iv: connection.credential_iv,
   authTag: connection.credential_auth_tag
-}, encryptionSecret);
+}, resolveAgentEncryptionSecret(encryptionSecret, fallbackSecret));

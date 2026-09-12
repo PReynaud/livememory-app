@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { decryptAgentCredential, encryptAgentCredential } from '../../server/utils/agent-crypto';
+import { decryptAgentCredential, encryptAgentCredential, resolveAgentEncryptionSecret } from '../../server/utils/agent-crypto';
 import { mintAgentCapability, verifyAgentCapability } from '../../server/utils/agent-capability';
+import { trustedAgentOrigins } from '../../server/utils/agent-origin';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const secret = Buffer.alloc(32, 7).toString('base64');
@@ -12,6 +13,20 @@ describe('embedded agent credential security', () => {
     const encrypted = encryptAgentCredential('cursor_secret', secret);
     expect(JSON.stringify(encrypted)).not.toContain('cursor_secret');
     expect(decryptAgentCredential(encrypted, secret)).toBe('cursor_secret');
+  });
+
+  it('derives a usable key from a non-base64 server secret and rejects placeholders', () => {
+    const derived = resolveAgentEncryptionSecret(
+      'replace-with-32-byte-base64-key',
+      'service-role-fallback-secret'
+    );
+    expect(derived).toBe('service-role-fallback-secret');
+    const encrypted = encryptAgentCredential('cursor_secret', derived);
+    expect(decryptAgentCredential(encrypted, derived)).toBe('cursor_secret');
+    expect(() => resolveAgentEncryptionSecret(
+      'replace-with-32-byte-base64-key',
+      'replace-with-local-service-role-key'
+    )).toThrow('Agent credential encryption is not configured.');
   });
 
   it('issues short-lived capabilities with a read or write scope', () => {
@@ -77,8 +92,33 @@ describe('embedded agent boundaries', () => {
   it('requires configured secrets and a trusted browser origin', () => {
     const request = read('server/utils/agent-request.ts');
     const mcp = read('server/api/agent/mcp.ts');
+    const connections = read('server/utils/agent-connections.ts');
+    const profile = read('app/pages/profile.vue');
+    const runner = read('server/utils/agent-runner.ts');
     expect(request).toMatch(/Agent capability security is not configured/);
     expect(request).toMatch(/Untrusted request origin/);
+    expect(request).toMatch(/getRequestURL/);
+    expect(request).not.toMatch(/Agent origin is not configured/);
     expect(mcp).toMatch(/Agent capability security is not configured/);
+    expect(connections).toMatch(/resolveAgentEncryptionSecret/);
+    expect(profile).toMatch(/flex items-center gap-3/);
+    expect(runner).toMatch(/id: 'composer-2\.5'/);
+    expect(runner).toMatch(/id: 'fast'/);
+    expect(runner).toMatch(/value: 'false'/);
+    expect(runner).not.toMatch(/id: 'auto'/);
+  });
+
+  it('trusts the request origin even when AGENT_ALLOWED_ORIGIN is unset', () => {
+    expect(trustedAgentOrigins('https://livememory.pierre-reynaud.fr', '')).toEqual(
+      new Set(['https://livememory.pierre-reynaud.fr'])
+    );
+    expect(trustedAgentOrigins(
+      'https://livememory.pierre-reynaud.fr',
+      'http://localhost:3000'
+    ).has('https://livememory.pierre-reynaud.fr')).toBe(true);
+    expect(trustedAgentOrigins(
+      'https://livememory.pierre-reynaud.fr',
+      'http://localhost:3000'
+    ).has('https://evil.example')).toBe(false);
   });
 });

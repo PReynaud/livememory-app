@@ -1,6 +1,7 @@
-import { createError, getRequestHeader, type H3Event } from 'h3';
+import { createError, getRequestHeader, getRequestURL, type H3Event } from 'h3';
 import { useRuntimeConfig } from '#imports';
 import { getAgentConnection } from './agent-connections';
+import { trustedAgentOrigins } from './agent-origin';
 import { runAgentTurn, type PromptImage } from './agent-runner';
 import { requireAgentSession } from './agent-session';
 import { claimPendingProposal, createPendingProposal } from './agent-proposals';
@@ -35,9 +36,12 @@ export const validatePromptImages = (images: unknown): PromptImage[] => {
 };
 
 export const assertTrustedAgentOrigin = (event: H3Event, allowedOrigin: string) => {
-  if (!allowedOrigin) throw createError({ statusCode: 500, statusMessage: 'Agent origin is not configured.' });
+  const requestOrigin = getRequestURL(event).origin;
   const origin = getRequestHeader(event, 'origin');
-  if (origin !== allowedOrigin) throw createError({ statusCode: 403, statusMessage: 'Untrusted request origin.' });
+  if (!origin || !trustedAgentOrigins(requestOrigin, allowedOrigin).has(origin)) {
+    throw createError({ statusCode: 403, statusMessage: 'Untrusted request origin.' });
+  }
+  return requestOrigin;
 };
 
 export const handleAgentRequest = async (
@@ -57,8 +61,7 @@ export const handleAgentRequest = async (
   const config = useRuntimeConfig(event);
   const capabilitySecret = String(config.agentCapabilitySecret || '');
   if (!capabilitySecret) throw createError({ statusCode: 500, statusMessage: 'Agent capability security is not configured.' });
-  const allowedOrigin = String(config.agentAllowedOrigin || '');
-  assertTrustedAgentOrigin(event, allowedOrigin);
+  const origin = assertTrustedAgentOrigin(event, String(config.agentAllowedOrigin || ''));
   const result = await runAgentTurn({
     session,
     connection,
@@ -67,7 +70,7 @@ export const handleAgentRequest = async (
     images: validatePromptImages(images),
     encryptionSecret: String(config.agentCredentialEncryptionKey || ''),
     capabilitySecret,
-    origin: allowedOrigin
+    origin
   });
   if (scope === 'read') {
     const proposal = await createPendingProposal(
@@ -88,8 +91,7 @@ export const confirmAgentRequest = async (event: H3Event, proposalId: unknown) =
   const config = useRuntimeConfig(event);
   const capabilitySecret = String(config.agentCapabilitySecret || '');
   if (!capabilitySecret) throw createError({ statusCode: 500, statusMessage: 'Agent capability security is not configured.' });
-  const allowedOrigin = String(config.agentAllowedOrigin || '');
-  assertTrustedAgentOrigin(event, allowedOrigin);
+  const origin = assertTrustedAgentOrigin(event, String(config.agentAllowedOrigin || ''));
   const session = await requireAgentSession(event);
   const connection = await getAgentConnection(session);
   if (!connection || connection.health !== 'healthy') {
@@ -104,7 +106,7 @@ export const confirmAgentRequest = async (event: H3Event, proposalId: unknown) =
     images: [],
     encryptionSecret: String(config.agentCredentialEncryptionKey || ''),
     capabilitySecret,
-    origin: allowedOrigin,
+    origin,
     proposalId: proposal.id
   });
 };
