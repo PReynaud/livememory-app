@@ -23,7 +23,11 @@ export const runAgentTurn = async (options: {
   origin: string;
   proposalId?: string;
 }) => {
-  const credential = readAgentCredential(options.connection, options.encryptionSecret);
+  const credential = readAgentCredential(
+    options.connection,
+    options.encryptionSecret,
+    options.session.env.serviceRoleKey
+  );
   const capability = mintAgentCapability({
     userId: options.session.userId,
     scope: options.scope,
@@ -39,7 +43,10 @@ export const runAgentTurn = async (options: {
   };
   const agentOptions = {
     apiKey: credential,
-    model: { id: 'auto' },
+    model: {
+      id: 'composer-2.5',
+      params: [{ id: 'fast', value: 'false' }]
+    },
     cloud: { repos: [], skipReviewerRequest: true },
     mcpServers
   };

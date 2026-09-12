@@ -1,6 +1,12 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
+const PLACEHOLDER_SECRETS = new Set([
+  '',
+  'replace-with-32-byte-base64-key',
+  'replace-with-high-entropy-secret',
+  'replace-with-local-service-role-key'
+]);
 
 export type EncryptedAgentCredential = {
   ciphertext: string;
@@ -8,12 +14,22 @@ export type EncryptedAgentCredential = {
   authTag: string;
 };
 
+export const resolveAgentEncryptionSecret = (dedicated: string, fallback: string) => {
+  for (const candidate of [dedicated, fallback]) {
+    const value = candidate.trim();
+    if (!PLACEHOLDER_SECRETS.has(value)) return value;
+  }
+  throw new Error('Agent credential encryption is not configured.');
+};
+
 const encryptionKey = (secret: string) => {
-  const key = Buffer.from(secret, 'base64');
-  if (key.length !== 32) {
+  const value = secret.trim();
+  if (PLACEHOLDER_SECRETS.has(value)) {
     throw new Error('Agent credential encryption is not configured.');
   }
-  return key;
+  const key = Buffer.from(value, 'base64');
+  if (key.length === 32) return key;
+  return createHash('sha256').update(value).digest();
 };
 
 export const encryptAgentCredential = (

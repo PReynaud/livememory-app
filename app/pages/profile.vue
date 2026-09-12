@@ -259,7 +259,7 @@ const connectCursor = async () => {
     </p>
     <form
       v-else
-      class="space-y-2"
+      class="flex items-center gap-3"
       @submit.prevent="void connectCursor()"
     >
       <UInput
@@ -267,11 +267,13 @@ const connectCursor = async () => {
         type="password"
         autocomplete="off"
         placeholder="Cursor API key"
+        class="min-w-0 flex-1"
         data-testid="agent-connection-key"
       />
       <UButton
         type="submit"
         label="Connect Cursor"
+        class="shrink-0"
         :loading="agentChat.loading"
         :disabled="!cursorKey.trim() || agentChat.loading"
         data-testid="agent-connection-connect"
