@@ -1,5 +1,6 @@
-import { Agent, CursorAgentError, type SDKImage } from '@cursor/sdk';
+import { Agent, type SDKImage } from '@cursor/sdk';
 import { createError } from 'h3';
+import { cursorAgentUserMessage, isCursorAgentError } from './agent-errors';
 import type { AgentSession } from './agent-session';
 import { mintAgentCapability } from './agent-capability';
 import {
@@ -80,8 +81,11 @@ export const runAgentTurn = async (options: {
     }
   } catch (error: unknown) {
     await updateAgentConnection(options.session, { health: 'unhealthy' }).catch(() => undefined);
-    if (error instanceof CursorAgentError) {
-      throw createError({ statusCode: 502, statusMessage: 'Your Cursor connection needs to be reconnected.' });
+    if (isCursorAgentError(error)) {
+      throw createError({
+        statusCode: 502,
+        statusMessage: cursorAgentUserMessage(error)
+      });
     }
     throw error;
   }

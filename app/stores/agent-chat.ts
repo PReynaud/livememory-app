@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { useSupabaseClient } from '#imports';
+import { useSupabaseClient, useSupabaseSession } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
 import type { Database } from '@/types/database.types';
 
@@ -9,6 +9,7 @@ export type PromptImage = { data: string; mimeType: string };
 
 export const useAgentChatStore = defineStore('agentChat', () => {
   const supabase = useSupabaseClient<Database>();
+  const supabaseSession = useSupabaseSession();
   const connected = ref(false);
   const healthy = ref(false);
   const open = ref(false);
@@ -20,9 +21,17 @@ export const useAgentChatStore = defineStore('agentChat', () => {
   const isReady = computed(() => connected.value && healthy.value);
 
   const headers = async () => {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session?.access_token) throw new Error('Authentication is required.');
-    return { Authorization: `Bearer ${data.session.access_token}` };
+    let token = supabaseSession.value?.access_token ?? null;
+    if (!token) {
+      const { data } = await supabase.auth.getSession();
+      token = data.session?.access_token ?? null;
+    }
+    if (!token) {
+      const { data } = await supabase.auth.refreshSession();
+      token = data.session?.access_token ?? null;
+    }
+    if (!token) throw new Error('Authentication is required.');
+    return { Authorization: `Bearer ${token}` };
   };
 
   const fetchStatus = async () => {

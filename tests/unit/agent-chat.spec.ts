@@ -3,7 +3,8 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { decryptAgentCredential, encryptAgentCredential, resolveAgentEncryptionSecret } from '../../server/utils/agent-crypto';
 import { mintAgentCapability, verifyAgentCapability } from '../../server/utils/agent-capability';
-import { trustedAgentOrigins } from '../../server/utils/agent-origin';
+import { resolveAgentMcpOrigin, trustedAgentOrigins } from '../../server/utils/agent-origin';
+import { cursorAgentUserMessage, isCursorAgentError } from '../../server/utils/agent-errors';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 const secret = Buffer.alloc(32, 7).toString('base64');
@@ -120,5 +121,45 @@ describe('embedded agent boundaries', () => {
       'https://livememory.pierre-reynaud.fr',
       'http://localhost:3000'
     ).has('https://evil.example')).toBe(false);
+  });
+
+  it('maps cross-realm Cursor AuthenticationError without leaking Authentication is required', () => {
+    const cjsLikeAuthError = Object.assign(new Error('Authentication is required.'), {
+      name: 'AuthenticationError'
+    });
+    expect(isCursorAgentError(cjsLikeAuthError)).toBe(true);
+    expect(cursorAgentUserMessage(cjsLikeAuthError)).toBe(
+      'Your Cursor connection needs to be reconnected.'
+    );
+    expect(cursorAgentUserMessage(cjsLikeAuthError)).not.toBe('Authentication is required.');
+
+    const runner = read('server/utils/agent-runner.ts');
+    const errors = read('server/utils/agent-errors.ts');
+    expect(runner).toMatch(/isCursorAgentError/);
+    expect(errors).toMatch(/CURSOR_AGENT_ERROR_NAME/);
+    expect(runner).not.toMatch(/if \(error instanceof CursorAgentError\)/);
+  });
+
+  it('prefers a public AGENT_ALLOWED_ORIGIN for MCP callbacks and skips localhost placeholders', () => {
+    expect(resolveAgentMcpOrigin(
+      'https://livememory.pierre-reynaud.fr',
+      'http://localhost:3000'
+    )).toBe('https://livememory.pierre-reynaud.fr');
+    expect(resolveAgentMcpOrigin(
+      'https://preview.example',
+      'https://livememory.pierre-reynaud.fr'
+    )).toBe('https://livememory.pierre-reynaud.fr');
+    expect(resolveAgentMcpOrigin('https://livememory.pierre-reynaud.fr', '')).toBe(
+      'https://livememory.pierre-reynaud.fr'
+    );
+  });
+
+  it('refreshes the browser session token and accepts cookie auth on agent APIs', () => {
+    const store = read('app/stores/agent-chat.ts');
+    const session = read('server/utils/agent-session.ts');
+    expect(store).toMatch(/useSupabaseSession/);
+    expect(store).toMatch(/refreshSession/);
+    expect(session).toMatch(/serverSupabaseUser/);
+    expect(session).toMatch(/serverSupabaseSession/);
   });
 });
