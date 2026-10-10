@@ -22,7 +22,7 @@ const hasTranscript = computed(() => Boolean(error.value) || messages.value.leng
 
 const allowed = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 const resetImageInput = () => {
-  if (imageInput.value) imageInput.value = '';
+  if (imageInput.value) imageInput.value.value = '';
 };
 const selectImages = (event: Event) => {
   const input = event.target as HTMLInputElement;
@@ -73,7 +73,7 @@ const closeControl = {
   'color': 'neutral',
   'variant': 'ghost',
   'aria-label': 'Close assistant'
-};
+} as const;
 const slideoverUi = {
   overlay: 'bg-elevated/0',
   content: 'lm-chrome lm-sheet-shell lm-assistant-sheet bg-default/50 backdrop-blur-[24px] divide-y-0 ring-0 shadow-none rounded-t-3xl',
