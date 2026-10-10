@@ -1,7 +1,7 @@
 import { createError, getRequestHeader, getRequestURL, type H3Event } from 'h3';
 import { useRuntimeConfig } from '#imports';
 import { getAgentConnection } from './agent-connections';
-import { trustedAgentOrigins } from './agent-origin';
+import { resolveAgentMcpOrigin, trustedAgentOrigins } from './agent-origin';
 import { runAgentTurn, type PromptImage } from './agent-runner';
 import { requireAgentSession } from './agent-session';
 import { claimPendingProposal, createPendingProposal } from './agent-proposals';
@@ -61,7 +61,9 @@ export const handleAgentRequest = async (
   const config = useRuntimeConfig(event);
   const capabilitySecret = String(config.agentCapabilitySecret || '');
   if (!capabilitySecret) throw createError({ statusCode: 500, statusMessage: 'Agent capability security is not configured.' });
-  const origin = assertTrustedAgentOrigin(event, String(config.agentAllowedOrigin || ''));
+  const allowedOrigin = String(config.agentAllowedOrigin || '');
+  const requestOrigin = assertTrustedAgentOrigin(event, allowedOrigin);
+  const origin = resolveAgentMcpOrigin(requestOrigin, allowedOrigin);
   const result = await runAgentTurn({
     session,
     connection,
@@ -91,7 +93,9 @@ export const confirmAgentRequest = async (event: H3Event, proposalId: unknown) =
   const config = useRuntimeConfig(event);
   const capabilitySecret = String(config.agentCapabilitySecret || '');
   if (!capabilitySecret) throw createError({ statusCode: 500, statusMessage: 'Agent capability security is not configured.' });
-  const origin = assertTrustedAgentOrigin(event, String(config.agentAllowedOrigin || ''));
+  const allowedOrigin = String(config.agentAllowedOrigin || '');
+  const requestOrigin = assertTrustedAgentOrigin(event, allowedOrigin);
+  const origin = resolveAgentMcpOrigin(requestOrigin, allowedOrigin);
   const session = await requireAgentSession(event);
   const connection = await getAgentConnection(session);
   if (!connection || connection.health !== 'healthy') {
