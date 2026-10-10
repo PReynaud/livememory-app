@@ -73,9 +73,16 @@ describe('embedded agent boundaries', () => {
   it('renders Home only for a healthy connection and refreshes after confirmation', () => {
     const home = read('app/pages/home.vue');
     const sheet = read('app/components/AppAiChatSheet.vue');
+    const styles = read('app/assets/css/main.css');
     expect(home).toMatch(/v-if="isAssistantReady"/);
     expect(sheet).toMatch(/agent-chat-confirm/);
     expect(sheet).toMatch(/events\.fetchEvents/);
+    expect(sheet).toMatch(/data-testid="agent-chat-images"/);
+    expect(sheet).toMatch(/class="sr-only"/);
+    expect(sheet).toMatch(/lm-assistant-sheet/);
+    expect(sheet).toMatch(/lm-assistant-composer/);
+    expect(styles).toMatch(/\.lm-assistant-sheet \{/);
+    expect(styles).toMatch(/bottom: 4\.75rem;/);
   });
 
   it('claims a persisted proposal once and binds MCP execution to its exact operations', () => {
