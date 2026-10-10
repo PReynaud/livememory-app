@@ -7,6 +7,7 @@ import {
   updateAgentConnection
 } from './agent-connections';
 import type { ProposedOperation } from './agent-proposals';
+import { ASSISTANT_FOLLOW_UP } from '#shared/agent-chat-transcript';
 
 type AgentConnection = NonNullable<Awaited<ReturnType<typeof import('./agent-connections').getAgentConnection>>>;
 
@@ -93,12 +94,30 @@ const WRITE_TOOL_NAMES = new Set([
   'attend_this_night', 'join_event', 'leave_event'
 ]);
 
+const payloadLike = (text: string) => {
+  return text.includes('{') || text.includes('```') || /^\s*json\b/i.test(text);
+};
+
+const extractProposalJson = (text: string) => {
+  const trimmed = text.trim();
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(trimmed);
+  const source = (fence?.[1] ?? trimmed.replace(/^\s*json\b/i, '')).trim();
+  const start = source.indexOf('{');
+  const end = source.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  return source.slice(start, end + 1);
+};
+
 export const parseProposal = (text: string): { preview: string; operations: ProposedOperation[] } => {
+  const fallback = () => ({
+    preview: payloadLike(text) ? ASSISTANT_FOLLOW_UP : text.trim(),
+    operations: [] as ProposedOperation[]
+  });
+  const candidate = extractProposalJson(text);
+  if (!candidate) return fallback();
   try {
-    const parsed = JSON.parse(text) as { preview?: unknown; operations?: unknown };
-    if (typeof parsed.preview !== 'string' || !Array.isArray(parsed.operations)) {
-      return { preview: text, operations: [] };
-    }
+    const parsed = JSON.parse(candidate) as { preview?: unknown; operations?: unknown };
+    if (typeof parsed.preview !== 'string' || !Array.isArray(parsed.operations)) return fallback();
     const operations = parsed.operations.filter((operation): operation is ProposedOperation => {
       const value = operation as ProposedOperation;
       return Boolean(value && WRITE_TOOL_NAMES.has(value.name)
@@ -106,6 +125,6 @@ export const parseProposal = (text: string): { preview: string; operations: Prop
     });
     return { preview: parsed.preview, operations };
   } catch {
-    return { preview: text, operations: [] };
+    return fallback();
   }
 };

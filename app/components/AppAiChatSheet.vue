@@ -3,22 +3,24 @@ import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useAgentChatStore } from '@/stores/agent-chat';
 import { useEventsStore } from '@/stores/events';
+import {
+  ASSISTANT_ADDING,
+  ASSISTANT_WORKING,
+  askDisabled,
+  attendanceChipLabel,
+  composerBusy,
+  proposalCardMeta,
+  visibleTranscriptText
+} from '#shared/agent-chat-transcript';
 
 const chat = useAgentChatStore();
 const events = useEventsStore();
-const { open, loading, error, messages, pendingPreview } = storeToRefs(chat);
+const { open, turnLoading, confirming, error, messages, pendingProposalId } = storeToRefs(chat);
 const prompt = ref('');
 const files = ref<File[]>([]);
 const imageError = ref('');
 const imageInput = ref<HTMLInputElement | null>(null);
-const sheetOpen = computed({
-  get: () => open.value,
-  set: (value) => {
-    open.value = value;
-    if (!value) chat.cancelPreview();
-  }
-});
-const hasTranscript = computed(() => Boolean(error.value) || messages.value.length > 0 || Boolean(pendingPreview.value));
+const hasTranscript = computed(() => Boolean(error.value) || messages.value.length > 0 || turnLoading.value);
 
 const allowed = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 const resetImageInput = () => {
@@ -51,7 +53,7 @@ const imagePayload = async () => Promise.all(files.value.map(async file => ({
   mimeType: file.type
 })));
 const send = async () => {
-  if (!prompt.value.trim() || loading.value) return;
+  if (askDisabled(prompt.value, turnLoading.value, confirming.value, !!pendingProposalId.value)) return;
   const result = await chat.send(prompt.value, await imagePayload());
   if (!result.error) {
     prompt.value = '';
@@ -88,7 +90,7 @@ const slideoverUi = {
 
 <template>
   <USlideover
-    v-model:open="sheetOpen"
+    v-model:open="open"
     side="bottom"
     title="Assistant"
     :close="closeControl"
@@ -112,27 +114,72 @@ const slideoverUi = {
           class="max-w-[85%] rounded-2xl px-3 py-2 text-[15px] leading-snug"
           :class="message.role === 'user' ? 'ms-auto bg-primary text-black' : 'bg-[var(--well)] text-[var(--fg)] ring-1 ring-[var(--well-border)]'"
         >
-          {{ message.text }}
+          <p v-if="visibleTranscriptText(message.text)">
+            {{ visibleTranscriptText(message.text) }}
+          </p>
+          <div
+            v-if="message.card"
+            class="mt-3 space-y-2"
+            data-testid="agent-chat-card"
+          >
+            <p
+              v-if="visibleTranscriptText(message.card.artist)"
+              class="text-lg font-semibold"
+            >
+              {{ visibleTranscriptText(message.card.artist) }}
+            </p>
+            <p v-if="visibleTranscriptText(proposalCardMeta(message.card))">
+              {{ visibleTranscriptText(proposalCardMeta(message.card)) }}
+            </p>
+            <span
+              class="inline-flex h-6 items-center rounded-full border px-2 text-[10px] font-semibold leading-none"
+              :class="message.card.attendance === 'going' ? 'border-[#FF4D8A] text-[#FF4D8A]' : 'border-[#A3A3A3] text-[#A3A3A3]'"
+            >
+              {{ attendanceChipLabel(message.card.attendance) }}
+            </span>
+            <p
+              v-if="visibleTranscriptText(message.card.note)"
+              class="text-sm text-muted"
+            >
+              {{ visibleTranscriptText(message.card.note) }}
+            </p>
+          </div>
+          <div
+            v-if="message.status === 'pending'"
+            class="mt-3 space-y-3"
+          >
+            <p
+              v-if="confirming"
+              data-testid="agent-chat-adding"
+            >
+              {{ ASSISTANT_ADDING }}
+            </p>
+            <div class="flex gap-3">
+              <UButton
+                :label="message.card ? 'Add concert' : 'Save'"
+                :loading="confirming"
+                :disabled="confirming"
+                data-testid="agent-chat-confirm"
+                @click="confirm"
+              />
+              <UButton
+                label="Don't add"
+                color="neutral"
+                variant="outline"
+                :disabled="confirming"
+                data-testid="agent-chat-cancel"
+                @click="chat.cancelPreview()"
+              />
+            </div>
+          </div>
         </div>
-        <div
-          v-if="pendingPreview"
-          class="flex flex-wrap gap-2"
+        <p
+          v-if="turnLoading"
+          aria-live="polite"
+          data-testid="agent-chat-working"
         >
-          <UButton
-            label="Confirm changes"
-            :loading="loading"
-            data-testid="agent-chat-confirm"
-            @click="confirm"
-          />
-          <UButton
-            label="Cancel"
-            color="neutral"
-            variant="outline"
-            :disabled="loading"
-            data-testid="agent-chat-cancel"
-            @click="chat.cancelPreview()"
-          />
-        </div>
+          {{ ASSISTANT_WORKING }}
+        </p>
       </div>
     </template>
     <template #footer>
@@ -165,7 +212,7 @@ const slideoverUi = {
                 type="button"
                 class="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-muted hover:text-[var(--fg)]"
                 :aria-label="`Remove ${file.name}`"
-                :disabled="loading"
+                :disabled="composerBusy(turnLoading, confirming, !!pendingProposalId)"
                 @click="removeImage(index)"
               >
                 <UIcon
@@ -185,7 +232,7 @@ const slideoverUi = {
             :rows="1"
             :maxrows="4"
             autoresize
-            :disabled="loading"
+            :disabled="composerBusy(turnLoading, confirming, !!pendingProposalId)"
             class="min-w-48 flex-1"
             :ui="{ base: 'bg-transparent px-0 py-1.5 text-[15px] ring-0 shadow-none placeholder:text-muted focus-visible:ring-0' }"
             @keydown="onPromptKeydown"
@@ -197,7 +244,7 @@ const slideoverUi = {
               color="neutral"
               variant="ghost"
               aria-label="Attach images"
-              :disabled="loading"
+              :disabled="composerBusy(turnLoading, confirming, !!pendingProposalId)"
               @click="imageInput?.click()"
             />
             <input
@@ -209,14 +256,14 @@ const slideoverUi = {
               tabindex="-1"
               aria-hidden="true"
               data-testid="agent-chat-images"
-              :disabled="loading"
+              :disabled="composerBusy(turnLoading, confirming, !!pendingProposalId)"
               @change="selectImages"
             >
             <UButton
               type="submit"
               label="Ask assistant"
-              :loading="loading"
-              :disabled="!prompt.trim() || loading"
+              :loading="turnLoading"
+              :disabled="askDisabled(prompt, turnLoading, confirming, !!pendingProposalId)"
               data-testid="agent-chat-send"
             />
           </div>

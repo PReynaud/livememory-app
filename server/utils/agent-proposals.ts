@@ -70,6 +70,19 @@ export const claimPendingProposal = async (
   return rows[0];
 };
 
+export const releaseConfirmedProposal = async (session: AgentSession, proposalId: string) => {
+  configured(session);
+  const filter = `id=eq.${proposalId}&user_id=eq.${session.userId}&status=eq.confirmed`;
+  const response = await fetch(`${endpoint(session)}?${filter}`, {
+    method: 'PATCH',
+    headers: { ...headers(session), Prefer: 'return=minimal' },
+    body: JSON.stringify({ status: 'pending', confirmed_at: null })
+  });
+  if (!response.ok) {
+    throw createError({ statusCode: 500, statusMessage: 'Failed to restore the proposal.' });
+  }
+};
+
 export const readConfirmedProposal = async (session: AgentSession, proposalId: string) => {
   configured(session);
   const response = await fetch(`${endpoint(session)}?id=eq.${proposalId}&user_id=eq.${session.userId}&status=eq.confirmed&select=*`, {
