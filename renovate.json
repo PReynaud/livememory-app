@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Keep LiveMemory current. Non-major updates are grouped and automerged when CI is green. Framework majors and Nuxt stay as reviewable PRs.",
+  "description": "Keep LiveMemory current via the Mend Renovate GitHub App. Non-major updates are grouped and automerged when CI is green. Framework majors and Nuxt stay as reviewable PRs.",
   "extends": [
     "github>nuxt/renovate-config-nuxt",
     ":enableVulnerabilityAlerts"
