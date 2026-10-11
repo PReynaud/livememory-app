@@ -98,13 +98,13 @@ NFR-15: Postgres is the last word on who may read or write — hard product rule
 
 **Starter / greenfield:** LiveMemory v1 is built on the **existing Nuxt/Supabase factory** in this repo (`nuxt-app-template` lineage). Do not copy the old LiveMemory codebase. Epic 1 Story 1 extends this factory (schema, auth, domain seed), not a new starter.
 
-- **AD-1 Shared domain, Postgres kernel:** One isomorphic TypeScript domain module in `shared/domain` takes a user-scoped Supabase client (JWT so RLS applies). Pinia stores, MCP tools, and pages must not query domain tables (`events`, `concerts`, `attendance`, `event_members`, `event_stages`, personal keys, or views over them) except Shared List may SELECT only the kernel public view (AD-2). SQL RPC is not the default. Nitro `server/api` exists only for personal-key exchange (AD-4) and registration (AD-6); after minting a user-scoped client it calls the domain module. Pages call stores; they do not fetch remote domain data.
+- **AD-1 Shared domain, Postgres kernel:** One isomorphic TypeScript domain module in `shared/domain` takes a user-scoped Supabase client (JWT so RLS applies). Pinia stores, MCP tools, and pages must not query domain tables (`events`, `concerts`, `attendance`, `event_members`, `event_stages`, OAuth grants, or views over them) except Shared List may SELECT only the kernel public view (AD-2). SQL RPC is not the default. Nitro `server/api` exists only for MCP OAuth (AD-4) and registration (AD-6); after resolving an access token to a user-scoped client it calls the domain module. Pages call stores; they do not fetch remote domain data.
 
 - **AD-2 Two readers:** Unauthenticated SELECT is allowed only through the kernel public Shared List view (enabled profiles; effective `going`/`attended`; grouped by Event; no notes; no unset Attendance; no empty Events). Notes are Event-owner SELECT only. Nobody SELECTs another User's Attendance. Disabled profile and unknown username are the same not-found result; enabled-but-empty is a visible empty list. Event pages require a signed-in owner or member. Auth redirect excludes `/`, `/login`, `/confirm`, `/u/**`. Auth middleware on `/home`, `/concerts`, `/profile`, `/e/:id`. After `/confirm`, honor `redirect` to an Event URL; otherwise land on Home.
 
 - **AD-3 Effective Attendance on read:** No background job and no persist-on-read. Effective Attendance is defined once in SQL (view or function). UI, MCP, and Shared List read that definition — never the raw column for display. Writes must not store `going` on a past Concert.
 
-- **AD-4 MCP personal key:** The User creates and revokes a personal key in the app. MCP sends the key to a Nitro route that verifies a hash, mints a user-scoped client, and runs the domain module as that User. Store hashes, never plaintext. v1 is revoke-only (no expiry). Screenshot interpretation stays outside LiveMemory. Bind SDK choice when CAP-6 is built (after UI CRUD).
+- **AD-4 MCP OAuth:** A remote MCP client connects with OAuth 2.1 (protected-resource metadata, authorization-server metadata, dynamic client registration, authorization code + PKCE). The User signs in with the existing account and allows the client in the browser. LiveMemory issues an access token it can resolve to that User, then runs the domain module with a user-scoped client. Profile lists granted clients and can revoke them. No personal key and no password in the client config. `service_role` is forbidden on domain tables. Screenshot interpretation stays outside LiveMemory.
 
 - **AD-5 Opaque Event URL:** Event page path is `/e/:id` where `:id` is the Event UUID. That URL is the unguessable Event link. Renaming does not change it. No vanity slugs in v1.
 
@@ -128,13 +128,13 @@ NFR-15: Postgres is the last word on who may read or write — hard product rule
 
 - **Routes:** `/` marketing; `/login` `/confirm`; `/home`; `/concerts`; `/profile`; `/e/:id`; `/u/:username`.
 
-- **Tables:** `profiles`, `events`, `concerts`, `event_stages`, `event_members`, `attendance`, personal-key table.
+- **Tables:** `profiles`, `events`, `concerts`, `event_stages`, `event_members`, `attendance`, OAuth client and grant tables.
 
-- **Structural seed:** `app/pages`, `app/stores`, `app/components`, `shared/domain`, `server/api` (personal key + signup only), `supabase/migrations`, `tests/unit`, `tests/e2e`.
+- **Structural seed:** `app/pages`, `app/stores`, `app/components`, `shared/domain`, `server/api` (MCP OAuth + signup only), `supabase/migrations`, `tests/unit`, `tests/e2e`.
 
 - **Capability map for sequencing:** CAP-1 account + owner CRUD; CAP-2 Events as groups / Home vs Concerts; CAP-3 dates, place, stages; CAP-4 Shared List; CAP-5 Attendance / attend-all; CAP-6 MCP after UI CRUD; CAP-7 join / leave / Bill view.
 
-- **Deferred (do not story in v1):** pretty Event slugs; SQL RPC as default mutation style; extra preview/staging product; realtime; username rename; Event-link rotation; owner kick; joiner roster; joiner notes; concert duration/overlap windows; import from old LiveMemory; OAuth for MCP; PWA.
+- **Deferred (do not story in v1):** pretty Event slugs; SQL RPC as default mutation style; extra preview/staging product; realtime; username rename; Event-link rotation; owner kick; joiner roster; joiner notes; concert duration/overlap windows; import from old LiveMemory; PWA.
 
 ### UX Design Requirements
 
@@ -218,7 +218,7 @@ Pierre sends an Event URL or enables a Shared List. Sam can view, join, set only
 **FRs covered:** FR-14, FR-15, FR-16, FR-18
 
 ### Epic 3: Let an agent write the same log
-Pierre creates and revokes a personal key. An authenticated agent can list, read, create, update, move, and delete Events and Concerts (including Attendance and joins) under the same owner vs joiner rights and validation as the UI. Not a second product.
+Pierre approves an MCP client in the browser and can revoke it. An authenticated agent can list, read, create, update, move, and delete Events and Concerts (including Attendance and joins) under the same owner vs joiner rights and validation as the UI. Not a second product.
 **FRs covered:** FR-17
 
 ## Epic 1: Keep a private log of nights
@@ -919,40 +919,44 @@ So that I do not silently wipe another User's Attendance.
 
 ## Epic 3: Let an agent write the same log
 
-Pierre creates and revokes a personal key. An authenticated agent can list, read, create, update, move, and delete Events and Concerts (including Attendance and joins) under the same owner vs joiner rights and validation as the UI. Not a second product. Screenshot interpretation stays outside LiveMemory. Every story adds or updates tests. Choose the MCP SDK in this epic (architecture deferred the library).
+Pierre approves an MCP client in the browser and can revoke it. An authenticated agent can list, read, create, update, move, and delete Events and Concerts (including Attendance and joins) under the same owner vs joiner rights and validation as the UI. Not a second product. Screenshot interpretation stays outside LiveMemory. Every story adds or updates tests. Choose the MCP SDK in this epic (architecture deferred the library).
 
-### Story 3.1: Create and revoke a personal MCP key
+### Story 3.1: Connect and revoke an MCP client
 
 As a signed-in User,
-I want to create and revoke a personal key in the app,
-So that an agent can act as me without putting my password in its config.
+I want to approve an MCP client in the browser and revoke it later,
+So that an agent can act as me without a password or a pasted key in its config.
 
 **Acceptance Criteria:**
 
-**Given** I am on Profile
-**When** I create a personal key
-**Then** I am shown the plaintext once
-**And** only a hash is stored on a `personal_keys` table (UUID, user-scoped) created in this story
-**And** Nitro can verify the hash and mint a user-scoped client (AD-4)
+**Given** a remote MCP client opens `POST /api/mcp`
+**When** it discovers authorization
+**Then** LiveMemory publishes protected-resource metadata and authorization-server metadata, including dynamic client registration (AD-4)
 
-**Given** I revoke the key
-**When** an agent presents it afterward
+**Given** I am signed in
+**When** the client starts an authorization-code flow with PKCE
+**Then** I can Allow or Deny that client
+**And** Allow issues an access token LiveMemory can resolve to my User, plus a refresh token
+**And** MCP then uses a user-scoped client (AD-4)
+
+**Given** I revoke that client on Profile
+**When** an agent presents its token afterward
 **Then** the call is rejected
-**And** v1 has no expiry policy beyond revoke (AD-4)
+**And** there is no personal key, no `personal_keys` table, and no `/api/mcp/exchange` (AD-4)
 
 **Given** domain Event/Concert tables
-**When** the key exchange runs
+**When** the token is resolved
 **Then** `service_role` is not used to read or write those tables (AD-1, AD-4, NFR-15)
 
 ### Story 3.2: Let an agent create and update my log
 
-As a User with a valid personal key,
+As a User with a valid OAuth access token,
 I want an MCP agent to list, read, create, update, move, and delete Events and Concerts (including Attendance) with the same validation as the UI,
 So that I can file structured data without typing every row.
 
 **Acceptance Criteria:**
 
-**Given** a valid personal key
+**Given** a valid OAuth access token for that User
 **When** the agent creates a Concert or Event
 **Then** the row is indistinguishable in the UI from one created in the form (same fields, same rules) (FR-17, UX-DR24)
 
@@ -977,7 +981,7 @@ So that MCP is not a back door around Event ownership.
 
 **Acceptance Criteria:**
 
-**Given** a personal key for a joiner
+**Given** an OAuth access token for a joiner
 **When** the agent tries to add, edit, move, or delete Concerts or update the Event
 **Then** the operation is blocked, same as the joiner UI (FR-17, FR-18)
 
@@ -985,7 +989,7 @@ So that MCP is not a back door around Event ownership.
 **When** it sets Attendance, uses attend-all on a soirée, joins via Event id, or leaves
 **Then** those operations follow FR-18 and FR-10 (FR-17)
 
-**Given** no key or an invalid key
+**Given** no token, an invalid token, or a revoked grant
 **When** a caller writes
 **Then** the write fails (FR-17)
 

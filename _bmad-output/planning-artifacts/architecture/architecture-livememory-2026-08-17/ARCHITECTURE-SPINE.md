@@ -31,7 +31,7 @@ Layered Nuxt with a Postgres security kernel. Presentation never talks to the da
 | Presentation | `app/pages`, `app/components` | Pinia stores, Vue, Nuxt UI |
 | Adapters | `app/stores`; MCP tools | domain module only (plus a user-scoped session) |
 | Domain | `shared/domain` | user-scoped Supabase client (RLS as that User) |
-| Exceptions | `server/api` | hashed personal keys, Auth; then domain with a user-scoped client |
+| Exceptions | `server/api` | MCP OAuth, Auth; then domain with a user-scoped client |
 | Kernel | `supabase/migrations` | nothing in the app |
 
 ```mermaid
@@ -57,7 +57,7 @@ MCP is a second adapter, not a second product. After UI CRUD exists it calls the
 
 - **Binds:** all writes and domain reads for CAP-1..CAP-7
 - **Prevents:** Pinia and MCP each writing their own table queries; service-role MCP; product rules living only in Vue
-- **Rule:** One isomorphic TypeScript domain module in `shared/domain` takes a **user-scoped** Supabase client (JWT/session of that User so RLS applies). Pinia stores, MCP tools, and pages must not query domain tables themselves (`events`, `concerts`, `attendance`, `event_members`, `event_stages`, personal keys, or views over them). Join, leave, Attendance, Concert create/attach, Event CRUD, and Shared List reads go through the domain module (Shared List may SELECT only the kernel public view in AD-2). SQL RPC is not the default. Nitro `server/api` exists only for personal-key exchange (AD-4) and registration (AD-6); after minting a user-scoped client it calls the domain module. `service_role` is forbidden for Event/Concert/Attendance/membership/stage reads and writes. Pages call stores; they do not fetch remote domain data.
+- **Rule:** One isomorphic TypeScript domain module in `shared/domain` takes a **user-scoped** Supabase client (JWT/session of that User so RLS applies). Pinia stores, MCP tools, and pages must not query domain tables themselves (`events`, `concerts`, `attendance`, `event_members`, `event_stages`, OAuth grants, or views over them). Join, leave, Attendance, Concert create/attach, Event CRUD, and Shared List reads go through the domain module (Shared List may SELECT only the kernel public view in AD-2). SQL RPC is not the default. Nitro `server/api` exists only for MCP OAuth (AD-4) and registration (AD-6); after resolving an access token to a user-scoped client it calls the domain module. `service_role` is forbidden for Event/Concert/Attendance/membership/stage reads and writes. Pages call stores; they do not fetch remote domain data.
 
 ### AD-2 — Two readers [ADOPTED]
 
@@ -71,11 +71,11 @@ MCP is a second adapter, not a second product. After UI CRUD exists it calls the
 - **Prevents:** UI showing attended while the public profile still shows Going; persist-on-read vs compute-on-read; a cron as a second mutation path
 - **Rule:** No background job and no persist-on-read in v1. **Effective** Attendance is defined once in SQL (view or function): stored `going` that is past in Europe/Paris is exposed as `attended` (after optional clock time, else end of that Paris calendar day). UI, MCP, and Shared List read that definition — never the raw column for display. Writes must not store `going` on a past Concert (store `attended`). Future `attended` is rejected. `attended` cannot become `going`. Clear at the past boundary stays unset (delete the row).
 
-### AD-4 — MCP personal key [ADOPTED]
+### AD-4 — MCP OAuth [ADOPTED]
 
 - **Binds:** CAP-6
-- **Prevents:** email/password in agent config; OAuth-for-v1; MCP acting as a superuser or using service_role
-- **Rule:** The User creates and revokes a personal key in the app. MCP sends the key to a Nitro route that verifies a hash, **mints a user-scoped client**, and runs the domain module as that User (same RLS as the UI). Store hashes, never plaintext. v1 is revoke-only (no expiry policy). Screenshot interpretation stays outside LiveMemory.
+- **Prevents:** email/password in agent config; a pasted personal key; MCP acting as a superuser or using service_role
+- **Rule:** Remote MCP uses OAuth 2.1. LiveMemory publishes protected-resource metadata and authorization-server metadata, supports dynamic client registration, and completes authorization code + PKCE (S256). The User signs in with the existing account and Allows the client in the browser. The token endpoint issues an access token LiveMemory can resolve to that User, plus a refresh token. MCP then **uses a user-scoped client** and runs the domain module as that User (same RLS as the UI). Profile lists granted clients and Revoke rejects later calls. No personal key. `service_role` stays forbidden for domain reads and writes (mint or token resolution only). Screenshot interpretation stays outside LiveMemory. Supersedes the 2026-08-17 personal-key rule (sprint change 2026-10-11).
 
 ### AD-5 — Opaque Event URL [ADOPTED]
 
@@ -93,7 +93,7 @@ MCP is a second adapter, not a second product. After UI CRUD exists it calls the
 
 - **Binds:** CAP-3, CAP-5, all tables
 - **Prevents:** two implementations inventing different UTC instants for dateless Concerts; public sequential numbers
-- **Rule:** Event `start_date` and `end_date` are calendar dates (inclusive). Concert has a calendar date plus optional clock time. Values are civil Europe/Paris, stored as date/time-without-timezone, not as UTC-as-source-of-truth. Place is free text; Concert inherits Event place unless that Event allows per-Concert override. All entity ids (Event, Concert, Attendance, membership, stage, personal key) are UUIDs, like `auth.users`.
+- **Rule:** Event `start_date` and `end_date` are calendar dates (inclusive). Concert has a calendar date plus optional clock time. Values are civil Europe/Paris, stored as date/time-without-timezone, not as UTC-as-source-of-truth. Place is free text; Concert inherits Event place unless that Event allows per-Concert override. All entity ids (Event, Concert, Attendance, membership, stage, OAuth grant) are UUIDs, like `auth.users`.
 
 ### AD-8 — Membership is not Attendance [ADOPTED]
 
@@ -148,7 +148,7 @@ MCP is a second adapter, not a second product. After UI CRUD exists it calls the
 | Dates | Civil Europe/Paris date + optional time. Do not convert dateless Concerts to a UTC instant. |
 | Errors | Stores keep `{ data, error }`. Domain returns structured results including `created` / `attached` / `needs_choice` / `impossible_place` and errors with rule id + message. |
 | State | Remote data in Pinia, not pages. No realtime in v1; refresh on revisit. List queries are set-based for the signed-in User (owned+joined), not per-Event round trips. Target: ~1000 Concerts usable (SPEC: list within 2 seconds). |
-| Auth | `@nuxtjs/supabase` session for the browser. MCP: hashed personal key → Nitro → user-scoped client → domain. |
+| Auth | `@nuxtjs/supabase` session for the browser. MCP: OAuth 2.1 → Nitro → user-scoped client → domain. |
 | Tests | Vitest on stores, domain, handlers. Playwright against **local** Supabase only. Every story adds or updates tests. Auto-imports stay off. E2E signup includes username. |
 | Deletes | Owner deletes; non-empty Event confirms joiner impact and deletes Concerts + Attendance. Empty Event delete is enough to invalidate `/e/:id`. |
 
@@ -182,7 +182,7 @@ livememory-app/
   app/stores/             # Pinia adapters
   app/components/
   shared/domain/          # isomorphic Event/Concert/Attendance/membership
-  server/api/             # personal key + signup only
+  server/api/             # MCP OAuth + signup only
   supabase/migrations/    # schema, RLS, constraints, public views
   tests/unit/
   tests/e2e/
@@ -198,7 +198,7 @@ erDiagram
   concerts ||--o{ attendance : per-user
   profiles ||--o{ attendance : records
   profiles ||--o{ event_members : joins
-  profiles ||--o{ personal_keys : issues
+  profiles ||--o{ oauth_grants : approves
 ```
 
 ```mermaid
@@ -230,7 +230,7 @@ Production URL: `https://livememory.pierre-reynaud.fr`. One cloud: Vercel + host
 | CAP-3 Dates, place, stages, incompatible Event edits | migrations + domain | AD-7, AD-9, AD-11, AD-13 |
 | CAP-4 Shared List | kernel public view + `/u/:username` | AD-2, AD-3, AD-6 |
 | CAP-5 Attendance, attend-all, auto-attended | `attendance` + effective-attendance SQL | AD-3, AD-8, AD-11, AD-12 |
-| CAP-6 MCP | personal key route + same domain module | AD-1, AD-4, AD-10 |
+| CAP-6 MCP | OAuth routes + same domain module | AD-1, AD-4, AD-10 |
 | CAP-7 Join, Bill view, own Attendance, leave | domain join/leave + Event page | AD-2, AD-5, AD-8 |
 
 ## Deferred
@@ -239,4 +239,4 @@ Production URL: `https://livememory.pierre-reynaud.fr`. One cloud: Vercel + host
 - MCP protocol library and process hosting: bind only AD-1 and AD-4; choose the SDK when CAP-6 is built (after UI CRUD).
 - SQL RPC as the default mutation style: reserved if a mutation cannot stay correct in TypeScript plus RLS.
 - Extra preview/staging product (AD-14 already forbids remote Playwright and a second cloud).
-- Realtime fan-out, username rename, Event-link rotation, owner kick, joiner roster, joiner notes, concert duration / overlap windows beyond AD-10 (same artist + date + different times remain allowed; Stage/Scene is not part of identity), import from old LiveMemory, OAuth for MCP, PWA.
+- Realtime fan-out, username rename, Event-link rotation, owner kick, joiner roster, joiner notes, concert duration / overlap windows beyond AD-10 (same artist + date + different times remain allowed; Stage/Scene is not part of identity), import from old LiveMemory, PWA.

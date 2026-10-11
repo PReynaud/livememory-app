@@ -20,7 +20,7 @@ UI system: **Nuxt UI 4** on Nuxt 4. Behavioral delta only; do not restyle the li
 
 Product UI language: **English**. On-screen Attendance label is **"Going"**. PRD token `going` / "J'y vais" is the glossary synonym only — this spine overrides FR-4 testable copy for the English UI.
 
-Auth is individual accounts. Two share paths: **Shared List** (public profile; visitors may be signed out; tap an Event to open it and join) and **Event link** (unguessable Event URL; joiners must be signed in; own Attendance only). MCP is not a screen; agent-created rows must look identical to UI-created rows.
+Auth is individual accounts. Two share paths: **Shared List** (public profile; visitors may be signed out; tap an Event to open it and join) and **Event link** (unguessable Event URL; joiners must be signed in; own Attendance only). MCP tools are not a log screen. Connecting a client is a browser consent page (Allow / Deny) after the existing sign-in. Profile lists connected clients and can revoke one. Agent-created rows must look identical to UI-created rows.
 
 ## Information Architecture
 
@@ -33,7 +33,7 @@ Auth is individual accounts. Two share paths: **Shared List** (public profile; v
 | Event (joiner) | Event link after sign-in; Concerts row; Shared List tap | Same Event details and Bill Concerts. Own Attendance only (soirée attend-all for self; festival per Concert). No Add-to-this-Event, no Edit Concert, no Edit/Delete Event. **Leave Event**. | Joiner |
 | Add Concert | Nav **Add** (new Event/Concert); owner Event scoped CTA | Create a Concert on an Event the User **owns**. From Event: that Event is prefilled. From nav: picker or transparent single-night. Never writes a joined Bill. | Event owner |
 | Edit Concert | Concert row (owner) | Update fields, Attendance, notes, move Event | Event owner |
-| Profile | Glass nav / side nav | Username, sharing on/off + copy public-profile URL, sign out | Signed-in User |
+| Profile | Glass nav / side nav | Username, sharing on/off + copy public-profile URL, connected MCP clients with Revoke, sign out | Signed-in User |
 | Shared List | Username-derived public URL | Same chrome, that User's `going` + `attended`. Tap a grouping to open the Event (sign-in then join, FR-18). No write on this page. | Visitor |
 
 Default signed-in landing is **Home**. The rest of the log lives on **Concerts**, not under the Home stats.
