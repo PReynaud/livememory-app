@@ -1,13 +1,109 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Keep LiveMemory current via the Mend Renovate GitHub App. Non-major updates are grouped and automerged when CI is green. Framework majors and Nuxt stay as reviewable PRs.",
   "extends": [
-    "github>nuxt/renovate-config-nuxt"
+    "github>nuxt/renovate-config-nuxt",
+    ":enableVulnerabilityAlerts"
+  ],
+  "schedule": [
+    "* * * * *"
+  ],
+  "dependencyDashboard": true,
+  "labels": [
+    "dependencies"
   ],
   "lockFileMaintenance": {
-    "enabled": true
+    "enabled": true,
+    "automerge": true
   },
-  "packageRules": [{
-    "matchDepTypes": ["resolutions"],
-    "enabled": false
-  }],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Supabase CLI version pinned in GitHub Actions",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "uses: supabase/setup-cli@v\\d+\\s+with:\\s+(?:#[^\\n]*\\s+)?version: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "supabase",
+      "packageNameTemplate": "supabase",
+      "datasourceTemplate": "npm"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDepTypes": ["resolutions"],
+      "enabled": false
+    },
+    {
+      "description": "Automerge non-major updates once CI is green",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Nuxt and Nuxt UI move together and need a Node engine check",
+      "matchPackageNames": ["nuxt", "@nuxt/ui"],
+      "groupName": "nuxt and nuxt ui",
+      "groupSlug": "nuxt-ui",
+      "automerge": false,
+      "prBodyNotes": [
+        "Review this PR on its own. Nuxt 4.6.1 requires Node `^22.22.3 || ^24.15.0 || >=26.0.0` (Node 24.13 is too old). Ship `@nuxt/ui` 4.11 with Nuxt 4.6. Do not set `future.compatibilityVersion: 5` in the same change. Keep server handlers on `h3` imports."
+      ]
+    },
+    {
+      "description": "Pinia 4 and @pinia/nuxt 1 must be upgraded together",
+      "matchPackageNames": ["pinia", "@pinia/nuxt"],
+      "groupName": "pinia",
+      "groupSlug": "pinia",
+      "automerge": false,
+      "prBodyNotes": [
+        "Upgrade to Pinia 4.0.3 or newer together with `@pinia/nuxt` 1.x, and add direct dependency `@vue/devtools-api` `^8.1.5`. Pinia 4.0.0 through 4.0.2 crash the Nuxt prerender of `/`."
+      ]
+    },
+    {
+      "description": "Vitest 5 requires @nuxt/test-utils 4",
+      "matchPackageNames": ["vitest", "@nuxt/test-utils"],
+      "groupName": "vitest and nuxt test utils",
+      "groupSlug": "vitest",
+      "automerge": false,
+      "prBodyNotes": [
+        "`@nuxt/test-utils` 3 only accepts Vitest 3. Move to Vitest 5 and `@nuxt/test-utils` 4 in the same PR. `@nuxt/test-utils` is a Nuxt module, so this also affects `nuxt dev` and the Vercel build."
+      ]
+    },
+    {
+      "description": "TypeScript 7 cannot run vue-tsc or typescript-eslint yet",
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "prBodyNotes": [
+        "Do not merge TypeScript 7.0. It does not ship the programmatic compiler API that `vue-tsc` (`pnpm typecheck`) and `@nuxt/eslint` need. Stay on 6.x until those tools support it."
+      ]
+    },
+    {
+      "description": "Auth cookie behavior can change with @supabase/ssr",
+      "matchPackageNames": ["@nuxtjs/supabase"],
+      "automerge": false,
+      "prBodyNotes": [
+        "2.0.10 only bumps dependencies, but it moves `@supabase/ssr` from `^0.10.3` to `^0.12.4`. Re-test login, confirm, and session cookies before merging."
+      ]
+    },
+    {
+      "description": "Keep the GitHub Actions Supabase CLI pin on the same PR as the devDependency",
+      "matchPackageNames": ["supabase"],
+      "groupName": "supabase cli",
+      "groupSlug": "supabase-cli"
+    },
+    {
+      "description": "pnpm 12 is a major package-manager bump",
+      "matchPackageNames": ["pnpm"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "prBodyNotes": [
+        "Review a pnpm major on its own. The repo is on pnpm 11."
+      ]
+    }
+  ],
   "postUpdateOptions": ["pnpmDedupe"]
 }
