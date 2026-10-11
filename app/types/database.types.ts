@@ -9,6 +9,94 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_connections: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          credential_auth_tag: string
+          credential_ciphertext: string
+          credential_iv: string
+          health: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          credential_auth_tag: string
+          credential_ciphertext: string
+          credential_iv: string
+          health?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          credential_auth_tag?: string
+          credential_ciphertext?: string
+          credential_iv?: string
+          health?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_connections_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_pending_proposals: {
+        Row: {
+          confirmed_at: string | null
+          connection_updated_at: string
+          created_at: string
+          expires_at: string
+          id: string
+          operations: Json
+          preview: string
+          prompt: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          connection_updated_at: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          operations: Json
+          preview: string
+          prompt: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          connection_updated_at?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          operations?: Json
+          preview?: string
+          prompt?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_pending_proposals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           concert_id: string

@@ -77,6 +77,12 @@ MCP is a second adapter, not a second product. After UI CRUD exists it calls the
 - **Prevents:** email/password in agent config; OAuth-for-v1; MCP acting as a superuser or using service_role
 - **Rule:** The User creates and revokes a personal key in the app. MCP sends the key to a Nitro route that verifies a hash, **mints a user-scoped client**, and runs the domain module as that User (same RLS as the UI). Store hashes, never plaintext. v1 is revoke-only (no expiry policy). Screenshot interpretation stays outside LiveMemory.
 
+### AD-15 — Embedded agent boundary [ADOPTED]
+
+- **Binds:** CAP-6 embedded assistant
+- **Prevents:** browser-exposed provider credentials; a prompt alone authorizing writes; external MCP compatibility regressions; storage of private prompts and images
+- **Rule:** The embedded assistant is an opt-in server-side provider adapter, initially Cursor Cloud Agents with no repository. The browser sends only its Supabase access token to Nitro; Nitro validates that user, decrypts the provider credential using a server-only key, and passes an expiring user-and-scope capability to a separate embedded MCP route. Preview turns expose read-only tools. A separate confirmation creates a write-scoped turn; domain RLS and existing destructive-operation confirmations remain authoritative. Agent connections retain only encrypted credentials, health, and opaque agent identifiers; the browser reads connection status only. Prompt content and images are not persisted, and images are transient PNG/JPEG/GIF/WebP inputs capped at five files of 15 MB each. The public personal-key MCP route remains unchanged.
+
 ### AD-5 — Opaque Event URL [ADOPTED]
 
 - **Binds:** CAP-7, Event identity
@@ -148,7 +154,7 @@ MCP is a second adapter, not a second product. After UI CRUD exists it calls the
 | Dates | Civil Europe/Paris date + optional time. Do not convert dateless Concerts to a UTC instant. |
 | Errors | Stores keep `{ data, error }`. Domain returns structured results including `created` / `attached` / `needs_choice` / `impossible_place` and errors with rule id + message. |
 | State | Remote data in Pinia, not pages. No realtime in v1; refresh on revisit. List queries are set-based for the signed-in User (owned+joined), not per-Event round trips. Target: ~1000 Concerts usable (SPEC: list within 2 seconds). |
-| Auth | `@nuxtjs/supabase` session for the browser. MCP: hashed personal key → Nitro → user-scoped client → domain. |
+| Auth | `@nuxtjs/supabase` session for the browser. External MCP: hashed personal key → Nitro → user-scoped client → domain. Embedded agent: browser session → Nitro provider adapter → expiring scoped MCP capability → user-scoped client → domain. |
 | Tests | Vitest on stores, domain, handlers. Playwright against **local** Supabase only. Every story adds or updates tests. Auto-imports stay off. E2E signup includes username. |
 | Deletes | Owner deletes; non-empty Event confirms joiner impact and deletes Concerts + Attendance. Empty Event delete is enough to invalidate `/e/:id`. |
 

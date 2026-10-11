@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { useSupabaseClient, useToast } from '#imports';
 import { getErrorMessage } from '@/utils/error-message';
-import { canWriteOnline, OFFLINE_TOAST_TITLE } from '@/utils/online-write';
+import { notifyOfflineWrite } from '@/utils/online-write';
 import type { Database } from '@/types/database.types';
 import {
   createEvent,
@@ -27,7 +27,13 @@ import {
   joinEvent,
   leaveEvent
 } from '#shared/domain/membership';
-import { souvenirStats } from '#shared/domain/home';
+import {
+  concertRefsForLastNight,
+  concertRefsForSouvenirs,
+  selectLastNightEvent,
+  souvenirStats,
+  type ConcertDateTimeRef
+} from '#shared/domain/home';
 import {
   createConcert,
   deleteConcert,
@@ -35,6 +41,7 @@ import {
   nextEventsListWindowEnd,
   listConcertsForEvent,
   listConcertsForEventIds,
+  listConcertEventIds,
   listOwnedConcerts,
   moveConcert,
   updateConcert,
@@ -49,6 +56,7 @@ import {
   attendThisNight as markNightAttendance,
   clearAttendance,
   isConcertPast,
+  isNightGoingPressed,
   listMyAttendance,
   setAttendance,
   type AttendanceClient,
@@ -107,15 +115,7 @@ export const useEventsStore = defineStore('events', () => {
   const error = ref<string | null>(null);
   const eventWindowEnd = ref(0);
   const allConcertsLoaded = ref(false);
-
-  const offlineWriteError = () => {
-    if (canWriteOnline()) {
-      return null;
-    }
-
-    toast.add({ title: OFFLINE_TOAST_TITLE });
-    return OFFLINE_TOAST_TITLE;
-  };
+  const concertEventIndex = ref<ConcertDateTimeRef[]>([]);
 
   const syncSessionUser = async () => {
     const { data } = await supabase.auth.getUser();
@@ -180,8 +180,30 @@ export const useEventsStore = defineStore('events', () => {
     return isConcertPast(concert, now);
   };
 
+  const eventGoingStatus = (eventId: string): AttendanceStatus | null => {
+    const rows = concertsForEvent(eventId);
+    if (!isNightGoingPressed(rows.map(row => attendanceStatus(row.id)))) {
+      return null;
+    }
+
+    return rows.every(row => concertIsPast(row)) ? 'attended' : 'going';
+  };
+
+  const isEventGoingBusy = (eventId: string) => {
+    if (attendThisNightBusy.value) {
+      return true;
+    }
+
+    return concertsForEvent(eventId).some(row => isAttendanceBusy(row.id));
+  };
+
   const concertsForEvent = (eventId: string) => {
-    return concerts.value.filter(concert => concert.event_id === eventId);
+    const listed = concerts.value.filter(concert => concert.event_id === eventId);
+    if (listed.length || currentEvent.value?.id !== eventId) {
+      return listed;
+    }
+
+    return currentConcerts.value;
   };
 
   const stagesForEvent = (eventId: string) => {
@@ -201,9 +223,46 @@ export const useEventsStore = defineStore('events', () => {
   const hasMoreEvents = computed(() => eventWindowEnd.value < events.value.length);
 
   const homeStats = computed(() => souvenirStats({
-    eventCount: events.value.length,
-    statuses: Object.values(attendanceByConcertId.value)
+    events: events.value,
+    concerts: concertRefsForSouvenirs(concertEventIndex.value, concerts.value),
+    statuses: attendanceByConcertId.value
   }));
+
+  const lastNightEvent = computed(() => selectLastNightEvent(
+    events.value,
+    concertRefsForLastNight(concertEventIndex.value, concerts.value),
+    attendanceByConcertId.value
+  ));
+
+  const ensureLastNightBillLoaded = async () => {
+    const lastNight = lastNightEvent.value;
+    if (!lastNight) {
+      return null;
+    }
+
+    const union = concertRefsForLastNight(concertEventIndex.value, concerts.value);
+    const unionForEvent = union.filter(concert => concert.event_id === lastNight.id);
+    const loadedIds = new Set(
+      concerts.value.filter(concert => concert.event_id === lastNight.id).map(concert => concert.id)
+    );
+    const billIncomplete = unionForEvent.some(concert => !loadedIds.has(concert.id));
+    if (!billIncomplete) {
+      return null;
+    }
+
+    const listedBill = await listConcertsForEventIds(concertsClient(), [lastNight.id]);
+    if (listedBill.error) {
+      return listedBill.error.message;
+    }
+
+    const incoming = listedBill.data ?? [];
+    if (incoming.length === 0 && unionForEvent.length > 0) {
+      return null;
+    }
+
+    mergeConcertsForEvents([lastNight.id], incoming);
+    return null;
+  };
 
   const fetchEvents = async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
@@ -221,6 +280,9 @@ export const useEventsStore = defineStore('events', () => {
       }
 
       events.value = result.data ?? [];
+
+      const indexedConcerts = await listConcertEventIds(concertsClient());
+      concertEventIndex.value = indexedConcerts.error ? [] : (indexedConcerts.data ?? []);
 
       const { upcoming } = splitEventsForConcerts(events.value);
       const nextWindowEnd = Math.min(
@@ -252,6 +314,12 @@ export const useEventsStore = defineStore('events', () => {
       if (listedAttendanceError) {
         error.value = listedAttendanceError;
         return { data: events.value, error: listedAttendanceError };
+      }
+
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        error.value = lastNightBillError;
+        return { data: events.value, error: lastNightBillError };
       }
 
       return { data: events.value, error: null };
@@ -366,7 +434,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const createOwnedEvent = async (input: CreateEventInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -404,7 +472,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const updateOwnedEvent = async (input: UpdateEventInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline, conflicts: null };
     }
@@ -524,7 +592,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const createOwnedConcert = async (input: CreateConcertInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return mutationResult(null, offline);
     }
@@ -560,7 +628,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const updateOwnedConcert = async (input: UpdateConcertInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return mutationResult(null, offline);
     }
@@ -601,7 +669,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const moveOwnedConcert = async (input: MoveConcertInput) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return mutationResult(null, offline);
     }
@@ -633,7 +701,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const deleteOwnedConcert = async (concertId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -662,7 +730,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const deleteOwnedEvent = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -697,7 +765,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const leaveJoinedEvent = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -772,7 +840,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const cycleAttendance = async (concert: ConcertRecord) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -812,6 +880,12 @@ export const useEventsStore = defineStore('events', () => {
         };
       }
 
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        attendanceError.value = lastNightBillError;
+        return { data: result.data, error: lastNightBillError };
+      }
+
       return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update attendance');
@@ -825,7 +899,7 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const attendThisNight = async (eventId: string) => {
-    const offline = offlineWriteError();
+    const offline = notifyOfflineWrite(toast);
     if (offline) {
       return { data: null, error: offline };
     }
@@ -851,6 +925,12 @@ export const useEventsStore = defineStore('events', () => {
       }
       attendanceByConcertId.value = next;
 
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        attendanceError.value = lastNightBillError;
+        return { data: result.data, error: lastNightBillError };
+      }
+
       return { data: result.data, error: null };
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err, 'Failed to update attendance');
@@ -858,6 +938,74 @@ export const useEventsStore = defineStore('events', () => {
       return { data: null, error: errorMessage };
     } finally {
       attendThisNightBusy.value = false;
+    }
+  };
+
+  const cycleEventGoing = async (eventId: string) => {
+    const offline = notifyOfflineWrite(toast);
+    if (offline) {
+      return { data: null, error: offline };
+    }
+
+    const event = events.value.find(row => row.id === eventId) ?? currentEvent.value;
+    if (event?.kind !== 'single_night') {
+      return { data: null, error: null };
+    }
+
+    const rows = concertsForEvent(eventId);
+    if (!rows.length || isEventGoingBusy(eventId)) {
+      return { data: null, error: null };
+    }
+
+    if (eventGoingStatus(eventId) === null) {
+      return attendThisNight(eventId);
+    }
+
+    attendThisNightBusy.value = true;
+    attendanceError.value = null;
+    const busyIds = rows.map(row => row.id);
+    attendanceBusyByConcertId.value = {
+      ...attendanceBusyByConcertId.value,
+      ...Object.fromEntries(busyIds.map(id => [id, true as const]))
+    };
+
+    try {
+      let remaining = { ...attendanceByConcertId.value };
+      for (const concert of rows) {
+        if (!remaining[concert.id]) {
+          continue;
+        }
+
+        const result = await clearAttendance(attendanceClient(), concert.id);
+        if (result.error) {
+          attendanceError.value = result.error.message;
+          await loadAttendance();
+          return { data: null, error: result.error.message };
+        }
+
+        remaining = Object.fromEntries(
+          Object.entries(remaining).filter(([concertId]) => concertId !== concert.id)
+        ) as Record<string, AttendanceStatus>;
+      }
+
+      attendanceByConcertId.value = remaining;
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        attendanceError.value = lastNightBillError;
+        return { data: null, error: lastNightBillError };
+      }
+
+      return { data: null, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update attendance');
+      attendanceError.value = errorMessage;
+      await loadAttendance();
+      return { data: null, error: errorMessage };
+    } finally {
+      attendThisNightBusy.value = false;
+      attendanceBusyByConcertId.value = Object.fromEntries(
+        Object.entries(attendanceBusyByConcertId.value).filter(([concertId]) => !busyIds.includes(concertId))
+      ) as Record<string, true>;
     }
   };
 
@@ -880,9 +1028,12 @@ export const useEventsStore = defineStore('events', () => {
     visibleEvents,
     hasMoreEvents,
     homeStats,
+    lastNightEvent,
     attendanceStatus,
     isAttendanceBusy,
     isAttendThisNightBusy,
+    eventGoingStatus,
+    isEventGoingBusy,
     concertIsPast,
     loadingMore,
     fetchEvents,
@@ -899,6 +1050,7 @@ export const useEventsStore = defineStore('events', () => {
     moveOwnedConcert,
     deleteOwnedConcert,
     cycleAttendance,
+    cycleEventGoing,
     attendThisNight
   };
 });
