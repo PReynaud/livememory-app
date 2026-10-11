@@ -5,6 +5,7 @@ import { definePageMeta, useSupabaseUser, useToast } from '#imports';
 import { useAuthStore } from '@/stores/auth';
 import { useOauthGrantsStore } from '@/stores/oauth-grants';
 import { useProfileStore } from '@/stores/profile';
+import { useAgentChatStore } from '@/stores/agent-chat';
 import { COPY_LINK_FAILED, copyTextToClipboard } from '@/utils/copy-link';
 import { OAUTH_GRANTS_EMPTY, OAUTH_GRANTS_HELPER } from '#shared/domain/oauth-grants';
 import { SHARED_LIST_HELPER } from '#shared/domain/shared-list';
@@ -18,6 +19,7 @@ const toast = useToast();
 const authStore = useAuthStore();
 const profileStore = useProfileStore();
 const oauthGrantsStore = useOauthGrantsStore();
+const agentChat = useAgentChatStore();
 const { username, sharedListEnabled, error, loading } = storeToRefs(profileStore);
 const {
   grants,
@@ -44,6 +46,7 @@ const sharedListUrl = computed(() => {
 watch(() => supabaseUser.value?.id, () => {
   void profileStore.fetchOwnProfile();
   void oauthGrantsStore.fetchGrants();
+  void agentChat.fetchStatus();
 }, { immediate: true });
 
 const persistSharing = async (enabled: boolean) => {
@@ -78,6 +81,12 @@ const revokeGrant = async (grantId: string) => {
 const signOut = async () => {
   profileStore.setUsername(null);
   await authStore.signOut();
+};
+
+const cursorKey = ref('');
+const connectCursor = async () => {
+  const result = await agentChat.connect(cursorKey.value);
+  if (!result.error) cursorKey.value = '';
 };
 </script>
 
@@ -178,6 +187,56 @@ const signOut = async () => {
         />
       </li>
     </ul>
+
+    <h2 class="text-xl font-semibold pt-2">
+      Cursor assistant
+    </h2>
+    <p class="text-[13px] text-muted">
+      Connect a Cursor API key to use the in-app assistant. Your key stays server-side.
+    </p>
+    <UAlert
+      v-if="agentChat.error"
+      color="error"
+      variant="subtle"
+      :title="agentChat.error"
+    />
+    <p
+      v-if="agentChat.isReady"
+      data-testid="agent-connection-status"
+    >
+      Cursor is connected.
+    </p>
+    <form
+      v-else
+      class="flex items-center gap-3"
+      @submit.prevent="void connectCursor()"
+    >
+      <UInput
+        v-model="cursorKey"
+        type="password"
+        autocomplete="off"
+        placeholder="Cursor API key"
+        class="min-w-0 flex-1"
+        data-testid="agent-connection-key"
+      />
+      <UButton
+        type="submit"
+        label="Connect Cursor"
+        class="shrink-0"
+        :loading="agentChat.loading"
+        :disabled="!cursorKey.trim() || agentChat.loading"
+        data-testid="agent-connection-connect"
+      />
+    </form>
+    <UButton
+      v-if="agentChat.connected"
+      label="Disconnect Cursor"
+      color="neutral"
+      variant="outline"
+      :loading="agentChat.loading"
+      data-testid="agent-connection-disconnect"
+      @click="void agentChat.disconnect()"
+    />
 
     <UButton
       label="Sign out"
