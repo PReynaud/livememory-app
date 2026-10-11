@@ -24,30 +24,30 @@
     "secret-scan": "node scripts/secret-scan.mjs"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.117",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@iconify-json/lucide": "^1.2.142",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@nuxt/ui": "^4.10.0",
     "@nuxtjs/supabase": "2.0.9",
     "@pinia/nuxt": "^0.11.3",
-    "@supabase/supabase-js": "^2.112.3",
+    "@supabase/supabase-js": "^2.117.3",
     "nuxt": "^4.4.8",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.3.2",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.16.0",
     "@nuxt/test-utils": "^3.21.0",
-    "@playwright/test": "^1.58.2",
-    "@vue/test-utils": "^2.4.6",
-    "eslint": "^10.7.0",
-    "happy-dom": "^20.0.0",
-    "lint-staged": "^17.3.0",
-    "simple-git-hooks": "^2.13.1",
+    "@playwright/test": "^1.64.0",
+    "@vue/test-utils": "^2.5.1",
+    "eslint": "^10.12.0",
+    "happy-dom": "^20.14.6",
+    "lint-staged": "^17.6.0",
+    "simple-git-hooks": "^2.14.0",
     "supabase": "^2.76.0",
     "typescript": "^6.0.3",
     "vitest": "^3.2.4",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.12"
   },
   "packageManager": "pnpm@11.13.1",
   "simple-git-hooks": {
