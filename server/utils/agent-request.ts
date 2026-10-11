@@ -4,7 +4,11 @@ import { getAgentConnection } from './agent-connections';
 import { trustedAgentOrigins } from './agent-origin';
 import { runAgentTurn, type PromptImage } from './agent-runner';
 import { requireAgentSession } from './agent-session';
-import { claimPendingProposal, createPendingProposal } from './agent-proposals';
+import { claimPendingProposal, createPendingProposal, releaseConfirmedProposal } from './agent-proposals';
+import { presentProposal } from './agent-proposal-preview';
+import { applyStoredOperations } from './agent-proposal-apply';
+import { invokeLogTool } from './mcp-log-tools';
+import { createUserScopedClient } from './mcp-user-client';
 
 const MIME_TYPES = new Set<PromptImage['mimeType']>([
   'image/png', 'image/jpeg', 'image/gif', 'image/webp'
@@ -73,13 +77,20 @@ export const handleAgentRequest = async (
     origin
   });
   if (scope === 'read') {
+    const parsed = result.proposal ?? { preview: result.text, operations: [] };
+    const presentation = presentProposal(parsed);
     const proposal = await createPendingProposal(
       session,
       connection.updated_at,
-      result.proposal?.preview ?? result.text,
-      result.proposal?.operations ?? []
+      presentation.text,
+      parsed.operations
     );
-    return { ...result, text: proposal.preview, proposalId: proposal.id, requiresConfirmation: proposal.operations.length > 0 };
+    return {
+      text: presentation.text,
+      proposalId: proposal.id,
+      requiresConfirmation: presentation.requiresConfirmation,
+      card: presentation.card
+    };
   }
   return result;
 };
@@ -91,22 +102,19 @@ export const confirmAgentRequest = async (event: H3Event, proposalId: unknown) =
   const config = useRuntimeConfig(event);
   const capabilitySecret = String(config.agentCapabilitySecret || '');
   if (!capabilitySecret) throw createError({ statusCode: 500, statusMessage: 'Agent capability security is not configured.' });
-  const origin = assertTrustedAgentOrigin(event, String(config.agentAllowedOrigin || ''));
+  assertTrustedAgentOrigin(event, String(config.agentAllowedOrigin || ''));
   const session = await requireAgentSession(event);
   const connection = await getAgentConnection(session);
   if (!connection || connection.health !== 'healthy') {
     throw createError({ statusCode: 409, statusMessage: 'Connect Cursor in Profile before using the assistant.' });
   }
   const proposal = await claimPendingProposal(session, proposalId, connection.updated_at);
-  return await runAgentTurn({
-    session,
-    connection,
-    prompt: JSON.stringify(proposal.operations),
-    scope: 'write',
-    images: [],
-    encryptionSecret: String(config.agentCredentialEncryptionKey || ''),
-    capabilitySecret,
-    origin,
-    proposalId: proposal.id
-  });
+  const client = createUserScopedClient(session.env, session.accessToken);
+  const applied = await applyStoredOperations(proposal.operations, (name, args) =>
+    invokeLogTool(name, args, client));
+  if (!applied.ok) {
+    if (!applied.wrote) await releaseConfirmedProposal(session, proposal.id).catch(() => undefined);
+    throw createError({ statusCode: 409, statusMessage: applied.text });
+  }
+  return { text: applied.text };
 };
