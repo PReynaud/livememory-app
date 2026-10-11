@@ -1,10 +1,7 @@
 {
   "mcpServers": {
     "livememory": {
-      "url": "https://livememory.pierre-reynaud.fr/api/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:LIVEMEMORY_MCP_KEY}"
-      }
+      "url": "https://livememory.pierre-reynaud.fr/api/mcp"
     },
     "nuxt": {
       "type": "http",

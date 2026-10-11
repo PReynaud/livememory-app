@@ -233,30 +233,131 @@ export type Database = {
         }
         Relationships: []
       }
-      personal_keys: {
+      oauth_authorization_codes: {
         Row: {
+          client_id: string
+          code_challenge: string
+          code_hash: string
           created_at: string
-          id: string
-          key_hash: string
+          expires_at: string
+          grant_id: string | null
+          redirect_uri: string
+          used_at: string | null
           user_id: string
         }
         Insert: {
+          client_id: string
+          code_challenge: string
+          code_hash: string
           created_at?: string
-          id?: string
-          key_hash: string
+          expires_at: string
+          grant_id?: string | null
+          redirect_uri: string
+          used_at?: string | null
           user_id: string
         }
         Update: {
+          client_id?: string
+          code_challenge?: string
+          code_hash?: string
           created_at?: string
-          id?: string
-          key_hash?: string
+          expires_at?: string
+          grant_id?: string | null
+          redirect_uri?: string
+          used_at?: string | null
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "personal_keys_user_id_fkey"
+            foreignKeyName: "oauth_authorization_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oauth_authorization_codes_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_grants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oauth_authorization_codes_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: true
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      oauth_clients: {
+        Row: {
+          client_name: string
+          created_at: string
+          id: string
+          redirect_uris: string[]
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          id?: string
+          redirect_uris: string[]
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          id?: string
+          redirect_uris?: string[]
+        }
+        Relationships: []
+      }
+      oauth_grants: {
+        Row: {
+          access_expires_at: string | null
+          access_token_hash: string | null
+          client_id: string
+          created_at: string
+          has_access_token: boolean | null
+          id: string
+          previous_refresh_token_hash: string | null
+          refresh_token_hash: string | null
+          user_id: string
+        }
+        Insert: {
+          access_expires_at?: string | null
+          access_token_hash?: string | null
+          client_id: string
+          created_at?: string
+          has_access_token?: boolean | null
+          id?: string
+          previous_refresh_token_hash?: string | null
+          refresh_token_hash?: string | null
+          user_id: string
+        }
+        Update: {
+          access_expires_at?: string | null
+          access_token_hash?: string | null
+          client_id?: string
+          created_at?: string
+          has_access_token?: boolean | null
+          id?: string
+          previous_refresh_token_hash?: string | null
+          refresh_token_hash?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_grants_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "oauth_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "oauth_grants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -380,6 +481,15 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: undefined
       }
+      attach_oauth_grant_tokens: {
+        Args: {
+          p_access_expires_at: string
+          p_access_hash: string
+          p_grant_id: string
+          p_refresh_hash: string
+        }
+        Returns: undefined
+      }
       concert_event_rule_violation: {
         Args: { concert: Database["public"]["Tables"]["concerts"]["Row"] }
         Returns: string
@@ -417,7 +527,52 @@ export type Database = {
           username: string
         }[]
       }
-      lookup_personal_key_user: { Args: { key_hash: string }; Returns: string }
+      issue_oauth_authorization_code: {
+        Args: {
+          p_client_id: string
+          p_code_challenge: string
+          p_code_hash: string
+          p_expires_at: string
+          p_redirect_uri: string
+          p_user_id: string
+        }
+        Returns: string
+      }
+      lookup_oauth_access_token: {
+        Args: { p_token_hash: string }
+        Returns: string
+      }
+      oauth_client_for_redirect: {
+        Args: { p_client_id: string; p_redirect_uri: string }
+        Returns: Json
+      }
+      oauth_redirect_uri_allowed: { Args: { uri: string }; Returns: boolean }
+      redeem_oauth_authorization_code: {
+        Args: {
+          p_access_expires_at: string
+          p_access_hash: string
+          p_client_id: string
+          p_code_challenge: string
+          p_code_hash: string
+          p_redirect_uri: string
+          p_refresh_hash: string
+        }
+        Returns: Json
+      }
+      register_oauth_client: {
+        Args: { p_client_name: string; p_redirect_uris: string[] }
+        Returns: string
+      }
+      rotate_oauth_refresh_token: {
+        Args: {
+          p_access_expires_at: string
+          p_access_hash: string
+          p_client_id: string
+          p_next_refresh_hash: string
+          p_refresh_hash: string
+        }
+        Returns: string
+      }
       save_event_and_concert_dates: {
         Args: {
           p_allow_place_override?: boolean

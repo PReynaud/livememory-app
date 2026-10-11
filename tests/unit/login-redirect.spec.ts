@@ -23,6 +23,12 @@ describe('nextLoginRedirect', () => {
       path: '/login',
       query: { redirect: '/home' }
     });
+    expect(nextLoginRedirect(login(), {
+      fullPath: '/oauth/authorize?redirect_uri=http://127.0.0.1/oauth/callback'
+    })).toEqual({
+      path: '/login',
+      query: { redirect: '/oauth/authorize?redirect_uri=http://127.0.0.1/oauth/callback' }
+    });
   });
 
   it('skips unsafe fallbacks instead of rewriting them to /home', () => {

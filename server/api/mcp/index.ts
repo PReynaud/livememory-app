@@ -11,8 +11,11 @@ import {
   setResponseStatus
 } from 'h3';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { exchangePersonalKey } from '../../utils/personal-key-exchange';
-import { MCP_KEY_HEADER, readPersonalKeyFromHeaders } from '../../utils/mcp-auth';
+import { resolveMcpAccess } from '../../utils/mcp-access';
+import { mcpWwwAuthenticate } from '../../utils/oauth';
+import { createSupabaseOauthStore } from '../../utils/oauth-db';
+import { requestOrigin } from '../../utils/oauth-http';
+import { assertMcpSupabaseEnv, mintUserSession } from '../../utils/personal-key-exchange';
 import { readMcpSupabaseEnv } from '../../utils/mcp-runtime';
 import { createUserScopedClient } from '../../utils/mcp-user-client';
 import { createLiveMemoryMcpServer } from '../../utils/mcp-server';
@@ -20,7 +23,6 @@ import { createLiveMemoryMcpServer } from '../../utils/mcp-server';
 const MCP_ALLOWED_HEADERS = [
   'content-type',
   'authorization',
-  MCP_KEY_HEADER,
   'mcp-session-id',
   'mcp-protocol-version',
   'accept',
@@ -43,6 +45,16 @@ const headersToFetch = (headers: Record<string, string | undefined>) => {
   }
 
   return result;
+};
+
+const rejectMcpAccess = (
+  event: Parameters<typeof setResponseStatus>[0],
+  wwwAuthenticate: string
+) => {
+  setResponseStatus(event, 401);
+  setResponseHeader(event, 'WWW-Authenticate', wwwAuthenticate);
+  setResponseHeader(event, 'Content-Type', 'application/json; charset=utf-8');
+  return send(event, JSON.stringify({ error: 'invalid_token' }));
 };
 
 const writeWebResponse = async (
@@ -80,20 +92,28 @@ export default defineEventHandler(async (event) => {
     }));
   }
 
-  const personalKey = readPersonalKeyFromHeaders(
-    getRequestHeader(event, 'authorization'),
-    getRequestHeader(event, MCP_KEY_HEADER)
-  );
-  if (!personalKey) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Invalid personal key.'
-    });
+  const env = readMcpSupabaseEnv(event);
+  const origin = requestOrigin(event);
+  let sessionToken: string;
+  try {
+    const access = await resolveMcpAccess(
+      getRequestHeader(event, 'authorization'),
+      origin,
+      async (tokenHash) => {
+        assertMcpSupabaseEnv(env);
+        return createSupabaseOauthStore(env).lookupAccessUserId(tokenHash);
+      }
+    );
+    if (!access.ok) {
+      return rejectMcpAccess(event, access.wwwAuthenticate);
+    }
+
+    sessionToken = await mintUserSession(access.userId, env);
+  } catch {
+    return rejectMcpAccess(event, mcpWwwAuthenticate(origin));
   }
 
-  const env = readMcpSupabaseEnv(event);
-  const session = await exchangePersonalKey(personalKey, env);
-  const client = createUserScopedClient(env, session.access_token);
+  const client = createUserScopedClient(env, sessionToken);
 
   const raw = await readRawBody(event);
   let parsedBody: unknown;

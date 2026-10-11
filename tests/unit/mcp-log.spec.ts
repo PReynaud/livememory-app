@@ -12,7 +12,7 @@ import {
   type LogDomain,
   type McpToolJson
 } from '../../server/utils/mcp-log-tools';
-import { readPersonalKeyFromHeaders } from '../../server/utils/mcp-auth';
+import { readBearerToken } from '../../server/utils/oauth';
 
 const read = (relative: string) => readFileSync(resolve(process.cwd(), relative), 'utf8');
 
@@ -65,13 +65,12 @@ const domainStub = (overrides: Partial<LogDomain>): LogDomain => ({
   ...overrides
 });
 
-describe('MCP personal key headers', () => {
-  it('reads Authorization Bearer, raw lm_ key, or x-livememory-key', () => {
-    expect(readPersonalKeyFromHeaders('Bearer lm_secret', undefined)).toBe('lm_secret');
-    expect(readPersonalKeyFromHeaders('lm_raw_only', undefined)).toBe('lm_raw_only');
-    expect(readPersonalKeyFromHeaders(undefined, 'lm_header')).toBe('lm_header');
-    expect(readPersonalKeyFromHeaders('Bearer lm_secret', 'lm_header')).toBe('lm_header');
-    expect(readPersonalKeyFromHeaders('Basic nope', undefined)).toBe('');
+describe('MCP bearer header', () => {
+  it('reads only a Bearer token and ignores a raw lm_ key', () => {
+    expect(readBearerToken('Bearer access-token')).toBe('access-token');
+    expect(readBearerToken('lm_raw_only')).toBe('');
+    expect(readBearerToken('Basic nope')).toBe('');
+    expect(readBearerToken(undefined)).toBe('');
   });
 });
 
@@ -534,12 +533,12 @@ describe('MCP joiner and membership tools', () => {
 });
 
 describe('MCP adapter wiring', () => {
-  it('binds Streamable HTTP, exchanges the personal key, and never queries domain tables with service_role', () => {
+  it('binds Streamable HTTP, resolves the opaque access token, and never queries domain tables with service_role', () => {
     const tools = read('server/utils/mcp-log-tools.ts');
     const server = read('server/utils/mcp-server.ts');
     const route = read('server/api/mcp/index.ts');
     const client = read('server/utils/mcp-user-client.ts');
-    const auth = read('server/utils/mcp-auth.ts');
+    const mint = read('server/utils/personal-key-exchange.ts');
     const domain = liveMemoryLogDomain;
 
     expect(tools).toMatch(/createConcert/);
@@ -582,11 +581,21 @@ describe('MCP adapter wiring', () => {
     expect(route).toMatch(/WebStandardStreamableHTTPServerTransport/);
     expect(route).toMatch(/sessionIdGenerator: undefined/);
     expect(route).toMatch(/enableJsonResponse: true/);
-    expect(route).toMatch(/exchangePersonalKey/);
+    expect(route).toMatch(/resolveMcpAccess/);
+    expect(route).toMatch(/mintUserSession/);
     expect(route).toMatch(/createUserScopedClient/);
     expect(route).toMatch(/createLiveMemoryMcpServer/);
-    expect(route).toMatch(/MCP_KEY_HEADER/);
-    expect(auth).toMatch(/x-livememory-key/);
+    expect(route).toMatch(/WWW-Authenticate/);
+    expect(route).toMatch(/Content-Type', 'application\/json/);
+    expect(route).toMatch(/catch \{/);
+    expect(route).toContain('error: \'invalid_token\'');
+    expect(route.indexOf('await resolveMcpAccess(')).toBeLessThan(route.indexOf('await readRawBody('));
+    expect(route.indexOf('await readRawBody(')).toBeLessThan(route.indexOf('createLiveMemoryMcpServer('));
+    expect(route).not.toMatch(/x-livememory-key/);
+    expect(route).not.toMatch(/exchangePersonalKey/);
+    expect(route).not.toMatch(/lm_/);
+    expect(mint).toMatch(/admin\/generate_link/);
+    expect(mint).not.toMatch(/lookup_personal_key_user/);
     expect(route).not.toMatch(/from\('events'\)/);
     expect(route).not.toMatch(/from\('concerts'\)/);
     expect(route).not.toMatch(/\/rest\/v1\/events/);
@@ -613,15 +622,28 @@ describe('MCP adapter wiring', () => {
   });
 });
 
-describe('MCP Cursor OAuth discovery probes', () => {
-  it('returns 404 for OAuth well-known paths so Cursor uses Authorization headers', () => {
-    const middleware = read('server/middleware/00-no-oauth-discovery.ts');
+describe('MCP OAuth discovery routes', () => {
+  it('serves protected-resource and authorization-server metadata as JSON 200', () => {
+    const resource = read('server/routes/.well-known/oauth-protected-resource.get.ts');
+    const resourcePath = read('server/routes/.well-known/oauth-protected-resource/api/mcp.get.ts');
+    const server = read('server/routes/.well-known/oauth-authorization-server.get.ts');
     const config = read('nuxt.config.ts');
 
-    expect(middleware).toMatch(/\.well-known\/oauth/);
-    expect(middleware).toMatch(/setResponseStatus\(event, 404\)/);
+    for (const source of [resource, resourcePath, server]) {
+      expect(source).toMatch(/sendOauthJson\(event, 200/);
+      expect(source).not.toMatch(/302/);
+      expect(source).not.toMatch(/\/login/);
+    }
+
+    expect(resource).toMatch(/protectedResourceMetadata/);
+    expect(server).toMatch(/authorizationServerMetadata/);
     expect(config).toMatch(/'\/\.well-known\/\*\*'/);
     expect(config).toMatch(/'\/api\/\*\*'/);
+    expect(() => read('server/middleware/00-no-oauth-discovery.ts')).toThrow();
+
+    const openid = read('server/routes/.well-known/openid-configuration.get.ts');
+    expect(openid).toMatch(/404/);
+    expect(openid).not.toMatch(/sendOauthJson\(event, 200/);
   });
 });
 

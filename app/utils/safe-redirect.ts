@@ -11,11 +11,13 @@ export const getSafeInternalPath = (redirect: unknown, fallback = '/home'): stri
     return fallback;
   }
 
+  const pathOnly = decoded.split(/[?#]/, 1)[0] ?? '';
+
   if (
     !decoded.startsWith('/')
     || decoded.startsWith('//')
     || decoded.includes('\\')
-    || decoded.includes('://')
+    || pathOnly.includes('://')
   ) {
     return fallback;
   }

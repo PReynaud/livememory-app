@@ -85,8 +85,8 @@ Plan and implement features through **BMAD Method** workflows (spec → PRD/arch
 - Commit `app/types/database.types.ts` from `pnpm db:types` after schema changes. CI regenerates that file and fails on any diff.
 - Hosted schema is pushed by `.github/workflows/deploy-migrations.yml` on `main` (`supabase link` then `supabase db push`). Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` (plain database password, not a URI), and variable `SUPABASE_PROJECT_ID`. Direct `db.{ref}.supabase.co:5432` is IPv6-only and fails on GitHub-hosted runners. CI `supabase db reset` only refreshes the GitHub Actions local database.
 - `pnpm db:reset` applies every migration on an empty public schema, then seed. Hosted databases already have rows. CI runs `pnpm db:check-latest-migration` after `supabase start` so the latest file is applied on representative Event/Concert rows (catches SQLSTATE 55006 and similar).
-- Production MCP (`/api/mcp`) needs `SUPABASE_SERVICE_ROLE_KEY` on Vercel (server-only). Without it, authenticated MCP calls return `500 Personal key exchange is not configured` and Cursor tool discovery fails even with a valid personal key.
-- Cursor probes `/.well-known/oauth-*` before sending static `Authorization` headers. Those paths must return **404** (not a Supabase auth redirect to `/login`), or Cursor ignores the personal key and MCP tool discovery fails.
+- Production MCP (`/api/mcp`) needs `SUPABASE_SERVICE_ROLE_KEY` on Vercel (server-only). Without it, a Bearer access token cannot be resolved and returns `500 MCP authorization is not configured. Set SUPABASE_SERVICE_ROLE_KEY on the server.`
+- Protected-resource and authorization-server metadata under `/.well-known/oauth-*` must return JSON 200 and must not redirect to `/login`. `nuxt.config.ts` excludes `/.well-known/**` and `/api/**` from the Supabase auth redirect.
 
 ## Commands
 
