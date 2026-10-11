@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canWriteOnline, OFFLINE_TOAST_TITLE } from '../../app/utils/online-write';
+import { canWriteOnline, notifyOfflineWrite, OFFLINE_TOAST_TITLE } from '../../app/utils/online-write';
 import { surfaceNameForRoute } from '../../app/utils/surface-name';
 import { EVENTS_LIST_WINDOW } from '../../shared/domain/concerts';
 
@@ -24,6 +24,26 @@ describe('offline writes', () => {
     expect(canWriteOnline(true)).toBe(true);
     expect(canWriteOnline(false)).toBe(false);
     expect(canWriteOnline(undefined)).toBe(true);
+
+    const titles: string[] = [];
+    const toast = {
+      add: ({ title }: { title: string }) => {
+        titles.push(title);
+      }
+    };
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, 'onLine');
+    Object.defineProperty(globalThis.navigator, 'onLine', {
+      configurable: true,
+      get: () => false
+    });
+    try {
+      expect(notifyOfflineWrite(toast)).toBe(OFFLINE_TOAST_TITLE);
+      expect(titles).toEqual([OFFLINE_TOAST_TITLE]);
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(globalThis.navigator, 'onLine', descriptor);
+      }
+    }
   });
 });
 
@@ -41,12 +61,17 @@ describe('list polish source guards', () => {
     expect(home).toMatch(/variant="home"/);
     expect(home).toMatch(/loading/);
     expect(home).toMatch(/import\.meta\.server/);
+    expect(home).toMatch(/max-w-3xl/);
     expect(concerts).toMatch(/AppListSkeleton/);
     expect(concerts).toMatch(/variant="groups"/);
     expect(concerts).toMatch(/import\.meta\.server/);
+    expect(concerts).toMatch(/max-w-3xl/);
     expect(concerts).not.toMatch(/Loading events/);
     expect(eventPage).toMatch(/AppListSkeleton/);
+    expect(eventPage).toMatch(/max-w-3xl/);
     expect(eventPage).not.toMatch(/Loading event/);
+    expect(read('app/pages/profile.vue')).toMatch(/max-w-3xl/);
+    expect(read('app/pages/u/[username].vue')).toMatch(/max-w-3xl/);
   });
 
   it('shows Couldn\'t load with Retry on Home, Concerts, and Event', () => {
@@ -82,6 +107,9 @@ describe('list polish source guards', () => {
     expect(store).toMatch(/hasMoreEvents/);
     expect(store).not.toMatch(/from\('concerts'\)/);
     expect(concerts).toMatch(/visibleEvents/);
+    expect(concerts).toMatch(/paginateConcertEvents/);
+    expect(concerts).toMatch(/filteredEvents/);
+    expect(concerts).not.toMatch(/windowIds/);
     expect(concerts).toMatch(/loadingMore/);
     expect(concerts).toMatch(/loadMore/);
     expect(concerts).toMatch(/loadMoreEvents/);
@@ -89,7 +117,7 @@ describe('list polish source guards', () => {
     expect(concerts).not.toMatch(/v-for="event in events"/);
   });
 
-  it('uses max-w-3xl on list and Event pages and keeps Profile narrower', () => {
+  it('uses max-w-3xl on list, Event, Profile, and public pages', () => {
     const home = read('app/pages/home.vue');
     const concerts = read('app/pages/concerts.vue');
     const eventPage = read('app/pages/e/[id].vue');
@@ -101,11 +129,12 @@ describe('list polish source guards', () => {
     expect(concerts).toMatch(/max-w-3xl/);
     expect(eventPage).toMatch(/max-w-3xl/);
     expect(shared).toMatch(/max-w-3xl/);
+    expect(profile).toMatch(/max-w-3xl/);
     expect(home).not.toMatch(/max-w-lg/);
     expect(concerts).not.toMatch(/max-w-lg/);
     expect(eventPage).not.toMatch(/max-w-lg/);
     expect(shared).not.toMatch(/max-w-lg/);
-    expect(profile).toMatch(/max-w-lg/);
+    expect(profile).not.toMatch(/max-w-lg/);
     expect(app).toMatch(/chrome-safe/);
   });
 
@@ -145,13 +174,12 @@ describe('list polish source guards', () => {
 
   it('blocks offline writes in the store with a toast and no queue', () => {
     const store = read('app/stores/events.ts');
-    expect(store).toMatch(/canWriteOnline/);
-    expect(store).toMatch(/OFFLINE_TOAST_TITLE/);
-    expect(store).toMatch(/toast\.add/);
+    expect(store).toMatch(/notifyOfflineWrite/);
     expect(store).not.toMatch(/offlineQueue|indexedDB|background-sync/);
     expect(store).toMatch(/createOwnedEvent/);
     expect(store).toMatch(/createOwnedConcert/);
     expect(store).toMatch(/cycleAttendance/);
+    expect(store).toMatch(/cycleEventGoing/);
   });
 
   it('keeps list actions tappable on small screens, forbids drag-and-drop, and stacks one sheet', () => {
@@ -165,6 +193,7 @@ describe('list polish source guards', () => {
     expect(eventPage).not.toMatch(/draggable|dragstart|vuedraggable/);
     expect(card).not.toMatch(/draggable|dragstart/);
     expect(card).toMatch(/AppAttendanceChip/);
+    expect(card).toMatch(/cycleEventGoing/);
     expect(addSheet).toMatch(/useEditEventSheetStore/);
     expect(addSheet).toMatch(/closeSheet/);
     expect(editSheet).toMatch(/useAddConcertSheetStore/);
