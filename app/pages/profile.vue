@@ -3,17 +3,12 @@ import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { definePageMeta, useSupabaseUser, useToast } from '#imports';
 import { useAuthStore } from '@/stores/auth';
+import { useOauthGrantsStore } from '@/stores/oauth-grants';
 import { useProfileStore } from '@/stores/profile';
-import { usePersonalKeysStore } from '@/stores/personal-keys';
 import { useAgentChatStore } from '@/stores/agent-chat';
 import { COPY_LINK_FAILED, copyTextToClipboard } from '@/utils/copy-link';
+import { OAUTH_GRANTS_EMPTY, OAUTH_GRANTS_HELPER } from '#shared/domain/oauth-grants';
 import { SHARED_LIST_HELPER } from '#shared/domain/shared-list';
-import {
-  COPY_KEY_FAILED,
-  PERSONAL_KEY_ACTIVE,
-  PERSONAL_KEY_COPY_NOW,
-  PERSONAL_KEY_HELPER
-} from '#shared/domain/personal-keys';
 
 definePageMeta({
   middleware: 'auth'
@@ -23,17 +18,15 @@ const supabaseUser = useSupabaseUser();
 const toast = useToast();
 const authStore = useAuthStore();
 const profileStore = useProfileStore();
-const personalKeysStore = usePersonalKeysStore();
+const oauthGrantsStore = useOauthGrantsStore();
 const agentChat = useAgentChatStore();
 const { username, sharedListEnabled, error, loading } = storeToRefs(profileStore);
 const {
-  hasKey,
-  plaintext,
-  error: personalKeyError,
-  loading: personalKeyLoading
-} = storeToRefs(personalKeysStore);
+  grants,
+  error: grantsError,
+  loading: grantsLoading
+} = storeToRefs(oauthGrantsStore);
 const copyBusy = ref(false);
-const copyKeyBusy = ref(false);
 
 const metadataUsername = computed(() => {
   const value = supabaseUser.value?.user_metadata?.username;
@@ -52,7 +45,7 @@ const sharedListUrl = computed(() => {
 
 watch(() => supabaseUser.value?.id, () => {
   void profileStore.fetchOwnProfile();
-  void personalKeysStore.fetchStatus();
+  void oauthGrantsStore.fetchGrants();
   void agentChat.fetchStatus();
 }, { immediate: true });
 
@@ -81,25 +74,12 @@ const copySharedListLink = async () => {
   }
 };
 
-const copyPersonalKey = async () => {
-  if (copyKeyBusy.value || !plaintext.value) {
-    return;
-  }
-
-  copyKeyBusy.value = true;
-  try {
-    const result = await copyTextToClipboard(plaintext.value);
-    if (result.error) {
-      toast.add({ title: COPY_KEY_FAILED });
-    }
-  } finally {
-    copyKeyBusy.value = false;
-  }
+const revokeGrant = async (grantId: string) => {
+  await oauthGrantsStore.revokeGrant(grantId);
 };
 
 const signOut = async () => {
   profileStore.setUsername(null);
-  personalKeysStore.dismissPlaintext();
   await authStore.signOut();
 };
 
@@ -162,82 +142,51 @@ const connectCursor = async () => {
     />
 
     <UAlert
-      v-if="personalKeyError"
+      v-if="grantsError"
       color="error"
       variant="subtle"
-      data-testid="personal-key-error"
-      :title="personalKeyError"
+      data-testid="oauth-grants-error"
+      :title="grantsError"
     />
 
     <h2 class="text-xl font-semibold pt-2">
-      Personal key
+      Connected clients
     </h2>
 
     <p class="text-[13px] text-muted">
-      {{ PERSONAL_KEY_HELPER }}
+      {{ OAUTH_GRANTS_HELPER }}
     </p>
 
     <p
-      v-if="hasKey && !plaintext"
-      data-testid="personal-key-status"
+      v-if="!grantsLoading && !grantsError && grants.length === 0"
+      data-testid="oauth-grants-empty"
     >
-      {{ PERSONAL_KEY_ACTIVE }}
+      {{ OAUTH_GRANTS_EMPTY }}
     </p>
 
-    <div
-      v-if="plaintext"
+    <ul
+      v-else-if="grants.length > 0"
       class="space-y-3"
     >
-      <p class="text-[13px] text-muted">
-        {{ PERSONAL_KEY_COPY_NOW }}
-      </p>
-      <p
-        class="break-all font-mono text-sm"
-        data-testid="personal-key-plaintext"
+      <li
+        v-for="grant in grants"
+        :key="grant.id"
+        class="flex items-center justify-between gap-3"
+        data-testid="oauth-grant"
       >
-        {{ plaintext }}
-      </p>
-      <UButton
-        label="Copy key"
-        color="primary"
-        variant="outline"
-        class="h-11 rounded-full ring-2"
-        :loading="copyKeyBusy"
-        data-testid="personal-key-copy"
-        @click="void copyPersonalKey()"
-      />
-      <UButton
-        label="Done"
-        color="neutral"
-        variant="outline"
-        class="h-11 rounded-full"
-        data-testid="personal-key-dismiss"
-        @click="personalKeysStore.dismissPlaintext()"
-      />
-    </div>
-
-    <UButton
-      :label="hasKey ? 'Create new key' : 'Create personal key'"
-      color="primary"
-      variant="outline"
-      class="h-11 rounded-full"
-      :loading="personalKeyLoading"
-      :disabled="personalKeyLoading"
-      data-testid="personal-key-create"
-      @click="void personalKeysStore.createKey()"
-    />
-
-    <UButton
-      v-if="hasKey"
-      label="Revoke key"
-      color="neutral"
-      variant="outline"
-      class="h-11 rounded-full"
-      :loading="personalKeyLoading"
-      :disabled="personalKeyLoading"
-      data-testid="personal-key-revoke"
-      @click="void personalKeysStore.revokeKey()"
-    />
+        <span data-testid="oauth-grant-name">{{ grant.clientName }}</span>
+        <UButton
+          label="Revoke"
+          color="neutral"
+          variant="outline"
+          class="h-11 rounded-full"
+          :loading="grantsLoading"
+          :disabled="grantsLoading"
+          data-testid="oauth-grant-revoke"
+          @click="void revokeGrant(grant.id)"
+        />
+      </li>
+    </ul>
 
     <h2 class="text-xl font-semibold pt-2">
       Cursor assistant

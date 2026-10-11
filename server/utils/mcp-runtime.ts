@@ -1,8 +1,8 @@
 import type { H3Event } from 'h3';
 import { useRuntimeConfig } from '#imports';
-import type { PersonalKeyExchangeEnv } from './personal-key-exchange';
+import type { McpSupabaseEnv } from './personal-key-exchange';
 
-export const readMcpSupabaseEnv = (event: H3Event): PersonalKeyExchangeEnv => {
+export const readMcpSupabaseEnv = (event: H3Event): McpSupabaseEnv => {
   const config = useRuntimeConfig(event);
   const publicConfig = config.public as {
     supabase?: { url?: string; key?: string };

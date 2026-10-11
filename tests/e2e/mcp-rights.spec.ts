@@ -3,7 +3,7 @@ import { createE2EAccountForTest, deleteE2EAccountForTest } from './helpers/e2e-
 import { waitForNuxtHydration } from './helpers/wait-for-hydration';
 import {
   callMcpTool,
-  createPersonalKeyFromProfile,
+  connectMcpClient,
   postMcpUnauthorized
 } from './helpers/mcp-client';
 import { EVENT_RULE, EVENT_RULE_MESSAGE } from '../../shared/domain/events';
@@ -85,8 +85,8 @@ test('joiner MCP cannot edit the Bill, can join attend and leave, and invalid ke
   try {
     await page.goto('/login');
     await signInOnPage(page, owner);
-    await expect(page).toHaveURL(/\/home/);
-    const ownerKey = await createPersonalKeyFromProfile(page);
+    await expect(page).toHaveURL(url => url.pathname === '/home');
+    const ownerKey = (await connectMcpClient(page)).accessToken;
     const baseURL = appBaseURL(page);
     const night = addUtcDays(parisToday(), 10);
 
@@ -133,13 +133,14 @@ test('joiner MCP cannot edit the Bill, can join attend and leave, and invalid ke
 
     await signOutOnPage(page);
     await signInOnPage(page, joiner);
-    await expect(page).toHaveURL(/\/home/);
-    const joinerKey = await createPersonalKeyFromProfile(page);
+    await expect(page).toHaveURL(url => url.pathname === '/home');
+    const joinerKey = (await connectMcpClient(page)).accessToken;
 
     const missing = await postMcpUnauthorized(baseURL);
     expect(missing.status).toBe(401);
+    expect(missing.headers.get('www-authenticate') ?? '').toContain('/.well-known/oauth-protected-resource');
 
-    const invalid = await postMcpUnauthorized(baseURL, 'lm_not_a_real_key');
+    const invalid = await postMcpUnauthorized(baseURL, 'not-a-real-token');
     expect(invalid.status).toBe(401);
 
     const joined = await callMcpTool(baseURL, joinerKey, 'join_event', { eventId: event.id });

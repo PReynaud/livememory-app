@@ -8,5 +8,8 @@ describe('getSafeInternalPath', () => {
     expect(getSafeInternalPath('//evil.example')).toBe('/home');
     expect(getSafeInternalPath('/%2F%2Fevil.example')).toBe('/home');
     expect(getSafeInternalPath('https://evil.example')).toBe('/home');
+    expect(getSafeInternalPath('/oauth/authorize?redirect_uri=http://127.0.0.1/oauth/callback'))
+      .toBe('/oauth/authorize?redirect_uri=http://127.0.0.1/oauth/callback');
+    expect(getSafeInternalPath('/oauth/authorize/http://evil.example')).toBe('/home');
   });
 });

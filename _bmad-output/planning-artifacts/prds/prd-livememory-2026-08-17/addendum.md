@@ -2,7 +2,7 @@
 title: LiveMemory PRD addendum
 status: final
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-10-11
 ---
 
 # Addendum
@@ -15,7 +15,7 @@ This addendum contains binding implementation constraints and informational rese
 
 ## Machine interface (MCP)
 
-Pierre wants an MCP interface exposed early so an agent can create and update Events and Concerts, including by extracting data from screenshots outside LiveMemory. That is FR-17. This addendum names the mechanism: an MCP interface authenticated as the acting User (Event owner or joiner, same rights as the UI) and subject to the same validation as the UI. Concert create follows FR-13 outcomes (attach, refuse, or the same attach-or-create choice) rather than a warn-then-save-anyway confirm. Not a second product. Not a substitute for the first UI CRUD path.
+Pierre wants an MCP interface exposed early so an agent can create and update Events and Concerts, including by extracting data from screenshots outside LiveMemory. That is FR-17. This addendum names the mechanism: an MCP interface authenticated as the acting User via OAuth 2.1 (browser Allow, revocable grant — no pasted personal key), with the same rights as the UI and the same validation as the UI. Concert create follows FR-13 outcomes (attach, refuse, or the same attach-or-create choice) rather than a warn-then-save-anyway confirm. Not a second product. Not a substitute for the first UI CRUD path.
 
 Rejected alternative: treat the Event as only "Concerts I saw." Pierre wants the Event view to show the whole owner-entered bill, then Attendance. Canonical/scraped festival databases remain out of v1.
 

@@ -75,13 +75,14 @@ describe('embedded agent boundaries', () => {
     expect(request).not.toMatch(/storage|from\('/i);
   });
 
-  it('exposes only read tools during preview and does not alter public MCP keys', () => {
+  it('exposes only read tools during preview and keeps public MCP on OAuth', () => {
     const embedded = read('server/utils/embedded-mcp-server.ts');
     const mcp = read('server/api/mcp/index.ts');
     expect(embedded).toMatch(/if \(scope === 'read'\) return server/);
     expect(embedded).toMatch(/create_concert/);
     expect(embedded).toMatch(/proposal_scope/);
-    expect(mcp).toMatch(/readPersonalKeyFromHeaders/);
+    expect(mcp).toMatch(/resolveMcpAccess/);
+    expect(mcp).not.toMatch(/readPersonalKeyFromHeaders/);
     expect(mcp).not.toMatch(/agent-capability/);
   });
 

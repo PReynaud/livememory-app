@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import type { PersonalKeyExchangeEnv } from './personal-key-exchange';
+import type { McpSupabaseEnv } from './personal-key-exchange';
 
 export const createUserScopedClient = (
-  env: PersonalKeyExchangeEnv,
+  env: McpSupabaseEnv,
   accessToken: string
 ) => {
   return createClient(env.supabaseUrl, env.anonKey, {
