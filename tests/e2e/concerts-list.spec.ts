@@ -42,3 +42,24 @@ test('filters Concerts by type and keeps filters when switching tabs', async ({ 
   await expect(authenticatedPage.getByRole('link', { name: /Rock Week/ })).toBeVisible();
   await expect(authenticatedPage.getByRole('link', { name: /Club Night/ })).toHaveCount(0);
 });
+
+test('groups the Concerts list under year headings in list order', async ({ authenticatedPage, account }) => {
+  await createOwnedEventRest(account, { name: 'Moonrise Night', start: '2025-04-26', place: 'Paris' });
+  await createOwnedEventRest(account, { name: 'Solar Coast Night', start: '2025-03-14', place: 'Lyon' });
+  await createOwnedEventRest(account, { name: 'Arctic Lane Night', start: '2024-11-09', place: 'Lille' });
+
+  await gotoConcertsPeriod(authenticatedPage, 'past');
+  await waitForNuxtHydration(authenticatedPage);
+
+  const years = authenticatedPage.getByTestId('concerts-year');
+  await expect(years).toHaveCount(2);
+  await expect(years.getByRole('heading', { level: 2 })).toHaveText(['2025', '2024']);
+
+  const year2025 = authenticatedPage.getByRole('region', { name: '2025' });
+  await expect(year2025.getByRole('link', { name: /Moonrise Night/ })).toBeVisible();
+  await expect(year2025.getByRole('link', { name: /Solar Coast Night/ })).toBeVisible();
+  await expect(year2025.locator('[data-variant="row"] .lm-date-stack')).toHaveCount(2);
+  const year2024 = authenticatedPage.getByRole('region', { name: '2024' });
+  await expect(year2024.getByRole('link', { name: /Arctic Lane Night/ })).toBeVisible();
+  await expect(authenticatedPage.getByRole('tab', { name: /All|Favorites/ })).toHaveCount(0);
+});
