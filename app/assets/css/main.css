@@ -29,11 +29,11 @@ html {
   --hairline: color-mix(in oklch, var(--fg) 8%, transparent);
   --focus: #00D4FF;
   --glass: color-mix(in oklch, var(--surface) 58%, transparent);
-  --sheet-glass: color-mix(in oklch, var(--surface) 64%, transparent);
-  --panel-glass: color-mix(in oklch, var(--bg) 42%, transparent);
+  --sheet-glass: color-mix(in oklch, var(--surface) 82%, transparent);
+  --panel-glass: color-mix(in oklch, var(--surface-alt) 38%, transparent);
   --well: color-mix(in oklch, var(--bg) 88%, var(--surface));
   --well-glass: color-mix(in oklch, var(--bg) 55%, transparent);
-  --well-border: color-mix(in oklch, var(--fg) 12%, transparent);
+  --well-border: var(--border);
   --max-w: 768px;
   --page-x: 16px;
   --chrome-safe: 88px;
@@ -263,12 +263,12 @@ html {
   background: var(--panel-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+  border: 1px solid var(--border);
 }
 
 .lm-form-panel-artist {
-  border-color: color-mix(in oklch, var(--fg) 14%, transparent);
-  background: color-mix(in oklch, var(--panel-glass) 70%, var(--surface));
+  border-color: color-mix(in oklch, var(--fg) 12%, var(--border));
+  background: color-mix(in oklch, var(--surface-alt) 55%, var(--surface));
 }
 
 .lm-event-context {
@@ -291,7 +291,7 @@ html {
   background: var(--sheet-glass);
   backdrop-filter: blur(28px) saturate(1.15);
   -webkit-backdrop-filter: blur(28px) saturate(1.15);
-  border: 1px solid color-mix(in oklch, var(--fg) 10%, transparent);
+  border: 1px solid var(--border);
   border-bottom: 0;
 }
 
@@ -302,7 +302,7 @@ html {
   background: color-mix(in oklch, var(--sheet-glass) 88%, var(--bg));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+  border-top: 1px solid var(--border);
 }
 
 .lm-sheet-head::before {
@@ -465,10 +465,10 @@ html {
 }
 
 .lm-option-chip[aria-pressed="true"] {
-  border: 2px solid #FF4D8A;
-  color: #FF4D8A;
-  background: color-mix(in oklch, #FF4D8A 8%, var(--surface));
-  padding-inline: 13px;
+  border-color: #FF4D8A;
+  color: #000;
+  background: #FF4D8A;
+  font-weight: 600;
 }
 
 @media (min-width: 768px) {

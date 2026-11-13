@@ -2,7 +2,7 @@
 title: 'Story 4.5: Restyle the Add and Edit sheets'
 type: 'feature'
 created: '2026-11-13'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/project-context.md'
@@ -38,9 +38,9 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/add-concert-sheet.spec.ts` -- sheets use token text, no `text-white`; selected option chip filled pink with black text -- red first
-- [ ] `app/assets/css/main.css` -- navy glass mixes on `--surface` / `--surface-alt`; selected `.lm-option-chip` filled pink, black text
-- [ ] `app/components/AppAddConcertSheet.vue`, `app/components/AppEditEventSheet.vue` -- `text-white` to `text-[var(--fg)]`
+- [x] `tests/unit/add-concert-sheet.spec.ts` -- sheets use token text, no `text-white`; selected option chip filled pink with black text -- red first
+- [x] `app/assets/css/main.css` -- navy glass mixes on `--surface` / `--surface-alt`; selected `.lm-option-chip` filled pink, black text
+- [x] `app/components/AppAddConcertSheet.vue`, `app/components/AppEditEventSheet.vue` -- `text-white` to `text-[var(--fg)]`
 
 **Acceptance Criteria:**
 - Given the Add sheet, when opened, then panels render on navy surfaces and the existing add, edit, and attach e2e journeys pass unchanged.
@@ -50,3 +50,7 @@ context:
 **Commands:**
 - `pnpm lint && pnpm typecheck && pnpm test:unit` -- expected: all pass
 - `pnpm test:e2e` -- expected: all pass on local Supabase
+
+## Spec Change Log
+
+- Implementation: focused fields still drew Nuxt UI's pink `ring-primary`, which contradicts "keep cyan focus". `app/app.config.ts` now extends `input`, `inputMenu`, `select`, and `textarea` with a cyan ring and outline for the primary color. The unused `.lm-option-chip` selected state is pink-filled with black text, matching the festival day chip.

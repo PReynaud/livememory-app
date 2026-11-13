@@ -661,7 +661,7 @@ const slideoverUi = {
             class="lm-event-context"
             aria-live="polite"
           >
-            <span class="font-semibold text-white">{{ selectedEvent.name }}</span>
+            <span class="font-semibold text-[var(--fg)]">{{ selectedEvent.name }}</span>
             <span class="text-muted">{{ eventContextMeta }}</span>
           </div>
           <UFormField
@@ -685,11 +685,11 @@ const slideoverUi = {
                   <template #content>
                     <div class="max-w-72 space-y-2 p-3 text-[13px] text-muted">
                       <p>
-                        <span class="font-semibold text-white">Night</span>
+                        <span class="font-semibold text-[var(--fg)]">Night</span>
                         — one date, one city. Examples: a club show; a soirée with several artists.
                       </p>
                       <p>
-                        <span class="font-semibold text-white">Festival</span>
+                        <span class="font-semibold text-[var(--fg)]">Festival</span>
                         — several days, often several stages. Example: Rock en Seine.
                       </p>
                       <p>
@@ -783,7 +783,7 @@ const slideoverUi = {
             label="Add another artist"
             color="neutral"
             variant="link"
-            class="px-0 font-semibold text-white"
+            class="px-0 font-semibold text-[var(--fg)]"
             :disabled="pendingChoice"
             @click="addArtistRow"
           />
@@ -837,7 +837,7 @@ const slideoverUi = {
                 class="min-h-11 min-w-14 flex-1 rounded-xl border px-2 py-1.5 text-[13px] font-medium leading-tight"
                 :class="concertDate === day
                   ? 'border-primary bg-primary text-black'
-                  : 'border-[var(--well-border)] bg-[var(--well-glass)] text-white backdrop-blur-[12px]'"
+                  : 'border-[var(--well-border)] bg-[var(--well-glass)] text-[var(--fg)] backdrop-blur-[12px]'"
                 :aria-pressed="concertDate === day"
                 :aria-label="day"
                 :disabled="pendingChoice"
@@ -996,7 +996,7 @@ const slideoverUi = {
             label="Cancel"
             color="neutral"
             variant="link"
-            class="px-0 font-semibold text-white"
+            class="px-0 font-semibold text-[var(--fg)]"
             :disabled="saving"
             @click="dismissChoice"
           />
@@ -1049,7 +1049,7 @@ const slideoverUi = {
             label="Cancel"
             color="neutral"
             variant="link"
-            class="px-0 font-semibold text-white"
+            class="px-0 font-semibold text-[var(--fg)]"
             :disabled="saving"
             @click="cancelDelete"
           />
@@ -1075,7 +1075,7 @@ const slideoverUi = {
             label="Cancel"
             color="neutral"
             variant="link"
-            class="px-0 font-semibold text-white"
+            class="px-0 font-semibold text-[var(--fg)]"
             :disabled="saving"
             @click="cancelMove"
           />
