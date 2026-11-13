@@ -2,7 +2,7 @@
 title: 'Story 4.3: Group the Concerts list by year'
 type: 'feature'
 created: '2026-11-13'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/project-context.md'
@@ -47,11 +47,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/concert-list-filters.spec.ts` -- `groupEventsByYear` matrix -- red first
-- [ ] `app/utils/concert-list-filters.ts` -- `groupEventsByYear(events)` consecutive grouping by `start_date` year
-- [ ] `app/components/AppEventCard.vue` -- `row` variant: compact date stack leading the existing compact / group body
-- [ ] `app/pages/concerts.vue` -- `<section>` per year with `<h2>` year heading, cards in `row` variant
-- [ ] `tests/e2e/concerts-list.spec.ts` -- seed two years, assert headings in order
+- [x] `tests/unit/concert-list-filters.spec.ts` -- `groupEventsByYear` matrix -- red first
+- [x] `app/utils/concert-list-filters.ts` -- `groupEventsByYear(events)` consecutive grouping by `start_date` year
+- [x] `app/components/AppEventCard.vue` -- `row` variant: compact date stack leading the existing compact / group body
+- [x] `app/pages/concerts.vue` -- `<section>` per year with `<h2>` year heading, cards in `row` variant
+- [x] `tests/e2e/concerts-list.spec.ts` -- seed two years, assert headings in order
 
 **Acceptance Criteria:**
 - Given Events in 2025 and 2024 on the Past tab, when the list renders, then heading "2025" precedes "2024" and each Event sits under its year.

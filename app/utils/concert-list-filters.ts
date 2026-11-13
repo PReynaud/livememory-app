@@ -235,3 +235,24 @@ export const filterEventsByConcertFilters = (
 export const paginateConcertEvents = (events: EventRecord[], limit: number) => {
   return events.slice(0, Math.max(0, limit));
 };
+
+export type EventYearGroup = {
+  year: string;
+  events: EventRecord[];
+};
+
+export const groupEventsByYear = (events: EventRecord[]): EventYearGroup[] => {
+  const groups: EventYearGroup[] = [];
+
+  for (const event of events) {
+    const year = event.start_date.slice(0, 4);
+    const last = groups[groups.length - 1];
+    if (last && last.year === year) {
+      last.events.push(event);
+    } else {
+      groups.push({ year, events: [event] });
+    }
+  }
+
+  return groups;
+};
