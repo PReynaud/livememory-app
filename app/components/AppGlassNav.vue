@@ -13,6 +13,11 @@ const links = [
 
 const isActive = (to: string) => route.path === to || route.path.startsWith(`${to}/`);
 const profileActive = computed(() => isActive('/profile'));
+
+const itemClass = (active: boolean) => active ? 'text-[var(--focus)]' : 'text-[var(--fg)]';
+const pillClass = (active: boolean) => active
+  ? 'ring-1 ring-[var(--focus)] bg-[color-mix(in_oklch,var(--focus)_12%,transparent)]'
+  : '';
 </script>
 
 <template>
@@ -22,16 +27,24 @@ const profileActive = computed(() => isActive('/profile'));
       inset-x-3 bottom-2.5 mx-auto h-16 w-auto max-w-[calc(var(--max-w)-24px)] flex-row items-center justify-around rounded-3xl px-1.5
       lg:inset-auto lg:bottom-auto lg:left-0 lg:top-0 lg:mx-0 lg:h-dvh lg:w-20 lg:max-w-none lg:flex-col lg:justify-start lg:gap-4 lg:rounded-none lg:border-0 lg:border-r lg:py-8"
   >
+    <span
+      class="hidden h-11 items-center justify-center text-[var(--fg)] lg:flex"
+      aria-hidden="true"
+    >
+      <AppLogo class="size-8" />
+    </span>
+
     <NuxtLink
       v-for="link in links"
       :key="link.to"
       :to="link.to"
+      :aria-current="isActive(link.to) ? 'page' : undefined"
       class="flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium lg:min-w-0"
-      :class="isActive(link.to) ? 'text-primary' : 'text-[var(--fg)]'"
+      :class="itemClass(isActive(link.to))"
     >
       <span
         class="flex h-7 w-12 items-center justify-center rounded-full"
-        :class="isActive(link.to) ? 'bg-primary text-black' : ''"
+        :class="pillClass(isActive(link.to))"
       >
         <UIcon
           :name="link.icon"
@@ -47,7 +60,7 @@ const profileActive = computed(() => isActive('/profile'));
       class="flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[var(--fg)] lg:min-w-0"
       @click="addSheet.openSheet()"
     >
-      <span class="flex h-8 w-11 items-center justify-center rounded-full bg-white text-black">
+      <span class="flex h-8 w-11 items-center justify-center rounded-full border-2 border-primary text-primary">
         <UIcon
           name="i-lucide-plus"
           class="size-5"
@@ -58,12 +71,13 @@ const profileActive = computed(() => isActive('/profile'));
 
     <NuxtLink
       to="/profile"
+      :aria-current="profileActive ? 'page' : undefined"
       class="flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium lg:min-w-0"
-      :class="profileActive ? 'text-primary' : 'text-[var(--fg)]'"
+      :class="itemClass(profileActive)"
     >
       <span
         class="flex h-7 w-12 items-center justify-center rounded-full"
-        :class="profileActive ? 'bg-primary text-black' : ''"
+        :class="pillClass(profileActive)"
       >
         <UIcon
           name="i-lucide-user"

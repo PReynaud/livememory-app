@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRuntimeConfig, useSupabaseUser } from '#imports';
+import { useSupabaseUser } from '#imports';
 
-const config = useRuntimeConfig();
-const appName = computed(() => config.public.appName);
 const supabaseUser = useSupabaseUser();
 const isAuthenticated = computed(() => Boolean(supabaseUser.value));
 </script>
@@ -15,8 +13,8 @@ const isAuthenticated = computed(() => Boolean(supabaseUser.value));
         to="/"
         class="flex items-center gap-2"
       >
-        <AppLogo class="w-auto h-6 shrink-0" />
-        <span class="font-semibold text-highlighted">{{ appName }}</span>
+        <AppLogo class="size-6 shrink-0 text-[var(--fg)]" />
+        <span class="text-lg font-bold tracking-tight text-[var(--fg)]">LiveMemory</span>
       </NuxtLink>
     </template>
 

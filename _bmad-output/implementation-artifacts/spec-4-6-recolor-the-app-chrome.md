@@ -2,7 +2,7 @@
 title: 'Story 4.6: Recolor the app chrome'
 type: 'feature'
 created: '2026-11-13'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/project-context.md'
@@ -38,10 +38,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/app-chrome.spec.ts` -- `aria-current`, cyan active, four targets, outline Add, wordmark -- red first
-- [ ] `app/components/AppGlassNav.vue` -- cyan active pill, `aria-current`, pink outline Add, rail logo on `lg`
-- [ ] `app/components/AppLogo.vue` -- equalizer bars (`currentColor` + pink)
-- [ ] `app/components/AppHeader.vue` -- "LiveMemory" wordmark
+- [x] `tests/unit/app-chrome.spec.ts` -- `aria-current`, cyan active, four targets, outline Add, wordmark -- red first
+- [x] `app/components/AppGlassNav.vue` -- cyan active pill, `aria-current`, pink outline Add, rail logo on `lg`
+- [x] `app/components/AppLogo.vue` -- equalizer bars (`currentColor` + pink)
+- [x] `app/components/AppHeader.vue` -- "LiveMemory" wordmark
 
 **Acceptance Criteria:**
 - Given `/concerts`, when the nav renders, then the Concerts link has `aria-current="page"` and the others do not.
@@ -53,3 +53,7 @@ context:
 - `pnpm lint && pnpm typecheck && pnpm test:unit` -- expected: all pass
 - `pnpm test:e2e` -- expected: all pass on local Supabase
 - `pnpm build:vercel` -- expected: prerender succeeds
+
+## Spec Change Log
+
+- Implementation: the desktop rail logo is a decorative `aria-hidden` mark rather than a link, so the nav keeps exactly four targets. The guest header shows the literal "LiveMemory" wordmark; page titles still use `appName`. Added `tests/e2e/app-chrome.spec.ts` for the `aria-current` and four-target acceptance criteria.

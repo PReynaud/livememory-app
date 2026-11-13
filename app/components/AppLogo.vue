@@ -7,19 +7,35 @@
   >
     <rect
       x="4"
-      y="4"
-      width="24"
-      height="24"
-      rx="6"
-      stroke="currentColor"
-      stroke-width="2"
+      y="14"
+      width="4"
+      height="12"
+      rx="2"
+      fill="currentColor"
     />
-    <path
-      d="M10 22V10h5.5a4 4 0 0 1 0 8H10"
-      stroke="var(--ui-primary)"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+    <rect
+      x="11"
+      y="6"
+      width="4"
+      height="20"
+      rx="2"
+      fill="var(--ui-primary)"
+    />
+    <rect
+      x="18"
+      y="10"
+      width="4"
+      height="16"
+      rx="2"
+      fill="currentColor"
+    />
+    <rect
+      x="25"
+      y="17"
+      width="4"
+      height="9"
+      rx="2"
+      fill="currentColor"
     />
   </svg>
 </template>
