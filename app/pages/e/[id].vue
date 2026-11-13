@@ -76,6 +76,16 @@ const showNightGoingChip = computed(() => {
 const nightIsPast = computed(() => {
   return hasConcerts.value && currentConcerts.value.every(row => eventsStore.concertIsPast(row));
 });
+const ownerNotes = computed(() => {
+  if (!isOwner.value) {
+    return [];
+  }
+
+  return currentConcerts.value.filter(concert => Boolean(concert.notes?.trim()));
+});
+const compactNote = computed(() => {
+  return currentConcerts.value.length === 1 ? ownerNotes.value[0]?.notes?.trim() ?? '' : '';
+});
 const concertCountLabel = computed(() => {
   const count = currentConcerts.value.length;
   return count === 1 ? '1 concert' : `${count} concerts`;
@@ -209,14 +219,12 @@ const leaveThisEvent = async () => {
 <template>
   <UContainer class="py-8 max-w-3xl space-y-5">
     <template v-if="currentEvent">
-      <header class="space-y-0">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-          {{ eventKindLabel }}
-        </p>
+      <header class="lm-event-header space-y-3">
         <div class="flex items-start justify-between gap-3">
-          <h1 class="min-w-0 flex-1 text-[34px] font-bold tracking-tight leading-[1.1]">
-            {{ currentEvent.name }}
-          </h1>
+          <AppDateStack
+            :date="currentEvent.start_date"
+            size="lg"
+          />
           <div class="lm-header-actions">
             <button
               v-if="isOwner"
@@ -247,9 +255,29 @@ const leaveThisEvent = async () => {
             </button>
           </div>
         </div>
-        <p class="mt-2 max-w-[40ch] text-[15px] leading-[1.45] text-muted">
-          {{ eventLead }}
-        </p>
+        <div>
+          <p class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+            {{ eventKindLabel }}
+          </p>
+          <h1 class="text-[34px] font-bold tracking-tight leading-[1.1] [overflow-wrap:anywhere]">
+            {{ currentEvent.name }}
+          </h1>
+          <p class="mt-2 flex max-w-[44ch] items-start gap-1.5 text-[15px] leading-[1.45] text-muted">
+            <UIcon
+              name="i-lucide-map-pin"
+              class="mt-[3px] size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <span>{{ eventLead }}</span>
+          </p>
+        </div>
+        <AppAttendanceChip
+          v-if="showNightGoingChip"
+          :status="eventsStore.eventGoingStatus(currentEvent.id)"
+          :is-past="nightIsPast"
+          :disabled="eventsStore.isEventGoingBusy(currentEvent.id)"
+          @click="void eventsStore.cycleEventGoing(currentEvent.id)"
+        />
       </header>
 
       <section
@@ -264,13 +292,6 @@ const leaveThisEvent = async () => {
             Bill
           </h2>
           <div class="flex shrink-0 items-center gap-2.5">
-            <AppAttendanceChip
-              v-if="showNightGoingChip"
-              :status="eventsStore.eventGoingStatus(currentEvent.id)"
-              :is-past="nightIsPast"
-              :disabled="eventsStore.isEventGoingBusy(currentEvent.id)"
-              @click="void eventsStore.cycleEventGoing(currentEvent.id)"
-            />
             <span
               class="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 text-xs font-semibold tabular-nums"
               :aria-label="concertCountLabel"
@@ -324,6 +345,13 @@ const leaveThisEvent = async () => {
                     >
                       {{ concertMeta(concert) }}
                     </p>
+                    <p
+                      v-if="isOwner && concert.notes && currentConcerts.length > 1"
+                      class="mt-1 line-clamp-2 text-[13px] leading-snug text-muted"
+                      data-testid="event-row-note"
+                    >
+                      {{ concert.notes }}
+                    </p>
                   </button>
                   <div
                     v-else
@@ -350,6 +378,25 @@ const leaveThisEvent = async () => {
               </div>
             </div>
           </template>
+        </div>
+      </section>
+
+      <section
+        v-if="isOwner && compactNote"
+        class="space-y-3"
+        data-testid="event-notes"
+        aria-labelledby="event-notes-heading"
+      >
+        <h2
+          id="event-notes-heading"
+          class="px-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+        >
+          My notes
+        </h2>
+        <div class="lm-card p-4">
+          <p class="whitespace-pre-line text-[15px] leading-[1.5]">
+            {{ compactNote }}
+          </p>
         </div>
       </section>
 
