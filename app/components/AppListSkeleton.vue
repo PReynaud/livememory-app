@@ -13,7 +13,7 @@ defineProps<{
   >
     <template v-if="variant === 'home'">
       <USkeleton class="h-28 w-full rounded-2xl" />
-      <div class="rounded-2xl bg-[#1A1A1A] p-4 flex gap-4">
+      <div class="rounded-2xl bg-[var(--surface)] p-4 flex gap-4">
         <USkeleton class="h-12 flex-1" />
         <USkeleton class="h-12 flex-1" />
         <USkeleton class="h-12 flex-1" />

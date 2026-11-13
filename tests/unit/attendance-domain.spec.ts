@@ -612,12 +612,12 @@ describe('attendance stays off pages and the store query path', () => {
     expect(chip).toMatch(/Mark as going/);
     expect(chip).toMatch(/Mark as attended/);
     expect(chip).toMatch(/#FF4D8A/);
-    expect(chip).toMatch(/#A3A3A3/);
+    expect(chip).toMatch(/var\(--muted\)/);
     expect(chip).toMatch(/border-dashed/);
     expect(chip).toMatch(/focus-visible/);
     expect(chip).toMatch(/motion-reduce|prefers-reduced-motion/);
     expect(chip).toMatch(/click\.stop/);
-    expect(chip).not.toMatch(/bg-\[#A3A3A3\]/);
+    expect(chip).not.toMatch(/bg-\[var\(--muted\)\]/);
     expect(chip).not.toMatch(/Set|On the bill|Skipped/);
   });
 });

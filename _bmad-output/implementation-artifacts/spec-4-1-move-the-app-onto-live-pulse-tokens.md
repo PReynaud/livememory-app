@@ -2,7 +2,7 @@
 title: 'Story 4.1: Move the app onto Live Pulse tokens'
 type: 'feature'
 created: '2026-11-13'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/project-context.md'
@@ -48,12 +48,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/helpers/contrast.ts` -- WCAG relative-luminance ratio helper -- shared by token tests
-- [ ] `tests/unit/design-tokens.spec.ts` -- parse `main.css` tokens; assert palette and contrast pairs -- red first
-- [ ] `app/assets/css/main.css` -- navy tokens, `--surface-alt`, `--focus`, cyan `:focus-visible`, cyan selected tab -- the pass itself
-- [ ] `app/components/AppAttendanceChip.vue` -- cyan focus ring; Attended/unset via `var(--muted)` -- one focus colour
-- [ ] `app/components/AppListSkeleton.vue`, `AppGlassNav.vue`, `AppEventCard.vue`, `app/pages/e/[id].vue` -- token variables instead of neutral hexes / `white/8`
-- [ ] `tests/unit/polish-lists.spec.ts`, `tests/unit/attendance-domain.spec.ts` -- update neutral-hex assertions
+- [x] `tests/unit/helpers/contrast.ts` -- WCAG relative-luminance ratio helper -- shared by token tests
+- [x] `tests/unit/design-tokens.spec.ts` -- parse `main.css` tokens; assert palette and contrast pairs -- red first
+- [x] `app/assets/css/main.css` -- navy tokens, `--surface-alt`, `--focus`, cyan `:focus-visible`, cyan selected tab -- the pass itself
+- [x] `app/components/AppAttendanceChip.vue` -- cyan focus ring; Attended/unset via `var(--muted)` -- one focus colour
+- [x] `app/components/AppListSkeleton.vue`, `AppGlassNav.vue`, `AppEventCard.vue`, `app/pages/e/[id].vue` -- token variables instead of neutral hexes / `white/8`
+- [x] `tests/unit/polish-lists.spec.ts`, `tests/unit/attendance-domain.spec.ts` -- update neutral-hex assertions
 
 **Acceptance Criteria:**
 - Given `main.css`, when tokens are parsed, then foreground, muted, and pink on canvas and surface are at least 4.5:1, and cyan on canvas is at least 3:1.

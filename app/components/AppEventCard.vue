@@ -99,7 +99,7 @@ const eventPath = computed(() => `/e/${props.event.id}`);
       />
     </div>
     <template v-else>
-      <div class="flex items-start justify-between gap-3 border-b border-white/8 pb-3 mb-3">
+      <div class="flex items-start justify-between gap-3 border-b border-[var(--hairline)] pb-3 mb-3">
         <a
           v-if="readonly"
           :href="eventPath"
@@ -136,7 +136,7 @@ const eventPath = computed(() => `/e/${props.event.id}`);
         <div
           v-for="(group, index) in groups"
           :key="group.date"
-          :class="[index > 0 ? 'mt-2.5 border-t border-white/8 pt-2.5' : '', 'space-y-1.5']"
+          :class="[index > 0 ? 'mt-2.5 border-t border-[var(--hairline)] pt-2.5' : '', 'space-y-1.5']"
         >
           <p
             v-if="showDayHeaders"

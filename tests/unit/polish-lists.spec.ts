@@ -138,7 +138,7 @@ describe('list polish source guards', () => {
     expect(app).toMatch(/chrome-safe/);
   });
 
-  it('announces surfaces, keeps focus rings on black, and drops glow plus blur animation under reduced motion', () => {
+  it('announces surfaces, keeps focus rings visible on the navy canvas, and drops glow plus blur animation under reduced motion', () => {
     const app = read('app/app.vue');
     const announcer = read('app/components/AppRouteAnnouncer.vue');
     const css = read('app/assets/css/main.css');
@@ -160,7 +160,7 @@ describe('list polish source guards', () => {
     expect(css).toMatch(/--well-glass:/);
     expect(css).toMatch(/-webkit-backdrop-filter/);
     expect(chip).toMatch(/border-dashed border-\[#FF4D8A\]/);
-    expect(chip).not.toMatch(/border-dashed border-\[#A3A3A3\]/);
+    expect(chip).not.toMatch(/border-dashed border-\[var\(--muted\)\]/);
     expect(chip).toMatch(/shadow-\[0_0_8px_#FF4D8A66\]/);
     expect(chip).toMatch(/motion-reduce:shadow-none/);
     expect(chip).toMatch(/motion-reduce:outline/);

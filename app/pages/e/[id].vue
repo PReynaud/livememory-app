@@ -294,7 +294,7 @@ const leaveThisEvent = async () => {
             <div
               v-for="(group, index) in billGroups"
               :key="group.date"
-              :class="index > 0 ? 'mt-3 border-t border-white/8 pt-3' : ''"
+              :class="index > 0 ? 'mt-3 border-t border-[var(--hairline)] pt-3' : ''"
             >
               <p
                 v-if="showDayHeaders"
@@ -363,7 +363,7 @@ const leaveThisEvent = async () => {
       />
       <div
         v-if="!isOwner"
-        class="member-zone mt-1 border-t border-white/8 pt-4"
+        class="member-zone mt-1 border-t border-[var(--hairline)] pt-4"
       >
         <UButton
           v-if="!confirmLeave"
@@ -396,7 +396,7 @@ const leaveThisEvent = async () => {
               label="Cancel"
               color="neutral"
               variant="link"
-              class="px-0 font-semibold text-white"
+              class="px-0 font-semibold text-[var(--fg)]"
               :disabled="leaving"
               @click="cancelLeave"
             />
