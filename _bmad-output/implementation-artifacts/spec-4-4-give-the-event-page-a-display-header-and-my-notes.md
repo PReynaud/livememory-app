@@ -2,7 +2,7 @@
 title: 'Story 4.4: Give the Event page a display header and my notes'
 type: 'feature'
 created: '2026-11-13'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/project-context.md'
@@ -47,9 +47,9 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/event-detail-design.spec.ts` -- notes gated by `isOwner`; date stack in header -- red first
-- [ ] `app/pages/e/[id].vue` -- date stack + title row, place line with `i-lucide-map-pin`, single-night chip in header, owner notes
-- [ ] `tests/e2e/event-notes.spec.ts` -- owner sees notes; joiner does not
+- [x] `tests/unit/event-detail-design.spec.ts` -- notes gated by `isOwner`; date stack in header -- red first
+- [x] `app/pages/e/[id].vue` -- date stack + title row, place line with `i-lucide-map-pin`, single-night chip in header, owner notes
+- [x] `tests/e2e/event-notes.spec.ts` -- owner sees notes; joiner does not
 
 **Acceptance Criteria:**
 - Given an owned single-concert Event with notes, when opened, then "My notes" shows the text.
@@ -60,3 +60,7 @@ context:
 **Commands:**
 - `pnpm lint && pnpm typecheck && pnpm test:unit` -- expected: all pass
 - `pnpm test:e2e` -- expected: all pass on local Supabase
+
+## Spec Change Log
+
+- Implementation: the header icon buttons (`.lm-header-icon`) had no CSS; they now render as 44px round targets. The Epic 2 source assertion in `tests/unit/joiner-attendance.spec.ts` that banned `concert.notes` on the page now requires every notes render to be guarded by `isOwner &&` (notes remain unreadable to joiners through `concert_notes`).
