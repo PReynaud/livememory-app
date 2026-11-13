@@ -29,11 +29,11 @@ html {
   --hairline: color-mix(in oklch, var(--fg) 8%, transparent);
   --focus: #00D4FF;
   --glass: color-mix(in oklch, var(--surface) 58%, transparent);
-  --sheet-glass: color-mix(in oklch, var(--surface) 64%, transparent);
-  --panel-glass: color-mix(in oklch, var(--bg) 42%, transparent);
+  --sheet-glass: color-mix(in oklch, var(--surface) 82%, transparent);
+  --panel-glass: color-mix(in oklch, var(--surface-alt) 38%, transparent);
   --well: color-mix(in oklch, var(--bg) 88%, var(--surface));
   --well-glass: color-mix(in oklch, var(--bg) 55%, transparent);
-  --well-border: color-mix(in oklch, var(--fg) 12%, transparent);
+  --well-border: var(--border);
   --max-w: 768px;
   --page-x: 16px;
   --chrome-safe: 88px;
@@ -124,6 +124,128 @@ html {
   border-color: color-mix(in oklch, var(--fg) 22%, var(--border));
 }
 
+.lm-date-stack {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  padding: 7px 0 6px;
+  border-radius: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-date-stack-weekday,
+.lm-date-stack-month {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.lm-date-stack-day {
+  margin: 3px 0 2px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.lm-date-stack[data-size="lg"] {
+  width: 60px;
+  padding: 9px 0 8px;
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--surface-alt) 82%, transparent);
+}
+
+.lm-date-stack[data-size="lg"] .lm-date-stack-day {
+  font-size: 28px;
+}
+
+.lm-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: 8.5rem;
+  border-color: color-mix(in oklch, var(--focus) 16%, var(--border));
+}
+
+.lm-hero-atmosphere {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 55% at 82% 78%, color-mix(in oklch, #FF4D8A 42%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 18% 22%, color-mix(in oklch, var(--focus) 22%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 55% 92%, color-mix(in oklch, #A78BFA 34%, transparent), transparent 70%);
+  animation: lm-pulse-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes lm-pulse-drift {
+  from {
+    transform: translate3d(-4%, -3%, 0);
+  }
+
+  to {
+    transform: translate3d(4%, 3%, 0);
+  }
+}
+
+.lm-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.lm-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.lm-header-icon:hover:not(:disabled) {
+  border-color: color-mix(in oklch, var(--fg) 18%, var(--border));
+  background: var(--surface-alt);
+}
+
+.lm-header-icon:disabled {
+  opacity: 0.6;
+}
+
+.lm-header-icon[aria-busy="true"] .lm-header-icon-spin {
+  animation: lm-spin 0.9s linear infinite;
+}
+
+@keyframes lm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.lm-year-heading {
+  padding: 0 2px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .lm-concert-row {
   display: flex;
   align-items: center;
@@ -141,12 +263,12 @@ html {
   background: var(--panel-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+  border: 1px solid var(--border);
 }
 
 .lm-form-panel-artist {
-  border-color: color-mix(in oklch, var(--fg) 14%, transparent);
-  background: color-mix(in oklch, var(--panel-glass) 70%, var(--surface));
+  border-color: color-mix(in oklch, var(--fg) 12%, var(--border));
+  background: color-mix(in oklch, var(--surface-alt) 55%, var(--surface));
 }
 
 .lm-event-context {
@@ -169,7 +291,7 @@ html {
   background: var(--sheet-glass);
   backdrop-filter: blur(28px) saturate(1.15);
   -webkit-backdrop-filter: blur(28px) saturate(1.15);
-  border: 1px solid color-mix(in oklch, var(--fg) 10%, transparent);
+  border: 1px solid var(--border);
   border-bottom: 0;
 }
 
@@ -180,7 +302,7 @@ html {
   background: color-mix(in oklch, var(--sheet-glass) 88%, var(--bg));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid color-mix(in oklch, var(--fg) 8%, transparent);
+  border-top: 1px solid var(--border);
 }
 
 .lm-sheet-head::before {
@@ -343,10 +465,10 @@ html {
 }
 
 .lm-option-chip[aria-pressed="true"] {
-  border: 2px solid #FF4D8A;
-  color: #FF4D8A;
-  background: color-mix(in oklch, #FF4D8A 8%, var(--surface));
-  padding-inline: 13px;
+  border-color: #FF4D8A;
+  color: #000;
+  background: #FF4D8A;
+  font-weight: 600;
 }
 
 @media (min-width: 768px) {
@@ -363,6 +485,16 @@ html {
 
   .lm-card-interactive {
     transition: none;
+  }
+
+  .lm-hero-atmosphere {
+    display: none;
+  }
+
+  .lm-header-icon,
+  .lm-header-icon[aria-busy="true"] .lm-header-icon-spin {
+    transition: none;
+    animation: none;
   }
 
   .lm-list-tab,

@@ -132,7 +132,7 @@ const createAttendanceClient = (rows: AttendanceRecord[] = []) => {
 };
 
 describe('joiner Event attendance surface', () => {
-  it('shows own chips and night Going, and hides Bill writes and notes', () => {
+  it('shows own chips and night Going, hides Bill writes, and shows notes only to the owner', () => {
     const page = read('app/pages/e/[id].vue');
 
     expect(page).toMatch(/AppAttendanceChip/);
@@ -149,7 +149,13 @@ describe('joiner Event attendance surface', () => {
     expect(page).toMatch(/billCtaLabel/);
     expect(page).toMatch(/openEditSheet/);
     expect(page).not.toMatch(/label="Notes"|name="notes"/);
-    expect(page).not.toMatch(/concert\.notes|currentEvent\.notes/);
+    expect(page).not.toMatch(/currentEvent\.notes/);
+    const template = page.slice(page.indexOf('<template>'));
+    const noteGuards = template.match(/v-if="[^"]*(?:concert\.notes|compactNote)[^"]*"/g) ?? [];
+    expect(noteGuards.length).toBeGreaterThan(0);
+    for (const guard of noteGuards) {
+      expect(guard).toMatch(/^v-if="isOwner && /);
+    }
   });
 
   it('offers only owned Events in the Add Concert picker', () => {

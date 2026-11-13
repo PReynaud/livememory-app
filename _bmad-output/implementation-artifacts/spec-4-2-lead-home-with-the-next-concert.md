@@ -2,7 +2,7 @@
 title: 'Story 4.2: Lead Home with the next concert'
 type: 'feature'
 created: '2026-11-13'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/docs/project-context.md'
@@ -48,13 +48,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/unit/dates-domain.spec.ts` -- `formatDateStack` matrix -- red first
-- [ ] `app/utils/event-dates.ts` -- `formatDateStack(iso)` UTC-safe, uppercase en-GB parts
-- [ ] `app/assets/css/main.css` -- date stack, hero, atmosphere (gradient + slow drift), `display: none` under reduced motion
-- [ ] `app/components/AppEventCard.vue` -- `variant?: 'default' | 'hero' | 'memory'` prop; hero = date stack + display title + pinned place + chip + atmosphere; memory = compact stack + title
-- [ ] `app/pages/home.vue` -- first featured as hero, rest featured; Last night as memory
-- [ ] `tests/unit/home-featured.spec.ts` -- hero once, `aria-hidden` atmosphere, reduced-motion rule
-- [ ] `tests/e2e/home-featured.spec.ts` -- long artist name fits a 390px viewport; reduced motion hides atmosphere
+- [x] `tests/unit/dates-domain.spec.ts` -- `formatDateStack` matrix -- red first
+- [x] `app/utils/event-dates.ts` -- `formatDateStack(iso)` UTC-safe, uppercase en-GB parts
+- [x] `app/assets/css/main.css` -- date stack, hero, atmosphere (gradient + slow drift), `display: none` under reduced motion
+- [x] `app/components/AppEventCard.vue` -- `variant?: 'default' | 'hero' | 'memory'` prop; hero = date stack + display title + pinned place + chip + atmosphere; memory = compact stack + title
+- [x] `app/pages/home.vue` -- first featured as hero, rest featured; Last night as memory
+- [x] `tests/unit/home-featured.spec.ts` -- hero once, `aria-hidden` atmosphere, reduced-motion rule
+- [x] `tests/e2e/home-featured.spec.ts` -- long artist name fits a 390px viewport; reduced motion hides atmosphere
 
 **Acceptance Criteria:**
 - Given two upcoming Events, when Home loads, then exactly one hero renders and the second is a featured card.
@@ -65,3 +65,7 @@ context:
 **Commands:**
 - `pnpm lint && pnpm typecheck && pnpm test:unit` -- expected: all pass
 - `pnpm test:e2e` -- expected: all pass on local Supabase
+
+## Spec Change Log
+
+- Implementation: added `app/components/AppDateStack.vue` (reused by 4.3 and 4.4) instead of inlining the stack in `AppEventCard`. `formatDateStack` caps the month at three letters because en-GB ICU renders September as "Sept". The stack is `aria-hidden`; meta lines keep the full date for screen readers and existing e2e assertions.

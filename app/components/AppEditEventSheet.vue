@@ -314,7 +314,7 @@ const slideoverUi = {
               label="Add stage"
               color="neutral"
               variant="link"
-              class="px-0 font-semibold text-white"
+              class="px-0 font-semibold text-[var(--fg)]"
               @click="addStage"
             />
           </div>
@@ -334,7 +334,7 @@ const slideoverUi = {
                 label="Remove"
                 color="neutral"
                 variant="link"
-                class="px-0 font-semibold text-white"
+                class="px-0 font-semibold text-[var(--fg)]"
                 @click="removeStage(index)"
               />
             </div>
@@ -434,7 +434,7 @@ const slideoverUi = {
               label="Cancel"
               color="neutral"
               variant="link"
-              class="px-0 font-semibold text-white"
+              class="px-0 font-semibold text-[var(--fg)]"
               :disabled="saving"
               @click="cancelDelete"
             />

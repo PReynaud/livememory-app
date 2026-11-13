@@ -9,6 +9,7 @@ import {
   eventMatchesConcertFilters,
   EVENTS_LIST_WINDOW,
   filterEventsByConcertFilters,
+  groupEventsByYear,
   paginateConcertEvents,
   placeFilterId
 } from '../../app/utils/concert-list-filters';
@@ -148,5 +149,47 @@ describe('concert list filters', () => {
     const yearListed = paginateConcertEvents(yearFiltered, EVENTS_LIST_WINDOW);
     expect(yearListed).toHaveLength(EVENTS_LIST_WINDOW);
     expect(yearListed.length < yearFiltered.length).toBe(true);
+  });
+});
+
+describe('groupEventsByYear', () => {
+  it('groups consecutive Events by start year and keeps list order', () => {
+    const a = eventAt('a', 'Moonrise', '2025-04-26');
+    const b = eventAt('b', 'Solar Coast', '2025-03-14');
+    const c = eventAt('c', 'Arctic Lane', '2024-11-09');
+
+    expect(groupEventsByYear([a, b, c])).toEqual([
+      { year: '2025', events: [a, b] },
+      { year: '2024', events: [c] }
+    ]);
+  });
+
+  it('keeps ascending upcoming order across a year boundary', () => {
+    const dec = eventAt('d', 'Winter Lights', '2026-12-05', { end_date: '2027-01-02', kind: 'festival' });
+    const jan = eventAt('j', 'New Year', '2027-01-18');
+
+    expect(groupEventsByYear([dec, jan]).map(group => group.year)).toEqual(['2026', '2027']);
+  });
+
+  it('starts a new group when a year reappears out of order', () => {
+    const groups = groupEventsByYear([
+      eventAt('1', 'One', '2025-01-01'),
+      eventAt('2', 'Two', '2024-01-01'),
+      eventAt('3', 'Three', '2025-06-01')
+    ]);
+
+    expect(groups.map(group => group.year)).toEqual(['2025', '2024', '2025']);
+  });
+
+  it('extends the last year when a later page continues it', () => {
+    const page1 = [eventAt('1', 'One', '2025-06-01'), eventAt('2', 'Two', '2025-03-01')];
+    const page2 = [...page1, eventAt('3', 'Three', '2025-01-10'), eventAt('4', 'Four', '2024-12-31')];
+
+    expect(groupEventsByYear(paginateConcertEvents(page2, 2))).toEqual([{ year: '2025', events: page1 }]);
+    expect(groupEventsByYear(page2).map(group => [group.year, group.events.length])).toEqual([['2025', 3], ['2024', 1]]);
+  });
+
+  it('returns no groups for an empty list', () => {
+    expect(groupEventsByYear([])).toEqual([]);
   });
 });

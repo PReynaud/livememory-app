@@ -287,6 +287,32 @@ describe('past Events leave featured without a How was it interstitial', () => {
   });
 });
 
+describe('Home Live Pulse hero', () => {
+  it('renders only the first featured Event as a hero and Last night as a memory card', () => {
+    const home = read('app/pages/home.vue');
+    expect(home).toMatch(/:variant="index === 0 \? 'hero' : 'default'"/);
+    expect(home.match(/'hero'/g)).toHaveLength(1);
+    expect(home).toMatch(/variant="memory"/);
+  });
+
+  it('keeps the atmosphere decorative and removes it under reduced motion', () => {
+    const card = read('app/components/AppEventCard.vue');
+    expect(card).toMatch(/class="lm-hero-atmosphere"\s+aria-hidden="true"/);
+    expect(card).toMatch(/AppDateStack/);
+    expect(card).toMatch(/data-variant/);
+    expect(card).not.toMatch(/<img|background-image|url\(/);
+
+    const stack = read('app/components/AppDateStack.vue');
+    expect(stack).toMatch(/aria-hidden="true"/);
+    expect(stack).toMatch(/formatDateStack/);
+
+    const css = read('app/assets/css/main.css');
+    expect(css).toMatch(/\.lm-hero-atmosphere\s*\{[^}]*radial-gradient/);
+    const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toMatch(/\.lm-hero-atmosphere\s*\{\s*display:\s*none;/);
+  });
+});
+
 describe('Home featured and stats surfaces', () => {
   it('fetches through the store, caps featured, and keeps stats non-tappable', () => {
     const home = read('app/pages/home.vue');

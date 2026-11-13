@@ -216,3 +216,46 @@ describe('add concert sheet open/close state', () => {
     expect(editUi).toMatch(/lg:w-\[28rem\]/);
   });
 });
+
+describe('Live Pulse sheets', () => {
+  const css = readFileSync(resolve(process.cwd(), 'app/assets/css/main.css'), 'utf8');
+  const rule = (selector: string) => {
+    const start = css.indexOf(`${selector} {`);
+    return css.slice(start, css.indexOf('}', start));
+  };
+
+  it('uses token text instead of white literals', () => {
+    for (const file of ['app/components/AppAddConcertSheet.vue', 'app/components/AppEditEventSheet.vue']) {
+      const sheet = readFileSync(resolve(process.cwd(), file), 'utf8');
+      expect(sheet, file).not.toMatch(/text-white/);
+      expect(sheet, file).toMatch(/text-\[var\(--fg\)\]/);
+    }
+  });
+
+  it('builds sheet, panels, and wells on navy surfaces with the border token', () => {
+    expect(css).toMatch(/--sheet-glass:\s*color-mix\(in oklch, var\(--surface\)/);
+    expect(css).toMatch(/--panel-glass:\s*color-mix\(in oklch, var\(--surface-alt\)/);
+    expect(css).toMatch(/--well-border:\s*var\(--border\)/);
+    expect(rule('.lm-sheet-shell')).toMatch(/border: 1px solid var\(--border\)/);
+    expect(rule('.lm-form-panel')).toMatch(/border: 1px solid var\(--border\)/);
+    expect(rule('.lm-form-panel-artist')).toMatch(/var\(--surface-alt\)/);
+  });
+
+  it('gives sheet fields the cyan focus ring instead of the pink primary ring', () => {
+    const appConfig = readFileSync(resolve(process.cwd(), 'app/app.config.ts'), 'utf8');
+    for (const component of ['input', 'inputMenu', 'select', 'textarea']) {
+      expect(appConfig, component).toMatch(new RegExp(`${component}: fieldFocus`));
+    }
+    expect(appConfig).toMatch(/focus-visible:ring-\(color:--focus\)/);
+    expect(appConfig).toMatch(/outline-\(color:--focus\)\/25/);
+  });
+
+  it('fills the selected option chip and festival day pink with black text', () => {
+    const pressed = rule('.lm-option-chip[aria-pressed="true"]');
+    expect(pressed).toMatch(/background: #FF4D8A/);
+    expect(pressed).toMatch(/color: #000/);
+
+    const addSheet = readFileSync(resolve(process.cwd(), 'app/components/AppAddConcertSheet.vue'), 'utf8');
+    expect(addSheet).toMatch(/concertDate === day\s*\n\s*\? 'border-primary bg-primary text-black'/);
+  });
+});

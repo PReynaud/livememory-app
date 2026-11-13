@@ -145,10 +145,11 @@ if (import.meta.server) {
         </div>
         <div class="space-y-3">
           <AppEventCard
-            v-for="event in featuredEvents"
+            v-for="(event, index) in featuredEvents"
             :key="event.id"
             :event="event"
             :concerts="eventsStore.concertsForEvent(event.id)"
+            :variant="index === 0 ? 'hero' : 'default'"
             featured
           />
         </div>
@@ -169,6 +170,7 @@ if (import.meta.server) {
         <AppEventCard
           :event="lastNightEvent"
           :concerts="eventsStore.concertsForEvent(lastNightEvent.id)"
+          variant="memory"
         />
       </section>
 

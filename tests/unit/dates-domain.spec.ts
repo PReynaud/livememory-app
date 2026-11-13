@@ -7,7 +7,25 @@ import {
 } from '../../shared/domain/dates';
 import { dateOutsideEventMessage as eventDateOutside } from '../../shared/domain/events';
 import { dateOutsideEventMessage as concertDateOutside } from '../../shared/domain/concerts';
-import { formatCivilDate as uiFormatCivilDate, formatEventDateLabel } from '../../app/utils/event-dates';
+import { formatCivilDate as uiFormatCivilDate, formatDateStack, formatEventDateLabel } from '../../app/utils/event-dates';
+
+describe('date stack', () => {
+  it('splits a civil date into uppercase weekday, day, month, and year', () => {
+    expect(formatDateStack('2025-04-26')).toEqual({ weekday: 'SAT', day: '26', month: 'APR', year: '2025' });
+  });
+
+  it('does not shift across month and year boundaries', () => {
+    expect(formatDateStack('2026-01-01')).toEqual({ weekday: 'THU', day: '1', month: 'JAN', year: '2026' });
+    expect(formatDateStack('2026-12-31')).toEqual({ weekday: 'THU', day: '31', month: 'DEC', year: '2026' });
+    expect(formatDateStack('2024-02-29')).toEqual({ weekday: 'THU', day: '29', month: 'FEB', year: '2024' });
+    expect(formatDateStack('2024-09-21').month).toBe('SEP');
+  });
+
+  it('falls back to the raw value without throwing', () => {
+    expect(formatDateStack('not-a-date')).toEqual({ weekday: '', day: 'not-a-date', month: '', year: '' });
+    expect(formatDateStack('')).toEqual({ weekday: '', day: '', month: '', year: '' });
+  });
+});
 
 describe('civil date display', () => {
   it('formats a Paris civil date as DD/MM/YYYY and ranges the same in domain and UI', () => {

@@ -12,6 +12,7 @@ import {
   concertFilterChips,
   EVENTS_LIST_WINDOW,
   filterEventsByConcertFilters,
+  groupEventsByYear,
   paginateConcertEvents,
   splitEventsForConcerts,
   type ListTab
@@ -73,6 +74,7 @@ const listedEvents = computed(() => {
 
   return paginateConcertEvents(filteredEvents.value, pastPageSize.value);
 });
+const yearGroups = computed(() => groupEventsByYear(listedEvents.value));
 const filterCount = computed(() => activeCount(tab.value));
 const catalog = computed(() => {
   const bucket = tab.value === 'upcoming' ? upcomingEvents.value : buckets.value.past;
@@ -183,14 +185,29 @@ if (import.meta.server) {
 
         <div
           v-else
-          class="space-y-2.5"
+          class="space-y-6"
         >
-          <AppEventCard
-            v-for="event in listedEvents"
-            :key="event.id"
-            :event="event"
-            :concerts="eventsStore.concertsForEvent(event.id)"
-          />
+          <section
+            v-for="(group, index) in yearGroups"
+            :key="`${group.year}-${index}`"
+            class="space-y-2.5"
+            data-testid="concerts-year"
+            :aria-labelledby="`concerts-year-${tab}-${index}`"
+          >
+            <h2
+              :id="`concerts-year-${tab}-${index}`"
+              class="lm-year-heading"
+            >
+              {{ group.year }}
+            </h2>
+            <AppEventCard
+              v-for="event in group.events"
+              :key="event.id"
+              :event="event"
+              :concerts="eventsStore.concertsForEvent(event.id)"
+              variant="row"
+            />
+          </section>
           <p
             v-if="loadingMore"
             data-testid="loading-more"
