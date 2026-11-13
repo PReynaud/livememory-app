@@ -426,3 +426,38 @@ test('keeps an in-progress festival in Coming up and Last night', async ({
   await expect(lastNight.getByText('Justice')).toBeVisible();
   await expect(lastNight.getByText('Phoenix')).toBeVisible();
 });
+
+test('leads Home with a hero that fits a long artist name and drops the atmosphere under reduced motion', async ({
+  authenticatedPage,
+  account
+}) => {
+  const session = await signIn(account);
+  const today = parisToday();
+  const soon = addUtcDays(today, 5);
+  const later = addUtcDays(today, 12);
+  const longArtist = 'The Extraordinarily Long Named Orchestra of the Northern Lights and Friends Live';
+  const heroId = await createEvent(session, { name: longArtist, start: soon, place: 'Lyon' });
+  await createConcert(session, { eventId: heroId, artist: longArtist, date: soon, place: 'Lyon' });
+  const laterId = await createEvent(session, { name: 'Second Night', start: later, place: 'Paris' });
+  await createConcert(session, { eventId: laterId, artist: 'Second Night', date: later, place: 'Paris' });
+
+  await authenticatedPage.setViewportSize({ width: 390, height: 844 });
+  await reloadHome(authenticatedPage);
+
+  const featured = authenticatedPage.getByTestId('home-featured');
+  const hero = featured.locator('[data-variant="hero"]');
+  await expect(hero).toHaveCount(1);
+  await expect(hero.getByRole('link')).toContainText(longArtist);
+  await expect(featured.locator('[data-variant="default"]')).toContainText('Second Night');
+  await expect(hero.locator('.lm-date-stack')).toBeVisible();
+  await expect(hero.locator('.lm-hero-atmosphere')).toBeVisible();
+
+  const overflow = await authenticatedPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  const heroBox = await hero.boundingBox();
+  expect(heroBox?.width ?? 0).toBeLessThanOrEqual(390);
+
+  await authenticatedPage.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(hero.locator('.lm-hero-atmosphere')).toBeHidden();
+  await expect(hero.getByRole('link')).toContainText(longArtist);
+});

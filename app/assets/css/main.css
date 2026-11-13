@@ -124,6 +124,79 @@ html {
   border-color: color-mix(in oklch, var(--fg) 22%, var(--border));
 }
 
+.lm-date-stack {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  padding: 7px 0 6px;
+  border-radius: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.lm-date-stack-weekday,
+.lm-date-stack-month {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.lm-date-stack-day {
+  margin: 3px 0 2px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.lm-date-stack[data-size="lg"] {
+  width: 60px;
+  padding: 9px 0 8px;
+  border-radius: 14px;
+  background: color-mix(in oklch, var(--surface-alt) 82%, transparent);
+}
+
+.lm-date-stack[data-size="lg"] .lm-date-stack-day {
+  font-size: 28px;
+}
+
+.lm-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: 8.5rem;
+  border-color: color-mix(in oklch, var(--focus) 16%, var(--border));
+}
+
+.lm-hero-atmosphere {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 55% at 82% 78%, color-mix(in oklch, #FF4D8A 42%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 18% 22%, color-mix(in oklch, var(--focus) 22%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 55% 92%, color-mix(in oklch, #A78BFA 34%, transparent), transparent 70%);
+  animation: lm-pulse-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes lm-pulse-drift {
+  from {
+    transform: translate3d(-4%, -3%, 0);
+  }
+
+  to {
+    transform: translate3d(4%, 3%, 0);
+  }
+}
+
 .lm-concert-row {
   display: flex;
   align-items: center;
@@ -363,6 +436,10 @@ html {
 
   .lm-card-interactive {
     transition: none;
+  }
+
+  .lm-hero-atmosphere {
+    display: none;
   }
 
   .lm-list-tab,
