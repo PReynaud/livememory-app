@@ -12,6 +12,11 @@ import {
 } from './helpers/mcp-client';
 import { transparentSingleNightName, CONCERT_IDENTITY, CONCERT_RULE_MESSAGE } from '../../shared/domain/concerts';
 
+const nextYearDate = (month: number, day: number) => {
+  const year = new Date().getUTCFullYear() + 1;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
 const appBaseURL = (page: import('@playwright/test').Page) => {
   return new URL(page.url()).origin;
 };
@@ -28,9 +33,10 @@ test('MCP create_concert after Allow appears on Concerts, then revoke returns 40
   await expect(page.getByText('Personal key')).toHaveCount(0);
 
   const session = await connectMcpClient(page);
+  const concertDate = nextYearDate(10, 15);
   const created = await callMcpTool(appBaseURL(page), session.accessToken, 'create_concert', {
     artist: 'MCP Justice',
-    date: '2026-10-15',
+    date: concertDate,
     time: '21:00',
     place: 'Nantes'
   });
@@ -39,12 +45,12 @@ test('MCP create_concert after Allow appears on Concerts, then revoke returns 40
   expect(created.json.outcome).toBe(CONCERT_IDENTITY.created);
   const concert = created.json.data as { artist?: string; date?: string; place?: string };
   expect(concert.artist).toBe('MCP Justice');
-  expect(concert.date).toBe('2026-10-15');
+  expect(concert.date).toBe(concertDate);
   expect(concert.place).toBe('Nantes');
 
   await page.getByRole('link', { name: 'Concerts' }).click();
   await waitForNuxtHydration(page);
-  const nightName = transparentSingleNightName('2026-10-15', 'Nantes');
+  const nightName = transparentSingleNightName(concertDate, 'Nantes');
   await expect(page.getByRole('link', { name: new RegExp(nightName) })).toBeVisible();
   await expect(page.getByText('MCP Justice')).toBeVisible();
   await expect(page.getByText('21:00').first()).toBeVisible();
@@ -71,9 +77,10 @@ test('MCP create_concert returns needs_choice and attach keeps a single Concert'
   const page = authenticatedPage;
   const session = await connectMcpClient(page);
   const key = session.accessToken;
+  const concertDate = nextYearDate(10, 16);
   const first = await callMcpTool(appBaseURL(page), key, 'create_concert', {
     artist: 'MCP Twin',
-    date: '2026-10-16',
+    date: concertDate,
     place: 'Bordeaux'
   });
   expect(first.json.ok).toBe(true);
@@ -82,7 +89,7 @@ test('MCP create_concert returns needs_choice and attach keeps a single Concert'
 
   const choice = await callMcpTool(appBaseURL(page), key, 'create_concert', {
     artist: 'MCP Twin',
-    date: '2026-10-16',
+    date: concertDate,
     place: 'Bordeaux'
   });
   expect(choice.json.ok).toBe(false);
@@ -93,7 +100,7 @@ test('MCP create_concert returns needs_choice and attach keeps a single Concert'
 
   const attached = await callMcpTool(appBaseURL(page), key, 'create_concert', {
     artist: 'MCP Twin',
-    date: '2026-10-16',
+    date: concertDate,
     place: 'Bordeaux',
     confirm: 'attach'
   });

@@ -133,7 +133,7 @@ const slideoverUi = {
             </p>
             <span
               class="inline-flex h-6 items-center rounded-full border px-2 text-[10px] font-semibold leading-none"
-              :class="message.card.attendance === 'going' ? 'border-[#FF4D8A] text-[#FF4D8A]' : 'border-[#A3A3A3] text-[#A3A3A3]'"
+              :class="message.card.attendance === 'going' ? 'border-[#FF4D8A] text-[#FF4D8A]' : 'border-[var(--muted)] text-[var(--muted)]'"
             >
               {{ attendanceChipLabel(message.card.attendance) }}
             </span>

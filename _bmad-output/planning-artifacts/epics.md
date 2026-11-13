@@ -221,6 +221,10 @@ Pierre sends an Event URL or enables a Shared List. Sam can view, join, set only
 Pierre approves an MCP client in the browser and can revoke it. An authenticated agent can list, read, create, update, move, and delete Events and Concerts (including Attendance and joins) under the same owner vs joiner rights and validation as the UI. Not a second product.
 **FRs covered:** FR-17
 
+### Epic 4: Live Pulse visual pass
+Pierre opens LiveMemory and the next concert feels present: navy canvas, a strong date-stacked hero, year-grouped history, a display Event header with his notes, and cyan focus and active chrome. Design only — the same screens, data, and rules as Epics 1–3. Source: Notion "Design & Explorations", "Evolution plan — current app toward Live Pulse" (2026-11-13).
+**FRs covered:** none new (visual pass on FR-7, FR-8, FR-9, FR-14 surfaces)
+
 ## Epic 1: Keep a private log of nights
 
 Pierre registers, signs in, and keeps a private Event-backed log: single-night shows and festivals, Concerts, per-user Attendance, owner notes, Home (featured + three souvenir stats), and Concerts (full owned log). LiveMemory is usable alone, with no sharing required. Built on the existing Nuxt/Supabase factory. Every story adds or updates tests in `tests/unit` and/or `tests/e2e` (Playwright against local Supabase only). Pages call Pinia stores; stores call `shared/domain` with a user-scoped client.
@@ -996,3 +1000,131 @@ So that MCP is not a back door around Event ownership.
 **Given** effective Attendance and Shared List rules
 **When** the agent reads
 **Then** it uses the same domain/SQL definitions as the UI (AD-3, NFR-6)
+
+## Epic 4: Live Pulse visual pass
+
+Restyle the screens the app already has toward the Live Pulse board: navy canvas `#081020`, surfaces `#111827` / `#1F2937`, text `#F9FAFB`, muted `#9CA3AF`, pink `#FF4D8A` kept for Going and primary meaning, cyan `#00D4FF` limited to focus and active chrome. Design only: no schema, store-write, route, or navigation-target changes. Each story is one reviewable PR and stops if contrast, long names, empty / loading / error states, or reduced motion fail. Held items (friends, tickets, photos, setlist/details/memories tabs, favorites, genre chips, trend stats, discovery search, MCP or Settings in nav, filled or glowing primary buttons) stay out. Design handoff: `_bmad-output/design/handoff-live-pulse.md`.
+
+### Story 4.1: Move the app onto Live Pulse tokens
+
+As Pierre,
+I want the navy palette and a cyan focus ring everywhere,
+So that the whole app reads as Live Pulse before any screen changes shape.
+
+**Acceptance Criteria:**
+
+**Given** `app/assets/css/main.css`
+**When** the tokens are read
+**Then** canvas, surface, surface-alt, foreground, muted, border, and focus match the Epic 4 palette, and pink is unchanged
+
+**Given** any keyboard-focused control, including Attendance chips
+**When** it receives `:focus-visible`
+**Then** it shows a cyan outline
+
+**Given** the token pairs foreground, muted, and pink on canvas and surfaces, and cyan focus on canvas
+**When** WCAG contrast is computed
+**Then** text pairs are at least 4.5:1 and the focus ring is at least 3:1
+
+**Given** a selected Concerts tab
+**When** it renders
+**Then** it uses cyan; Going chips, filter chips, and selected choices stay pink
+
+### Story 4.2: Lead Home with the next concert
+
+As Pierre,
+I want Home to open on a strong hero for my next concert,
+So that the next night feels present before my past ones.
+
+**Acceptance Criteria:**
+
+**Given** at least one upcoming Event
+**When** Home loads
+**Then** the first one renders as a hero with a weekday / day / month date stack, a display title, the place, and its Attendance chip; other upcoming Events stay featured cards
+
+**Given** a 90-character artist name
+**When** the hero renders on a 390px phone
+**Then** the title wraps and nothing overflows
+
+**Given** `prefers-reduced-motion: reduce`
+**When** Home renders
+**Then** the hero atmosphere is not displayed
+
+**Given** a last attended Event
+**When** Home renders
+**Then** it shows as a quiet memory card with a compact date stack, and the souvenir counts stay one horizontal, non-interactive card
+
+### Story 4.3: Group the Concerts list by year
+
+As Pierre,
+I want my Concerts grouped under year headings with a date stack on each row,
+So that I can scan years of history quickly.
+
+**Acceptance Criteria:**
+
+**Given** Events in two different years
+**When** I open Concerts
+**Then** they appear under year headings in list order, each Event row led by a date stack
+
+**Given** the Past tab with more Events than one window
+**When** I press Load more
+**Then** new Events join the right year heading without duplicating it
+
+**Given** the Upcoming and Past tabs and filters
+**When** I use them
+**Then** behavior and copy are unchanged, and no All or Favorites tab exists
+
+### Story 4.4: Give the Event page a display header and my notes
+
+As Pierre,
+I want an Event header with the date stack and place, and my notes on the page,
+So that one night reads like a memory, not a form.
+
+**Acceptance Criteria:**
+
+**Given** an Event I own
+**When** I open it
+**Then** the header shows a date stack, the display title, and the place; the night Going chip sits in the header for a single night
+
+**Given** an Event I own whose Concerts have notes
+**When** I open it
+**Then** a compact bill shows a "My notes" card and a festival bill shows each note under its row
+
+**Given** an Event I joined
+**When** I open it
+**Then** no owner notes are shown and my Attendance stays private
+
+### Story 4.5: Restyle the Add and Edit sheets
+
+As Pierre,
+I want the Add and Edit sheets on navy glass with clear focus,
+So that logging a night matches the rest of Live Pulse.
+
+**Acceptance Criteria:**
+
+**Given** the Add Concert or Edit Event sheet
+**When** it opens
+**Then** panels use the navy surfaces, inputs show the cyan focus ring, and the primary stays a 44px outline
+
+**Given** the existing fields, Event picker, and attach / create confirm
+**When** I log a concert
+**Then** they behave exactly as before
+
+### Story 4.6: Recolor the app chrome
+
+As Pierre,
+I want the nav and logo to match Live Pulse,
+So that I know where I am at a glance.
+
+**Acceptance Criteria:**
+
+**Given** the glass nav or desktop rail
+**When** a route is active
+**Then** its item is cyan with `aria-current="page"`, and Add is a pink outline circle
+
+**Given** the nav
+**When** it renders
+**Then** it has exactly Home, Concerts, Add, and Profile
+
+**Given** the header and rail
+**When** they render
+**Then** they show the equalizer wordmark "LiveMemory"

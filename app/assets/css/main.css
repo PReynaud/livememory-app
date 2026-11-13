@@ -18,13 +18,16 @@
 }
 
 html {
-  background-color: #000000;
-  --ui-bg: #000000;
-  --bg: #000000;
-  --surface: #1A1A1A;
-  --fg: #ffffff;
-  --muted: #A3A3A3;
-  --border: #2E2E2E;
+  background-color: var(--bg);
+  --ui-bg: #081020;
+  --bg: #081020;
+  --surface: #111827;
+  --surface-alt: #1F2937;
+  --fg: #F9FAFB;
+  --muted: #9CA3AF;
+  --border: #263042;
+  --hairline: color-mix(in oklch, var(--fg) 8%, transparent);
+  --focus: #00D4FF;
   --glass: color-mix(in oklch, var(--surface) 58%, transparent);
   --sheet-glass: color-mix(in oklch, var(--surface) 64%, transparent);
   --panel-glass: color-mix(in oklch, var(--bg) 42%, transparent);
@@ -37,12 +40,13 @@ html {
 }
 
 .dark {
-  --ui-bg: #000000;
+  --ui-bg: var(--bg);
   --ui-primary: #FF4D8A;
+  --ui-text-muted: var(--muted);
 }
 
 .dark :focus-visible {
-  outline: 2px solid #FF4D8A;
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -246,9 +250,9 @@ html {
 }
 
 .lm-list-tab[aria-selected="true"] {
-  border: 2px solid #FF4D8A;
+  border: 2px solid var(--focus);
   color: var(--fg);
-  background: var(--surface);
+  background: color-mix(in oklch, var(--focus) 6%, var(--surface));
   padding: 0 13px;
 }
 
@@ -269,9 +273,9 @@ html {
 }
 
 .lm-list-tab[aria-selected="true"] .lm-list-tab-count {
-  border-color: color-mix(in oklch, #FF4D8A 45%, var(--border));
-  color: #FF4D8A;
-  background: color-mix(in oklch, #FF4D8A 10%, var(--surface));
+  border-color: color-mix(in oklch, var(--focus) 45%, var(--border));
+  color: var(--focus);
+  background: color-mix(in oklch, var(--focus) 10%, var(--surface));
 }
 
 .lm-filter-bar {
