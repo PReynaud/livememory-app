@@ -7,20 +7,24 @@ sources:
   - _bmad-output/specs/spec-livememory/entities.md
   - _bmad-output/planning-artifacts/prds/prd-livememory-2026-08-17/prd.md
   - imports/tidal-home-frosted-chrome.png
-updated: 2026-08-17
+updated: 2026-11-13
 colors:
   # Brand-layer deltas on Nuxt UI 4. Unlisted semantic tokens inherit Nuxt UI defaults.
-  canvas: '#000000'
-  surface-card: '#1A1A1A'
-  surface-glass: '#141414'
-  foreground: '#FFFFFF'
-  muted: '#A3A3A3'
+  # Live Pulse visual pass (Epic 4): navy canvas, cyan focus/active chrome, pink unchanged.
+  canvas: '#081020'
+  surface-card: '#111827'
+  surface-alt: '#1F2937'
+  surface-glass: '#111827'
+  border: '#263042'
+  foreground: '#F9FAFB'
+  muted: '#9CA3AF'
   primary: '#FF4D8A'
   primary-foreground: '#000000'
   going: '#FF4D8A'
   going-foreground: '#000000'
-  attended: '#A3A3A3'
-  bill-only: '#A3A3A3'
+  focus: '#00D4FF'
+  attended: '#9CA3AF'
+  bill-only: '#9CA3AF'
   destructive: '#F87171'
 typography:
   display:
@@ -67,7 +71,7 @@ components:
     foreground: '{colors.foreground}'
     radius: '{rounded.xl}'
     blur: 24px
-    active: '{colors.going}'
+    active: '{colors.focus}'
   event-group:
     background: '{colors.surface-card}'
     foreground: '{colors.foreground}'
@@ -128,9 +132,13 @@ LiveMemory is a private concert history that should feel like a music product, n
 
 It inherits **Nuxt UI 4** (Tailwind v4 utilities, semantic `primary` / `neutral` / text / background tokens). This file specifies only the brand-layer delta. Do not introduce a second component library, icon set, or CSS methodology.
 
-The posture: true-black canvas, white type that scans in one glance, slightly lifted cards, frosted chrome at the thumb. Generous title type on list surfaces; dense but not cramped rows underneath. No album art in v1 (product non-goal), so contrast and type do the work art would do in Tidal.
+The posture: deep navy canvas, white type that scans in one glance, slightly lifted cards, frosted chrome at the thumb. Generous title type on list surfaces; dense but not cramped rows underneath. No album art in v1 (product non-goal), so contrast and type do the work art would do in Tidal.
 
 **Locked brand chroma (Pierre, 2026-08-17):** one hue `{colors.going}` (`#FF4D8A`) as **sparse touches**, not a second identity. Most of the UI stays black / white / muted. Pink appears only in the four roles under Colors → Going. Never a rainbow of badge colors, never Spotify/template green, never white primary pills.
+
+**Live Pulse visual pass (Pierre, 2026-11-13, Epic 4):** the canvas moves from true black to navy `{colors.canvas}` with navy surfaces. A second hue, `{colors.focus}` (cyan `#00D4FF`), is admitted for **focus rings and active chrome only** (active nav item, selected list tab). Pink keeps every Going / primary meaning. Violet `#A78BFA` is not a component token; it may appear only as a stop in the Home hero atmosphere gradient, which is hidden under reduced motion. Source: Notion "Design & Explorations", section "Evolution plan — current app toward Live Pulse".
+
+Held out of this pass (the Live Pulse board draws them; no data or decision exists): friends, tickets, photos, Setlist / Details / Memories tabs, favorites, genre chips, trend stats, discovery search, MCP or Settings in primary navigation, filled or glowing primary buttons, and a Manual / From-an-event switch in the Add sheet.
 
 v1 is **dark-only**. Force `.dark` on the app shell. No light theme.
 
@@ -138,18 +146,20 @@ Visual references (spines win on conflict): `imports/tidal-home-frosted-chrome.p
 
 ## Colors
 
-- **Canvas (`{colors.canvas}`)** — Page background. Near-true black, darker than default Nuxt UI `--ui-bg` in dark mode. Maps to `--ui-bg: #000000` in `.dark`.
-- **Surface card (`{colors.surface-card}`)** — Event groups on the canvas. A step up from canvas so groups read without borders. Maps toward `--ui-bg-elevated` / `--ui-bg-muted`, shifted toward `#1A1A1A`. Not used as the Add overlay fill.
+- **Canvas (`{colors.canvas}`)** — Page background. Deep navy. Maps to `--ui-bg: #081020` in `.dark`.
+- **Surface card (`{colors.surface-card}`)** — Event groups on the canvas. A step up from canvas so groups read without borders. Maps toward `--ui-bg-elevated` / `--ui-bg-muted`, shifted toward `#111827`. Not used as the Add overlay fill.
+- **Surface alt (`{colors.surface-alt}`)** — Wells, rows inside cards, and date stacks. One step above the card.
+- **Focus (`{colors.focus}`)** — Cyan. Keyboard focus ring everywhere, active glass-nav item, selected Concerts tab. Never a button fill, never Attendance, never decoration.
 - **Surface glass (`{colors.surface-glass}`)** — Fill *before* blur for bottom chrome **and** the Add/Edit Concert sheet. Never an opaque slab. Always paired with backdrop blur; the list or Event behind must remain faintly visible.
 - **Foreground (`{colors.foreground}`)** — Titles, artist names, primary numbers. `--ui-text-highlighted` / white.
 - **Muted (`{colors.muted}`)** — Place, date, secondary lines. `--ui-text-muted`.
 - **Primary (`{colors.primary}`)** — Same hex as `{colors.going}`. Maps to Nuxt UI `--ui-primary` (factory green is **out**). **Not** a filled button fill. Outline CTAs use this for border + label; `{colors.primary-foreground}` (black) is for **filled selected** surfaces only. Primary **buttons** use the outline variant.
 - **Going (`{colors.going}`)** — The **one** chroma, **global and locked**. Distinguish by **role + scale + glow**, never a second hue:
-  1. **Selected choice (filled)** — Active nav icon pill and selected day-chip: `{colors.going}` fill + `{colors.going-foreground}` black glyph/type. Day-chip is the full filled chip. Active nav: filled icon pill, black icon; the word stays going so it reads on glass. Not a button, not a badge. No glow.
+  1. **Selected choice (filled)** — Selected day-chip and selected Attendance choice in the sheet: `{colors.going}` fill + `{colors.going-foreground}` black type. Not a button, not a badge. No glow. (Active nav moved to `{colors.focus}` in Epic 4.)
   2. **Primary action (large outline)** — Save, Add to this festival / this night, Attend this night, Copy link. Hollow: transparent fill, **2px** going border, going text, height **44px**, full-width or flex-grow in an action row. **No neon glow.** Lives in an action row / Event content footer. This is a button.
   3. **Going badge (small neon)** — Trailing 24px pill, **1px** border, going text, restrained glow. Status, not a CTA.
   4. **Quiet chips** — Confirmed `Attended`: 24px **solid** muted outline, no glow. **Unset ghost:** same 24px pill, muted ink, **dashed** outline, the **next-state word** (`Going` if upcoming, `Attended` if past), no glow. Not a third label.
-  Add (+) in the nav stays a **white** filled circle — launcher, not selected, not a CTA duplicate. `#FF4D8A` on canvas ≈ 6.7:1 (outline text); black on `#FF4D8A` ≈ 6.7:1 (selected fill). On `{colors.surface-card}` outline ≈ 5.5:1.
+  Add (+) in the nav is a `{colors.going}` **outline** circle — launcher, not selected, not a CTA duplicate. `#FF4D8A` on canvas ≈ 6.0:1 (outline text); black on `#FF4D8A` ≈ 6.7:1 (selected fill). On `{colors.surface-card}` outline ≈ 5.6:1.
 - **Attended (`{colors.attended}`)** — Past Attendance. Quiet. Same hex as muted; quieter because it is outline/meta, not a filled chip.
 - **Bill-only / unset (`{colors.bill-only}`)** — Outline ink for **unset** Attendance (this User has not marked going or attended). Same hex as `{colors.muted}`. Ghost pill `{components.attendance-unset}`: same geometry as Going/Attended, **dashed** muted border, **no glow**. Visible word is the next state — **Going** (upcoming) or **Attended** (past). Tap confirms that state. Distinct from neon Going (color + glow) and from confirmed Attended (solid muted outline). Never "Set", "On the bill", "Skipped", "Not going", +/−, or a third chroma. Never on the Shared List.
 - **Destructive (`{colors.destructive}`)** — Delete Event confirmation and hard errors only. Inherit Nuxt UI error; hex is a dark-mode readable red, not a brand accent.
@@ -158,15 +168,19 @@ Load-bearing contrast (WCAG 2.2 AA, dark-only):
 
 | Pair | Ratio (approx) | Use |
 |---|---|---|
-| `{colors.foreground}` on `{colors.canvas}` | 21:1 | titles, artist |
-| `{colors.muted}` on `{colors.canvas}` | ≥ 7:1 | date, Place |
-| `{colors.bill-only}` on `{colors.surface-card}` | ≥ 7:1 | unset ghost Going / Attended |
-| `{colors.going}` on `{colors.canvas}` | ≈ 6.7:1 | Going badge, outline CTA, nav word |
-| `{colors.going}` on `{colors.surface-card}` | ≈ 5.5:1 | Going badge / outline CTA on cards |
-| `{colors.going-foreground}` on `{colors.going}` | ≈ 6.7:1 | selected day-chip; active nav icon |
-| `{colors.destructive}` on `{colors.canvas}` | ≥ 4.5:1 | confirm delete / Leave |
+| `{colors.foreground}` on `{colors.canvas}` | ≈ 18.2:1 | titles, artist |
+| `{colors.muted}` on `{colors.canvas}` | ≈ 7.5:1 | date, Place |
+| `{colors.bill-only}` on `{colors.surface-card}` | ≈ 7.0:1 | unset ghost Going / Attended |
+| `{colors.going}` on `{colors.canvas}` | ≈ 6.0:1 | Going badge, outline CTA |
+| `{colors.going}` on `{colors.surface-card}` | ≈ 5.6:1 | Going badge / outline CTA on cards |
+| `{colors.going}` on `{colors.surface-alt}` | ≈ 4.7:1 | Going chip on a well |
+| `{colors.going-foreground}` on `{colors.going}` | ≈ 6.7:1 | selected day-chip / Attendance choice |
+| `{colors.focus}` on `{colors.canvas}` | ≈ 10.7:1 | focus ring, active nav, selected tab |
+| `{colors.destructive}` on `{colors.canvas}` | ≈ 6.9:1 | confirm delete / Leave |
 
-Avoid: extra accent hues besides `{colors.going}`, gradients on the canvas, colored Event cards, using error red for Attendance.
+`tests/unit/design-tokens.spec.ts` enforces these pairs from `app/assets/css/main.css`.
+
+Avoid: accent hues besides `{colors.going}` and `{colors.focus}`, gradients on the canvas outside the Home hero atmosphere, colored Event cards, using error red for Attendance.
 
 ## Typography
 
@@ -195,7 +209,7 @@ Nuxt UI / Tailwind spacing scale inherited. Product deltas:
 
 Depth comes from **blur and fill**, not drop shadows.
 
-- Canvas is flat black.
+- Canvas is flat navy. The only gradient is the Home hero atmosphere, behind the next concert.
 - Cards are a lighter fill, no shadow.
 - **Exception — Going chip:** a restrained `box-shadow` glow in `{colors.going}` (≈ `0 0 8px` at 40% alpha). Chip-only. Not card elevation. Reduced motion: drop the glow; keep the outline.
 - Glass nav: `backdrop-filter: blur({components.glass-nav.blur})` plus translucent `{colors.surface-glass}`. Content scrolling underneath must tint the bar (Tidal player/nav).
@@ -220,7 +234,7 @@ Use Nuxt UI components as-is unless listed: `UButton`, `UForm` / fields, `UCard`
 
 Brand-layer components:
 
-- **Glass nav** — Mobile (`< lg`) persistent bottom bar. Frosted Tidal-family chrome — do **not** neon-glow the bar. Four targets: **Home**, Concerts, Add, Profile. Add is a white filled launcher pill. **Active** is selected-choice: icon pill **filled** `{colors.going}`, black glyph; label `{colors.going}`. Not an outline button, not a Going badge. Inactive items stay white. Desktop left rail uses the same selected fill on the active icon. → `mockups/key-home.html`
+- **Glass nav** — Mobile (`< lg`) persistent bottom bar. Frosted Tidal-family chrome — do **not** neon-glow the bar. Four targets: **Home**, Concerts, Add, Profile. Add is a `{colors.going}` outline launcher circle. **Active** is active chrome: icon pill with a `{colors.focus}` outline and a faint cyan tint, cyan glyph and label, `aria-current="page"`. Not an outline button, not a Going badge. Inactive items stay `{colors.foreground}`. Desktop left rail uses the same active treatment and shows the equalizer wordmark logo on top. → `mockups/key-home.html`
 - **Event group** — `{components.event-group}` on Concerts, Shared List, and the Event bill card. Used when the Bill has **2+ Concerts**. Header: Event name, date or range, Place. Body: Concert rows grouped by day. Day headers (`{typography.meta}`, semibold) are the visual breaks — not row hairlines. Tapping the header opens Event view. → `mockups/key-concerts.html`, `mockups/key-event.html`
 - **Compact Event** — `{components.event-compact}` when the Bill has **exactly one Concert** (typical `single_night`; also a festival or named night that still has one act). Same fill/radius as Event group. **One** artist title (`{typography.title}`), not Event name then artist again. One meta line: date · Place · time · Stage or Scene if present. If Event name ≠ artist, Event name is a **second muted meta line**, not a second title. Attendance chip on the right. Still an Event — tap opens Event view. Empty Bills (0 Concerts) stay a header-only Event group, not compact. → `mockups/key-concerts.html`
 - **Featured Event** — Home only, above stats. `{components.featured-event}`: same fill/radius as Event group. **2+ Concerts:** Event name `{typography.display-sm}`, then day-grouped rows (same day-break rule as Event group). **1 Concert:** artist as `{typography.display-sm}` (compact anatomy, larger type). Tapping still opens Event. Home stops after stats. → `mockups/key-home.html`
@@ -241,7 +255,7 @@ Brand-layer components:
 
 | Do | Don't |
 |---|---|
-| Black canvas, white type, going as the only chroma — sparse touches, four roles | Keep template green, Spotify green, a second pink, or color every chip |
+| Navy canvas, white type, going as the only content chroma (four roles), cyan only for focus and active chrome | Keep template green, Spotify green, a second pink, or color every chip |
 | Frost the bottom chrome **and** the Add sheet; let the list bleed through | Solid opaque footer, opaque add modal, or glass on every Event card |
 | Make artist + Event name scannable in one glance | Hide the add path behind a desktop-only control |
 | Same hue, four roles: filled select, large outline CTA, small neon Going, quiet chips | Fill Save, glow Save, or use the 24px Going pill as a button |
