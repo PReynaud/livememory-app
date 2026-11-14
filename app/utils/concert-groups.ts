@@ -43,6 +43,10 @@ export const eachCivilDateInclusive = (start: string, end: string): string[] => 
   return dates;
 };
 
+export const dayConcertCountLabel = (count: number): string => {
+  return count === 1 ? '1 concert' : `${count} concerts`;
+};
+
 export const formatConcertDayLabel = (iso: string): string => {
   const date = new Date(`${iso}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) {

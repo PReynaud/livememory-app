@@ -9,6 +9,7 @@ import { COPY_LINK_FAILED } from '@/utils/copy-link';
 import { LINK_COPIED, shareEventLink } from '@/utils/share-event';
 import { formatEventDateLabel } from '@/utils/event-dates';
 import {
+  dayConcertCountLabel,
   formatConcertClock,
   formatConcertDayLabel,
   groupConcertsByDate,
@@ -46,6 +47,21 @@ const loadFailed = computed(() => {
 });
 
 const billGroups = computed(() => groupConcertsByDate(currentConcerts.value));
+const collapsedDays = ref(new Set<string>());
+const canCollapseDays = computed(() => {
+  return currentEvent.value?.kind === 'festival' && billGroups.value.length > 1;
+});
+const isDayOpen = (date: string) => !collapsedDays.value.has(date);
+const toggleDay = (date: string) => {
+  const next = new Set(collapsedDays.value);
+  if (next.has(date)) {
+    next.delete(date);
+  } else {
+    next.add(date);
+  }
+
+  collapsedDays.value = next;
+};
 const showDayHeaders = computed(() => {
   if (!currentEvent.value) {
     return false;
@@ -108,6 +124,7 @@ const loadEvent = async (id: string) => {
   confirmLeave.value = false;
   leaveError.value = '';
   hasLeft.value = false;
+  collapsedDays.value = new Set();
   if (!id) {
     hasResolved.value = true;
     return;
@@ -223,6 +240,7 @@ const leaveThisEvent = async () => {
         <div class="flex items-start justify-between gap-3">
           <AppDateStack
             :date="currentEvent.start_date"
+            :end-date="currentEvent.end_date"
             size="lg"
           />
           <div class="lm-header-actions">
@@ -317,13 +335,33 @@ const leaveThisEvent = async () => {
               :key="group.date"
               :class="index > 0 ? 'mt-3 border-t border-[var(--hairline)] pt-3' : ''"
             >
+              <button
+                v-if="canCollapseDays"
+                type="button"
+                class="flex w-full cursor-pointer items-center justify-between gap-3 border-0 bg-transparent px-0.5 text-left"
+                :class="isDayOpen(group.date) ? 'mb-2' : ''"
+                :aria-expanded="isDayOpen(group.date)"
+                :aria-controls="`bill-day-${group.date}`"
+                @click="toggleDay(group.date)"
+              >
+                <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  {{ formatConcertDayLabel(group.date) }}
+                </span>
+                <span class="text-[11px] font-semibold tabular-nums text-muted">
+                  {{ dayConcertCountLabel(group.concerts.length) }}
+                </span>
+              </button>
               <p
-                v-if="showDayHeaders"
+                v-else-if="showDayHeaders"
                 class="mb-2 px-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted"
               >
                 {{ formatConcertDayLabel(group.date) }}
               </p>
-              <div class="space-y-2">
+              <div
+                v-show="!canCollapseDays || isDayOpen(group.date)"
+                :id="canCollapseDays ? `bill-day-${group.date}` : undefined"
+                class="space-y-2"
+              >
                 <div
                   v-for="concert in group.concerts"
                   :key="concert.id"

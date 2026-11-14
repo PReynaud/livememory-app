@@ -300,6 +300,7 @@ describe('Home Live Pulse hero', () => {
     const card = read('app/components/AppEventCard.vue');
     expect(card).toMatch(/class="lm-hero-atmosphere"\s+aria-hidden="true"/);
     expect(card).toMatch(/AppDateStack/);
+    expect(card).toMatch(/:end-date="stackEndDate"/);
     expect(card).toMatch(/data-variant/);
     expect(card).not.toMatch(/<img|background-image|url\(/);
 

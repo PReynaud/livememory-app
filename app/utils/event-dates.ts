@@ -1,5 +1,5 @@
 import type { EventRecord } from '#shared/domain/events';
-import { formatCivilDate, formatEventDateRange } from '#shared/domain/dates';
+import { CIVIL_DATE, formatCivilDate, formatEventDateRange } from '#shared/domain/dates';
 
 export { formatCivilDate };
 
@@ -8,16 +8,19 @@ export type DateStackParts = {
   day: string;
   month: string;
   year: string;
+  range: boolean;
 };
+
+const RANGE_DASH = '–';
 
 const stackPart = (date: Date, options: Intl.DateTimeFormatOptions) => {
   return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(date).toUpperCase();
 };
 
-export const formatDateStack = (iso: string): DateStackParts => {
+const singleDateStack = (iso: string): DateStackParts => {
   const date = new Date(`${iso}T00:00:00.000Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(date.getTime())) {
-    return { weekday: '', day: iso, month: '', year: '' };
+  if (!CIVIL_DATE.test(iso) || Number.isNaN(date.getTime())) {
+    return { weekday: '', day: iso, month: '', year: '', range: false };
   }
 
   return {
@@ -25,7 +28,31 @@ export const formatDateStack = (iso: string): DateStackParts => {
     day: stackPart(date, { day: 'numeric' }),
     // en-GB renders September as "Sept"; the stack column fits three letters.
     month: stackPart(date, { month: 'short' }).slice(0, 3),
-    year: stackPart(date, { year: 'numeric' })
+    year: stackPart(date, { year: 'numeric' }),
+    range: false
+  };
+};
+
+export const formatDateStack = (start: string, end?: string): DateStackParts => {
+  const startParts = singleDateStack(start);
+  if (!end || end === start || !startParts.weekday || !CIVIL_DATE.test(end) || end < start) {
+    return startParts;
+  }
+
+  const endParts = singleDateStack(end);
+  if (!endParts.weekday) {
+    return startParts;
+  }
+
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7);
+  const sameYear = start.slice(0, 4) === end.slice(0, 4);
+
+  return {
+    weekday: sameMonth ? '' : (sameYear ? startParts.year : `${startParts.year}${RANGE_DASH}${endParts.year}`),
+    day: `${startParts.day}${RANGE_DASH}${endParts.day}`,
+    month: sameMonth ? startParts.month : `${startParts.month}${RANGE_DASH}${endParts.month}`,
+    year: sameYear ? startParts.year : `${startParts.year}${RANGE_DASH}${endParts.year}`,
+    range: true
   };
 };
 

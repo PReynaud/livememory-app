@@ -149,7 +149,7 @@ describe('add concert sheet open/close state', () => {
     const stageItems = sheet.slice(sheet.indexOf('const stageItems ='), sheet.indexOf('const eventItems ='));
 
     expect(sheet).toMatch(/v-if="!isNewFestival"/);
-    expect(sheet).toMatch(/label="Stage or Scene"/);
+    expect(sheet).toMatch(/label="Stage or Scene"[\s\S]{0,80}description="Optional"/);
     expect(sheet).toMatch(/placeholder="Venue or stage"/);
     expect(sheet).toMatch(/placeholder="City"/);
     expect(sheet).toMatch(/label="City"/);
@@ -195,7 +195,8 @@ describe('add concert sheet open/close state', () => {
     const addUi = addSheet.slice(addSheet.indexOf('const slideoverUi ='), addSheet.indexOf('</script>'));
     const editUi = editSheet.slice(editSheet.indexOf('const slideoverUi ='), editSheet.indexOf('</script>'));
 
-    expect(addSheet).toMatch(/:label="saveLabel"[\s\S]*?class="h-11 flex-1 justify-center rounded-full ring-2"/);
+    expect(addSheet).toMatch(/:label="saveLabel"[\s\S]*?class="h-11 w-full flex-1 justify-center rounded-full ring-2"/);
+    expect(addSheet).toMatch(/flex w-full flex-col gap-3 sm:flex-row sm:items-center/);
     expect(addSheet).toMatch(/label="Attach"[\s\S]*?justify-center/);
     expect(addSheet).toMatch(/label="Create"[\s\S]*?justify-center/);
     expect(addUi).toMatch(/overlay: 'bg-elevated\/0'/);

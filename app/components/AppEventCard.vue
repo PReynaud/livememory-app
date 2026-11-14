@@ -53,6 +53,17 @@ const stackDate = computed(() => {
 
   return compact.value && concert.value ? concert.value.date : props.event.start_date;
 });
+const stackEndDate = computed(() => {
+  if (!stackDate.value || (compact.value && concert.value)) {
+    return undefined;
+  }
+
+  if (!props.event.end_date || props.event.end_date < props.event.start_date) {
+    return undefined;
+  }
+
+  return props.event.end_date;
+});
 const stackClock = computed(() => {
   return props.featured && isNight.value ? earliestConcertClock(props.concerts) : '';
 });
@@ -138,6 +149,7 @@ const eventPath = computed(() => `/e/${props.event.id}`);
       >
         <AppDateStack
           :date="stackDate"
+          :end-date="stackEndDate"
           :size="isHero ? 'lg' : 'sm'"
         />
         <span

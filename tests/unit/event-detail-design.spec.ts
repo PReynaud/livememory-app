@@ -8,7 +8,7 @@ const header = page.slice(page.indexOf('<header'), page.indexOf('</header>'));
 
 describe('Event page Live Pulse header', () => {
   it('leads the header with a date stack, the display title, and a pinned place line', () => {
-    expect(header).toMatch(/<AppDateStack[\s\S]*:date="currentEvent\.start_date"[\s\S]*size="lg"/);
+    expect(header).toMatch(/<AppDateStack[\s\S]*:date="currentEvent\.start_date"[\s\S]*:end-date="currentEvent\.end_date"[\s\S]*size="lg"/);
     expect(header).toMatch(/<h1[\s\S]*currentEvent\.name/);
     expect(header).toMatch(/i-lucide-map-pin/);
     expect(header).toMatch(/eventLead/);
@@ -36,6 +36,16 @@ describe('Event page owner notes', () => {
     expect(page).toMatch(/v-if="isOwner && concert\.notes/);
     expect(page).toMatch(/data-testid="event-notes"/);
     expect(page).toMatch(/My notes/);
+  });
+
+  it('collapses festival days and leaves a one-day bill without that control', () => {
+    expect(page).toMatch(/canCollapseDays/);
+    expect(page).toMatch(/currentEvent\.value\?\.kind === 'festival' && billGroups\.value\.length > 1/);
+    expect(page).toMatch(/aria-expanded/);
+    expect(page).toMatch(/dayConcertCountLabel/);
+    expect(page).toMatch(/v-show="!canCollapseDays \|\| isDayOpen\(group\.date\)"/);
+    expect(page).toMatch(/collapsedDays\.value = new Set\(\)/);
+    expect(page).toMatch(/collapsedDays = ref\(new Set/);
   });
 
   it('does not draw held Live Pulse items', () => {

@@ -929,6 +929,7 @@ const slideoverUi = {
             v-if="!isNewFestival"
             label="Stage or Scene"
             name="stage"
+            description="Optional"
           >
             <UInputMenu
               v-model="stageName"
@@ -972,7 +973,7 @@ const slideoverUi = {
           variant="subtle"
           :title="CONCERT_RULE_MESSAGE.needsChoice"
         />
-        <div class="flex items-center gap-4 pt-1">
+        <div class="flex w-full items-center gap-4 pt-1">
           <UButton
             type="button"
             label="Attach"
@@ -1004,16 +1005,16 @@ const slideoverUi = {
       </template>
       <div
         v-else
-        class="flex flex-col gap-3"
+        class="flex w-full flex-col gap-3"
       >
-        <div class="flex items-center gap-4">
+        <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <UButton
             type="submit"
             form="add-concert-form"
             :label="saveLabel"
             color="primary"
             variant="outline"
-            class="h-11 flex-1 justify-center rounded-full ring-2"
+            class="h-11 w-full flex-1 justify-center rounded-full ring-2"
             :disabled="saving || (isEdit && !editLoaded) || confirmMove"
             :aria-busy="saving || undefined"
           />
