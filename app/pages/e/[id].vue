@@ -238,11 +238,34 @@ const leaveThisEvent = async () => {
     <template v-if="currentEvent">
       <header class="lm-event-header space-y-3">
         <div class="flex items-start justify-between gap-3">
-          <AppDateStack
-            :date="currentEvent.start_date"
-            :end-date="currentEvent.end_date"
-            size="lg"
-          />
+          <div class="min-w-0 flex-1">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+              {{ eventKindLabel }}
+            </p>
+            <div class="flex items-start justify-between gap-3">
+              <h1 class="min-w-0 text-[34px] font-bold tracking-tight leading-[1.1] [overflow-wrap:anywhere]">
+                {{ currentEvent.name }}
+              </h1>
+              <AppDateStack
+                class="shrink-0"
+                :date="currentEvent.start_date"
+                :end-date="currentEvent.end_date"
+                size="lg"
+              />
+            </div>
+            <p
+              v-if="currentEvent.place"
+              class="mt-2 flex max-w-[44ch] items-start gap-1.5 text-[15px] leading-[1.45] text-muted"
+            >
+              <UIcon
+                name="i-lucide-map-pin"
+                class="mt-[3px] size-4 shrink-0"
+                aria-hidden="true"
+              />
+              <span>{{ currentEvent.place }}</span>
+            </p>
+            <span class="sr-only">{{ formatEventDateLabel(currentEvent) }}</span>
+          </div>
           <div class="lm-header-actions">
             <button
               v-if="isOwner"
@@ -272,22 +295,6 @@ const leaveThisEvent = async () => {
               />
             </button>
           </div>
-        </div>
-        <div>
-          <p class="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-            {{ eventKindLabel }}
-          </p>
-          <h1 class="text-[34px] font-bold tracking-tight leading-[1.1] [overflow-wrap:anywhere]">
-            {{ currentEvent.name }}
-          </h1>
-          <p class="mt-2 flex max-w-[44ch] items-start gap-1.5 text-[15px] leading-[1.45] text-muted">
-            <UIcon
-              name="i-lucide-map-pin"
-              class="mt-[3px] size-4 shrink-0"
-              aria-hidden="true"
-            />
-            <span>{{ eventLead }}</span>
-          </p>
         </div>
         <AppAttendanceChip
           v-if="showNightGoingChip"
@@ -344,7 +351,12 @@ const leaveThisEvent = async () => {
                 :aria-controls="`bill-day-${group.date}`"
                 @click="toggleDay(group.date)"
               >
-                <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  <UIcon
+                    :name="isDayOpen(group.date) ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                    class="size-4 shrink-0"
+                    aria-hidden="true"
+                  />
                   {{ formatConcertDayLabel(group.date) }}
                 </span>
                 <span class="text-[11px] font-semibold tabular-nums text-muted">

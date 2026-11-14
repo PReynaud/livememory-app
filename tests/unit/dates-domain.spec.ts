@@ -38,14 +38,14 @@ describe('date stack', () => {
       range: true
     });
     expect(formatDateStack('2026-08-30', '2026-09-01')).toEqual({
-      weekday: '2026',
+      weekday: '',
       day: '30–1',
       month: 'AUG–SEP',
       year: '2026',
       range: true
     });
     expect(formatDateStack('2026-12-30', '2027-01-01')).toEqual({
-      weekday: '2026–2027',
+      weekday: '',
       day: '30–1',
       month: 'DEC–JAN',
       year: '2026–2027',

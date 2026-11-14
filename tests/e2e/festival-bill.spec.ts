@@ -72,14 +72,17 @@ test('shows a festival date range and collapses one bill day', async ({ authenti
   await expect(badge).toHaveAttribute('data-range', 'true');
   await expect(badge.locator('.lm-date-stack-day')).toHaveText('19–22');
   await expect(badge.locator('.lm-date-stack-month')).toHaveText('DEC');
-  await expect(badge.locator('.lm-date-stack-weekday')).toHaveCount(0);
-  await expect(authenticatedPage.locator('header')).toContainText('19/12/2026 – 22/12/2026');
+  await expect(badge.locator('.lm-date-stack-year')).toHaveText('2026');
+  await expect(authenticatedPage.locator('header h1').locator('..').locator('.lm-date-stack')).toBeVisible();
+  await expect(authenticatedPage.locator('header p').filter({ hasText: 'Bristol' })).not.toContainText('2026');
+  await expect(authenticatedPage.locator('header .sr-only')).toHaveText('19/12/2026 – 22/12/2026');
 
   const firstDay = authenticatedPage.getByRole('button', { name: /19 Dec/ });
   const secondDay = authenticatedPage.getByRole('button', { name: /22 Dec/ });
   await expect(firstDay).toHaveAttribute('aria-expanded', 'true');
   await expect(secondDay).toHaveAttribute('aria-expanded', 'true');
   await expect(firstDay).toContainText('1 concert');
+  await expect(firstDay.locator('.iconify, svg').first()).toBeVisible();
   await firstDay.click();
   await expect(firstDay).toHaveAttribute('aria-expanded', 'false');
   const firstPanel = authenticatedPage.locator(`[id="${await firstDay.getAttribute('aria-controls')}"]`);
@@ -107,6 +110,7 @@ test('shows a festival date range and collapses one bill day', async ({ authenti
   const card = authenticatedPage.locator('[data-event-card="group"]', { hasText: 'Harbour Week' });
   await expect(card.locator('.lm-date-stack')).toHaveAttribute('data-range', 'true');
   await expect(card.locator('.lm-date-stack-day')).toHaveText('19–22');
+  await expect(card.locator('.lm-date-stack-year')).toHaveText('2026');
   await expect(card.getByTestId('event-card-date')).toHaveText('19/12/2026 – 22/12/2026');
 });
 
