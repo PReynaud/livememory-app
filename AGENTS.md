@@ -78,6 +78,21 @@ export const useMyStore = defineStore('myStore', () => {
 
 Plan and implement features through **BMAD Method** workflows (spec → PRD/architecture/stories → `bmad-dev-story`), not ad-hoc dumps.
 
+## Notion decision log
+
+The Live Memory Notion hub is the product memory. Before a product, design, or delivery task is done, write the decision or the shipped change there, in English.
+
+- Design and visual status: [Design & Explorations](https://www.notion.so/3f602994851f81e9acd8d42f465b9d20)
+- Priorities and cross-cutting decisions: [Roadmap & Decisions](https://www.notion.so/3f602994851f81128380cbe7cd368c2b)
+- Shipped work, migrations, hosting: [Engineering & Delivery](https://www.notion.so/3f602994851f814e8383d9631b65a8bf)
+- Hub, navigation only: [Live Memory](https://www.notion.so/3cf02994851f80f49c82cdbcdd927b33)
+
+Search the target page first and update the existing section when the topic is already there. Do not paste the same decision onto the hub.
+
+Each entry has a date, the decision, the context, the rationale, the consequences, the follow-up, and a link to the PR or commit.
+
+Skip dependency bumps, formatting, and chores that do not change behavior or a decision. If Notion is unreachable, say so in the PR or the chat summary. Do not invent a log entry.
+
 ## Known pitfalls
 
 - Import `defineAppConfig` from `#imports` in `app/app.config.ts`. Auto-imports are off; omitting it fails `pnpm build:vercel` prerender with `defineAppConfig is not defined` while lint and unit tests still pass.
