@@ -34,6 +34,10 @@ describe('Profile redesign', () => {
 
   it('keeps the Shared list switch, Copy link, revoke, and Cursor key actions wired as before', () => {
     expect(template).toMatch(/label="Shared list"/);
+    expect(template).toMatch(/Anyone with the link can see your list\./);
+    expect(template).toMatch(/Your list is private\./);
+    expect(template).not.toMatch(/On\. Anyone/);
+    expect(template).not.toMatch(/Off\. Your list/);
     expect(template).toMatch(/data-testid="shared-list-toggle"/);
     expect(template).toMatch(/persistSharing\(\$event === true\)/);
     expect(template).toMatch(/copySharedListLink\(\)/);

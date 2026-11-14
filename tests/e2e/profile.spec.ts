@@ -19,9 +19,9 @@ test('Profile groups Account, sharing, connected clients, and the assistant into
   await expect(sharing.getByText(SHARED_LIST_HELPER)).toBeVisible();
   const sharingSwitch = sharing.getByRole('switch', { name: 'Shared list' });
   await expect(sharingSwitch).toBeVisible();
-  await expect(sharing.getByText('Off. Your list is private.')).toBeVisible();
+  await expect(sharing.getByText('Your list is private.')).toBeVisible();
   await sharingSwitch.click();
-  await expect(sharing.getByText('On. Anyone with the link can see your list.')).toBeVisible();
+  await expect(sharing.getByText('Anyone with the link can see your list.')).toBeVisible();
   await expect(sharing.getByTestId('shared-list-url')).toHaveText(new RegExp(`/u/${account.username}$`));
   await expect(sharing.getByRole('button', { name: 'Copy link' })).toBeVisible();
   await sharingSwitch.click();

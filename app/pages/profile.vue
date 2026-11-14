@@ -175,7 +175,7 @@ const connectCursor = async () => {
       <USwitch
         :model-value="sharedListEnabled"
         label="Shared list"
-        :description="sharedListEnabled ? 'On. Anyone with the link can see your list.' : 'Off. Your list is private.'"
+        :description="sharedListEnabled ? 'Anyone with the link can see your list.' : 'Your list is private.'"
         :disabled="loading"
         data-testid="shared-list-toggle"
         @update:model-value="void persistSharing($event === true)"
