@@ -59,13 +59,35 @@ test('MCP create_concert after Allow appears on Concerts, then revoke returns 40
   const baseURL = appBaseURL(page);
   const refreshed = await refreshMcpToken(baseURL, session.clientId, session.refreshToken);
   expect(refreshed.status).toBe(200);
-  const refreshedBody = await refreshed.json() as { access_token?: string };
+  const refreshedBody = await refreshed.json() as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
   expect(refreshedBody.access_token).toBeTruthy();
+  expect(refreshedBody.refresh_token).toBe(session.refreshToken);
+  expect(refreshedBody.expires_in).toBe(30 * 24 * 60 * 60);
+
+  const stillConnected = await callMcpTool(baseURL, session.accessToken, 'list_events');
+  expect(stillConnected.json.ok).toBe(true);
+
+  const refreshedAgain = await refreshMcpToken(baseURL, session.clientId, session.refreshToken);
+  expect(refreshedAgain.status).toBe(200);
+  const refreshedAgainBody = await refreshedAgain.json() as { access_token?: string };
+  expect(refreshedAgainBody.access_token).toBeTruthy();
+  const previousAccessStillWorks = await callMcpTool(
+    baseURL,
+    refreshedBody.access_token as string,
+    'list_events'
+  );
+  expect(previousAccessStillWorks.json.ok).toBe(true);
 
   await revokeMcpGrant(page, session.clientName);
   await expect(page.getByTestId('oauth-grants-empty')).toHaveText(OAUTH_GRANTS_EMPTY);
-  const rejected = await postMcpUnauthorized(baseURL, session.accessToken);
+  const rejected = await postMcpUnauthorized(baseURL, refreshedAgainBody.access_token);
   expect(rejected.status).toBe(401);
+  const rejectedPrevious = await postMcpUnauthorized(baseURL, refreshedBody.access_token);
+  expect(rejectedPrevious.status).toBe(401);
   const staleRefresh = await refreshMcpToken(baseURL, session.clientId, session.refreshToken);
   expect(staleRefresh.status).toBe(401);
 });

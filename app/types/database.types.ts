@@ -415,6 +415,8 @@ export type Database = {
           created_at: string
           has_access_token: boolean | null
           id: string
+          previous_access_expires_at: string | null
+          previous_access_token_hash: string | null
           previous_refresh_token_hash: string | null
           refresh_token_hash: string | null
           user_id: string
@@ -426,6 +428,8 @@ export type Database = {
           created_at?: string
           has_access_token?: boolean | null
           id?: string
+          previous_access_expires_at?: string | null
+          previous_access_token_hash?: string | null
           previous_refresh_token_hash?: string | null
           refresh_token_hash?: string | null
           user_id: string
@@ -437,6 +441,8 @@ export type Database = {
           created_at?: string
           has_access_token?: boolean | null
           id?: string
+          previous_access_expires_at?: string | null
+          previous_access_token_hash?: string | null
           previous_refresh_token_hash?: string | null
           refresh_token_hash?: string | null
           user_id?: string
