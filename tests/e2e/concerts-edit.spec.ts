@@ -63,7 +63,7 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await expect(authenticatedPage.getByText('Concert saved.', { exact: true })).toBeVisible();
   await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
-  await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('aria-pressed', 'true');
 
   const other = await createOwnedEventRest(account, {
     name: 'Other Night',
@@ -88,12 +88,13 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await expect(authenticatedPage).toHaveURL(new RegExp(`${targetPath}$`));
   await expect(authenticatedPage.getByRole('heading', { name: 'Other Night' })).toBeVisible();
   await expect(authenticatedPage.getByText('Justice')).toBeVisible();
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('aria-pressed', 'true');
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await gotoConcertsPeriod(authenticatedPage, 'past');
   await waitForNuxtHydration(authenticatedPage);
-  await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.locator('[data-event-card="compact"]').getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('aria-pressed', 'true');
 
   await authenticatedPage.getByRole('link', { name: /Other Night/ }).click();
 
@@ -109,7 +110,7 @@ test('owner moves a Concert between two owned Events without duplicating', async
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(0);
 });
 
-test('compact card chip cycles Attendance and does not open Edit', async ({ authenticatedPage }) => {
+test('compact card eye toggles seen and does not open Edit', async ({ authenticatedPage }) => {
   await addOwnedNightWithConcert(authenticatedPage, {
     name: 'Solo Night',
     date: '2026-08-18',
@@ -121,9 +122,10 @@ test('compact card chip cycles Attendance and does not open Edit', async ({ auth
   await waitForNuxtHydration(authenticatedPage);
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
-  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(compact.getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('aria-pressed', 'true');
 
-  await compact.getByRole('button', { name: 'Mark as attended' }).click();
+  await compact.getByRole('button', { name: 'Seen: Justice' }).click();
   await expect(authenticatedPage.getByRole('dialog')).toHaveCount(0);
-  await expect(compact.getByRole('button', { name: 'Mark as attended' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(compact.getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(compact.getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('data-seen', 'false');
 });

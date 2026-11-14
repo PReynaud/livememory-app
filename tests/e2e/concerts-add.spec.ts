@@ -66,17 +66,18 @@ test('adds a concert to an owned night with locked date and Place', async ({ aut
   await expect(authenticatedPage.getByText('Justice')).toHaveCount(1);
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toHaveCount(1);
   await expect(authenticatedPage.getByText('20:15')).toHaveCount(2);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: 'Seen: Justice' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.getByRole('button', { name: 'Seen: Fontaines D.C.' })).toHaveAttribute('aria-pressed', 'true');
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 
   await gotoConcertsPeriod(authenticatedPage, 'past');
-  const nightGroup = authenticatedPage.getByRole('link', { name: /Club Night/ });
+  const nightGroup = authenticatedPage.locator('[data-event-card="group"]').filter({ hasText: 'Club Night' });
   await expect(nightGroup).toBeVisible();
   await expect(authenticatedPage.getByText('Justice').first()).toBeVisible();
   await expect(authenticatedPage.getByText('20:15').first()).toBeVisible();
-  const nightChip = authenticatedPage.locator('[data-event-card="group"]').getByRole('button', { name: /Mark as (going|attended)/ });
-  await expect(nightChip).toHaveCount(1);
-  await expect(nightChip).toHaveAttribute('aria-pressed', 'false');
+  await expect(nightGroup.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(nightGroup.getByTestId('seen-toggle')).toHaveCount(2);
 });
 
 test('adds a festival concert on a picked day and groups it', async ({ authenticatedPage, account }) => {
@@ -106,7 +107,8 @@ test('adds a festival concert on a picked day and groups it', async ({ authentic
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
   await expect(compact.getByText('The Last Dinner Party')).toBeVisible();
-  await expect(compact.getByText('22/08/2026 · Paris')).toBeVisible();
+  await expect(compact.getByTestId('event-card-meta')).toHaveText('Paris');
+  await expect(compact.getByTestId('event-card-date')).toHaveText('22/08/2026');
   await expect(compact.getByText('Rock Week')).toBeVisible();
   await expect(authenticatedPage.getByText('Saturday 22 Aug')).toHaveCount(0);
 });
@@ -201,7 +203,8 @@ test('nav Add onto an existing Event stores the concert', async ({ authenticated
 
   await expect(authenticatedPage.getByText('Fontaines D.C.')).toBeVisible();
   await expect(authenticatedPage.getByText('No concerts on this bill.')).toHaveCount(0);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: 'Seen: Fontaines D.C.' })).toHaveAttribute('aria-pressed', 'true');
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
 });
 

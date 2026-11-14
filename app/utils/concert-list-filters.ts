@@ -6,7 +6,7 @@ export { EVENTS_LIST_WINDOW } from '#shared/domain/concerts';
 export { splitEventsForConcerts };
 
 export type ListTab = 'upcoming' | 'past';
-export type AttendanceMap = Record<string, 'going' | 'attended' | null | undefined>;
+export type AttendanceMap = Record<string, 'going' | 'attended' | 'missed' | null | undefined>;
 
 export type ConcertListFilterState = {
   ids: string[];

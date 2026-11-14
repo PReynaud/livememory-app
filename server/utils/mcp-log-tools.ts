@@ -1,6 +1,7 @@
 import {
   attendThisNight,
   clearAttendance,
+  isAttendanceStatus,
   listMyAttendance,
   setAttendance,
   type AttendanceClient,
@@ -156,7 +157,7 @@ const asConfirmChoice = (value: unknown): ConcertIdentityConfirm | undefined => 
 };
 
 const asAttendanceStatus = (value: unknown): AttendanceStatus | '' => {
-  return value === 'going' || value === 'attended' ? value : '';
+  return isAttendanceStatus(value) ? value : '';
 };
 
 const okJson = (data: unknown, outcome?: ConcertCreateOutcome | null): McpToolJson => ({
@@ -510,7 +511,7 @@ export const invokeLogTool = async (
       if (!status) {
         return failJson({
           ruleId: 'persist_failed',
-          message: 'Attendance must be going or attended'
+          message: 'Attendance must be going, attended, or missed'
         });
       }
 

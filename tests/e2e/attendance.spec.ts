@@ -165,15 +165,72 @@ test('marks a future concert Going and a past concert Attended, then clear stays
 
   await gotoConcertsPeriod(authenticatedPage, 'past');
   const pastGroup = authenticatedPage.locator('section').filter({ hasText: 'Past Night' });
-  const concertsAttended = pastGroup.getByRole('button', { name: 'Mark as attended' });
-  await expect(concertsAttended).toHaveAttribute('aria-pressed', 'true');
-  await expect(concertsAttended).toHaveText('Attended');
+  await expect(pastGroup.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  const concertsEye = pastGroup.getByRole('button', { name: 'Seen: Fontaines D.C.' });
+  await expect(concertsEye).toHaveAttribute('aria-pressed', 'true');
 
   await pastGroup.getByRole('link', { name: /Past Night/ }).click();
   await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(1);
-  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(authenticatedPage.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(authenticatedPage.getByRole('button', { name: 'Seen: Fontaines D.C.' })).toHaveAttribute('aria-pressed', 'true');
   await expect(authenticatedPage.getByRole('button', { name: 'Attend this night' })).toHaveCount(0);
+});
+
+test('a past concert is seen by default; the eye marks it not seen and back', async ({ authenticatedPage, account }) => {
+  const session = await signIn(account.email, account.password);
+  const { eventId } = await createOwnedConcert(session.headers, session.supabaseUrl, {
+    name: 'Archive Night',
+    date: '2026-08-18',
+    place: 'Berlin',
+    artist: 'Wolfheart'
+  });
+  const secondResponse = await fetch(concertsRest(session.supabaseUrl), {
+    method: 'POST',
+    headers: session.headers,
+    body: JSON.stringify({ event_id: eventId, artist: 'Eluveitie', date: '2026-08-18', place: 'Berlin' })
+  });
+  expect(secondResponse.ok).toBe(true);
+
+  const attendedStat = authenticatedPage.getByTestId('home-stats').locator('[data-stat="attended"]');
+  await authenticatedPage.goto('/home');
+  await waitForNuxtHydration(authenticatedPage);
+  await expect(attendedStat).toHaveText(/2/);
+
+  await gotoConcertsPeriod(authenticatedPage, 'past');
+  const card = authenticatedPage.locator('section').filter({ hasText: 'Archive Night' });
+  const wolfheart = card.getByRole('button', { name: 'Seen: Wolfheart' });
+  const eluveitie = card.getByRole('button', { name: 'Seen: Eluveitie' });
+  await expect(card.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  await expect(wolfheart).toHaveAttribute('aria-pressed', 'true');
+  await expect(eluveitie).toHaveAttribute('aria-pressed', 'true');
+
+  await eluveitie.click();
+  await expect(eluveitie).toHaveAttribute('aria-pressed', 'false');
+  await expect(eluveitie).toHaveAttribute('data-seen', 'false');
+  await expect(wolfheart).toHaveAttribute('aria-pressed', 'true');
+
+  await authenticatedPage.reload();
+  await waitForNuxtHydration(authenticatedPage);
+  await gotoConcertsPeriod(authenticatedPage, 'past');
+  await expect(card.getByRole('button', { name: 'Seen: Eluveitie' })).toHaveAttribute('aria-pressed', 'false');
+
+  await authenticatedPage.goto('/home');
+  await waitForNuxtHydration(authenticatedPage);
+  await expect(attendedStat).toHaveText(/1/);
+
+  const effective = await fetch(`${session.supabaseUrl}/rest/v1/attendance_effective?select=status`, {
+    headers: session.headers
+  });
+  const statuses = (await effective.json() as { status: string }[]).map(row => row.status).sort();
+  expect(statuses).toEqual(['attended', 'missed']);
+
+  await gotoConcertsPeriod(authenticatedPage, 'past');
+  await card.getByRole('button', { name: 'Seen: Eluveitie' }).click();
+  await expect(card.getByRole('button', { name: 'Seen: Eluveitie' })).toHaveAttribute('aria-pressed', 'true');
+
+  await authenticatedPage.goto('/home');
+  await waitForNuxtHydration(authenticatedPage);
+  await expect(attendedStat).toHaveText(/2/);
 });
 
 test('hides another user attendance over REST and coerces past going to attended', async ({ page: _page }, testInfo) => {
@@ -206,6 +263,23 @@ test('hides another user attendance over REST and coerces past going to attended
       })
     });
     expect(futureAttended.ok).toBe(false);
+
+    const futureMissed = await fetch(`${ownerSession.supabaseUrl}/rest/v1/attendance`, {
+      method: 'POST',
+      headers: ownerSession.headers,
+      body: JSON.stringify({
+        concert_id: future.concertId,
+        status: 'missed'
+      })
+    });
+    expect(futureMissed.ok).toBe(false);
+    expect(await futureMissed.text()).toMatch(/future_missed/);
+
+    const pastDefault = await fetch(
+      `${ownerSession.supabaseUrl}/rest/v1/attendance_effective?concert_id=eq.${past.concertId}&select=status`,
+      { headers: ownerSession.headers }
+    );
+    expect(await pastDefault.json()).toEqual([{ status: 'attended' }]);
 
     const futureGoing = await fetch(`${ownerSession.supabaseUrl}/rest/v1/attendance`, {
       method: 'POST',

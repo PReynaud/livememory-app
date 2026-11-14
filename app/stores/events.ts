@@ -56,6 +56,7 @@ import {
   attendThisNight as markNightAttendance,
   clearAttendance,
   isConcertPast,
+  isConcertSeen,
   isNightGoingPressed,
   listMyAttendance,
   setAttendance,
@@ -898,6 +899,60 @@ export const useEventsStore = defineStore('events', () => {
     }
   };
 
+  const concertSeen = (concert: Pick<ConcertRecord, 'id' | 'date' | 'time'>) => {
+    return isConcertSeen(concertIsPast(concert), attendanceStatus(concert.id));
+  };
+
+  const toggleSeen = async (concert: ConcertRecord) => {
+    const offline = notifyOfflineWrite(toast);
+    if (offline) {
+      return { data: null, error: offline };
+    }
+
+    if (!concertIsPast(concert) || attendanceBusyByConcertId.value[concert.id]) {
+      return { data: null, error: null };
+    }
+
+    attendanceBusyByConcertId.value = {
+      ...attendanceBusyByConcertId.value,
+      [concert.id]: true
+    };
+    attendanceError.value = null;
+
+    try {
+      const wasSeen = concertSeen(concert);
+      const result = wasSeen
+        ? await setAttendance(attendanceClient(), { concertId: concert.id, status: 'missed' })
+        : await clearAttendance(attendanceClient(), concert.id);
+
+      if (result.error) {
+        attendanceError.value = result.error.message;
+        return { data: null, error: result.error.message };
+      }
+
+      attendanceByConcertId.value = {
+        ...attendanceByConcertId.value,
+        [concert.id]: wasSeen ? 'missed' : 'attended'
+      };
+
+      const lastNightBillError = await ensureLastNightBillLoaded();
+      if (lastNightBillError) {
+        attendanceError.value = lastNightBillError;
+        return { data: null, error: lastNightBillError };
+      }
+
+      return { data: { seen: !wasSeen }, error: null };
+    } catch (err: unknown) {
+      const errorMessage = getErrorMessage(err, 'Failed to update attendance');
+      attendanceError.value = errorMessage;
+      return { data: null, error: errorMessage };
+    } finally {
+      attendanceBusyByConcertId.value = Object.fromEntries(
+        Object.entries(attendanceBusyByConcertId.value).filter(([concertId]) => concertId !== concert.id)
+      ) as Record<string, true>;
+    }
+  };
+
   const attendThisNight = async (eventId: string) => {
     const offline = notifyOfflineWrite(toast);
     if (offline) {
@@ -1035,6 +1090,7 @@ export const useEventsStore = defineStore('events', () => {
     eventGoingStatus,
     isEventGoingBusy,
     concertIsPast,
+    concertSeen,
     loadingMore,
     fetchEvents,
     loadMoreEvents,
@@ -1050,6 +1106,7 @@ export const useEventsStore = defineStore('events', () => {
     moveOwnedConcert,
     deleteOwnedConcert,
     cycleAttendance,
+    toggleSeen,
     cycleEventGoing,
     attendThisNight
   };

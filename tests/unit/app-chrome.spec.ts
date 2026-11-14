@@ -18,16 +18,30 @@ describe('Live Pulse app chrome', () => {
     expect(nav).not.toMatch(/'text-primary'/);
   });
 
-  it('keeps exactly four targets: Home, Concerts, Add, Profile', () => {
+  it('keeps four destinations (Home, Concerts, Add, Profile) plus the Ask assistant control', () => {
     const linkTargets = [...template.matchAll(/<NuxtLink\b/g)].length;
     const buttons = [...template.matchAll(/<button\b/g)].length;
-    expect(linkTargets + buttons).toBe(3);
+    expect(linkTargets).toBe(2);
+    expect(buttons).toBe(2);
     expect(nav).toMatch(/to: '\/home', label: 'Home'/);
     expect(nav).toMatch(/to: '\/concerts', label: 'Concerts'/);
     expect(nav).toMatch(/to: '\/home', label: 'Home'[\s\S]*to: '\/concerts'[\s\S]*\] as const/);
     expect(template).toMatch(/aria-label="Add concert"/);
     expect(template).toMatch(/to="\/profile"/);
     expect(nav).not.toMatch(/\/mcp|Settings|Shared list|i-lucide-search|i-lucide-bell/);
+  });
+
+  it('opens the assistant from the menu as a button, only when Cursor is ready, and not from Home', () => {
+    const assistant = template.slice(template.indexOf('v-if="isAssistantReady"'), template.indexOf('Assistant\n'));
+    expect(assistant).toMatch(/<button|type="button"/);
+    expect(assistant).toMatch(/aria-label="Ask assistant"/);
+    expect(assistant).toMatch(/data-testid="nav-assistant-action"/);
+    expect(assistant).toMatch(/@click="agentChat\.open = true"/);
+    expect(assistant).not.toMatch(/to="/);
+    expect(nav).toMatch(/useAgentChatStore/);
+
+    const home = read('app/pages/home.vue');
+    expect(home).not.toMatch(/home-assistant-action|Ask assistant|useAgentChatStore/);
   });
 
   it('draws Add as a pink outline circle, not a white fill', () => {

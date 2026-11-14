@@ -20,18 +20,19 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
   await expect(compact.getByRole('link')).toContainText('Justice');
-  await expect(compact.getByText('10/08/2026 · Berlin · 20:15')).toBeVisible();
+  await expect(compact.getByTestId('event-card-meta')).toHaveText('Berlin · 20:15');
+  await expect(compact.getByTestId('event-card-date')).toHaveText('10/08/2026');
   await expect(compact.getByText('Concerts on 10/08/2026 at Berlin')).toBeVisible();
   await expect(authenticatedPage.locator('[data-event-card="group"]')).toHaveCount(0);
 
-  const chip = compact.getByRole('button', { name: 'Mark as attended' });
-  await expect(chip).toHaveAttribute('aria-pressed', 'true');
-  await expect(chip).toHaveText('Attended');
-  await expect(chip).toBeEnabled();
+  await expect(compact.getByRole('button', { name: /Mark as (going|attended)/ })).toHaveCount(0);
+  const eye = compact.getByRole('button', { name: 'Seen: Justice' });
+  await expect(eye).toHaveAttribute('aria-pressed', 'true');
+  await expect(eye).toBeEnabled();
 
-  await chip.click();
+  await eye.click();
   await expect(authenticatedPage).toHaveURL(/\/concerts/);
-  await expect(chip).toHaveAttribute('aria-pressed', 'false');
+  await expect(eye).toHaveAttribute('aria-pressed', 'false');
 
   await compact.getByRole('link').click();
   await expect(authenticatedPage).toHaveURL(/\/e\/[0-9a-f-]{36}$/i);

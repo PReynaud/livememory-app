@@ -121,6 +121,13 @@ export type Database = {
             foreignKeyName: "attendance_concert_id_fkey"
             columns: ["concert_id"]
             isOneToOne: false
+            referencedRelation: "attendance_effective"
+            referencedColumns: ["concert_id"]
+          },
+          {
+            foreignKeyName: "attendance_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
             referencedRelation: "concert_notes"
             referencedColumns: ["concert_id"]
           },
@@ -481,29 +488,7 @@ export type Database = {
           status: string | null
           user_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "attendance_concert_id_fkey"
-            columns: ["concert_id"]
-            isOneToOne: false
-            referencedRelation: "concert_notes"
-            referencedColumns: ["concert_id"]
-          },
-          {
-            foreignKeyName: "attendance_concert_id_fkey"
-            columns: ["concert_id"]
-            isOneToOne: false
-            referencedRelation: "concerts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "attendance_concert_id_fkey"
-            columns: ["concert_id"]
-            isOneToOne: false
-            referencedRelation: "shared_list_concerts"
-            referencedColumns: ["concert_id"]
-          },
-        ]
+        Relationships: []
       }
       concert_notes: {
         Row: {

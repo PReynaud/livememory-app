@@ -3,10 +3,12 @@ import { computed } from 'vue';
 import { useEventsStore, type ConcertRecord, type EventRecord } from '@/stores/events';
 import { formatEventDateLabel } from '@/utils/event-dates';
 import {
+  earliestConcertClock,
   eventNameDiffersFromArtist,
   formatConcertClock,
   formatConcertDayLabel,
   formatConcertMetaLine,
+  formatVenueLine,
   groupConcertsByDate,
   isCompactBill,
   shouldShowDayHeaders
@@ -17,30 +19,78 @@ const props = defineProps<{
   concerts: ConcertRecord[];
   featured?: boolean;
   readonly?: boolean;
+  hideAttendance?: boolean;
   variant?: 'default' | 'hero' | 'memory' | 'row';
 }>();
 
 const eventsStore = useEventsStore();
 const compact = computed(() => isCompactBill(props.concerts));
 const concert = computed(() => props.concerts[0] ?? null);
-const concertStageName = computed(() => {
-  if (concert.value?.stage_name) {
-    return concert.value.stage_name;
+const showAttendance = computed(() => !props.readonly && !props.hideAttendance);
+const isNight = computed(() => props.event.kind === 'single_night');
+const nightIsPast = computed(() => props.concerts.every(row => eventsStore.concertIsPast(row)));
+const stageNameFor = (row: ConcertRecord) => {
+  if (row.stage_name) {
+    return row.stage_name;
   }
 
-  if (!concert.value?.stage_id) {
+  if (!row.stage_id) {
     return '';
   }
 
-  return eventsStore.stagesForEvent(props.event.id).find(stage => stage.id === concert.value?.stage_id)?.name ?? '';
+  return eventsStore.stagesForEvent(props.event.id).find(stage => stage.id === row.stage_id)?.name ?? '';
+};
+const concertStageName = computed(() => (concert.value ? stageNameFor(concert.value) : ''));
+const sharedStageName = computed(() => {
+  const names = new Set(props.concerts.map(stageNameFor));
+  return names.size === 1 ? [...names][0] ?? '' : '';
 });
 const isHero = computed(() => props.variant === 'hero');
 const stackDate = computed(() => {
-  if (!props.variant || props.variant === 'default') {
+  if (!props.featured && (!props.variant || props.variant === 'default')) {
     return '';
   }
 
   return compact.value && concert.value ? concert.value.date : props.event.start_date;
+});
+const stackClock = computed(() => {
+  return props.featured && isNight.value ? earliestConcertClock(props.concerts) : '';
+});
+const showPlaceIcon = computed(() => isHero.value || props.featured);
+const compactMeta = computed(() => {
+  if (!concert.value) {
+    return '';
+  }
+
+  if (props.featured) {
+    return formatVenueLine(concertStageName.value, concert.value.place);
+  }
+
+  if (stackDate.value) {
+    return [formatVenueLine(concertStageName.value, concert.value.place), formatConcertClock(concert.value.time)]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  return formatConcertMetaLine(concert.value, concertStageName.value);
+});
+const groupMeta = computed(() => {
+  if (props.featured) {
+    return formatVenueLine(sharedStageName.value, props.event.place);
+  }
+
+  return stackDate.value
+    ? props.event.place
+    : [formatEventDateLabel(props.event), props.event.place].filter(Boolean).join(' · ');
+});
+const stackDateLabel = computed(() => {
+  if (!stackDate.value) {
+    return '';
+  }
+
+  return compact.value && concert.value
+    ? formatEventDateLabel({ start_date: concert.value.date, end_date: concert.value.date })
+    : formatEventDateLabel(props.event);
 });
 const titleClass = computed(() => {
   if (isHero.value) {
@@ -52,12 +102,19 @@ const titleClass = computed(() => {
     : 'text-base font-semibold [overflow-wrap:anywhere]';
 });
 const metaClass = computed(() => {
-  return isHero.value
+  return showPlaceIcon.value
     ? 'flex items-start gap-1 text-[13px] text-muted'
     : 'text-[13px] text-muted';
 });
 const groups = computed(() => groupConcertsByDate(props.concerts));
-const showDayHeaders = computed(() => shouldShowDayHeaders(props.event, props.concerts));
+const showDayHeaders = computed(() => {
+  if (props.featured && isNight.value) {
+    return false;
+  }
+
+  return shouldShowDayHeaders(props.event, props.concerts);
+});
+const showRowClock = computed(() => !(props.featured && isNight.value));
 const eventPath = computed(() => `/e/${props.event.id}`);
 </script>
 
@@ -75,11 +132,26 @@ const eventPath = computed(() => `/e/${props.event.id}`);
       aria-hidden="true"
     />
     <div :class="stackDate ? 'flex items-start gap-3' : ''">
-      <AppDateStack
+      <div
         v-if="stackDate"
-        :date="stackDate"
-        :size="isHero ? 'lg' : 'sm'"
-      />
+        class="flex shrink-0 flex-col items-center gap-1.5"
+      >
+        <AppDateStack
+          :date="stackDate"
+          :size="isHero ? 'lg' : 'sm'"
+        />
+        <span
+          class="sr-only"
+          data-testid="event-card-date"
+        >{{ stackDateLabel }}</span>
+        <span
+          v-if="stackClock"
+          class="text-[13px] font-semibold tabular-nums text-muted"
+          data-testid="event-card-time"
+        >
+          {{ stackClock }}
+        </span>
+      </div>
       <div
         class="min-w-0 flex-1"
         :class="compact ? '' : 'space-y-3'"
@@ -96,14 +168,18 @@ const eventPath = computed(() => `/e/${props.event.id}`);
             <p :class="titleClass">
               {{ concert.artist }}
             </p>
-            <p :class="metaClass">
+            <p
+              v-if="compactMeta"
+              :class="metaClass"
+              data-testid="event-card-meta"
+            >
               <UIcon
-                v-if="isHero"
+                v-if="showPlaceIcon"
                 name="i-lucide-map-pin"
                 class="mt-0.5 size-3.5 shrink-0"
-                aria-hidden="true"
+                aria-label="Venue"
               />
-              <span>{{ formatConcertMetaLine(concert, concertStageName) }}</span>
+              <span>{{ compactMeta }}</span>
             </p>
             <p
               v-if="eventNameDiffersFromArtist(event.name, concert.artist)"
@@ -120,14 +196,18 @@ const eventPath = computed(() => `/e/${props.event.id}`);
             <p :class="titleClass">
               {{ concert.artist }}
             </p>
-            <p :class="metaClass">
+            <p
+              v-if="compactMeta"
+              :class="metaClass"
+              data-testid="event-card-meta"
+            >
               <UIcon
-                v-if="isHero"
+                v-if="showPlaceIcon"
                 name="i-lucide-map-pin"
                 class="mt-0.5 size-3.5 shrink-0"
-                aria-hidden="true"
+                aria-label="Venue"
               />
-              <span>{{ formatConcertMetaLine(concert, concertStageName) }}</span>
+              <span>{{ compactMeta }}</span>
             </p>
             <p
               v-if="eventNameDiffersFromArtist(event.name, concert.artist)"
@@ -136,8 +216,15 @@ const eventPath = computed(() => `/e/${props.event.id}`);
               {{ event.name }}
             </p>
           </NuxtLink>
+          <AppSeenToggle
+            v-if="showAttendance && eventsStore.concertIsPast(concert)"
+            :seen="eventsStore.concertSeen(concert)"
+            :artist="concert.artist"
+            :disabled="eventsStore.isAttendanceBusy(concert.id)"
+            @click="void eventsStore.toggleSeen(concert)"
+          />
           <AppAttendanceChip
-            v-if="!readonly"
+            v-else-if="showAttendance"
             :status="eventsStore.attendanceStatus(concert.id)"
             :is-past="eventsStore.concertIsPast(concert)"
             :disabled="eventsStore.isAttendanceBusy(concert.id)"
@@ -154,14 +241,18 @@ const eventPath = computed(() => `/e/${props.event.id}`);
               <p :class="titleClass">
                 {{ event.name }}
               </p>
-              <p :class="metaClass">
+              <p
+                v-if="groupMeta"
+                :class="metaClass"
+                data-testid="event-card-meta"
+              >
                 <UIcon
-                  v-if="isHero"
+                  v-if="showPlaceIcon"
                   name="i-lucide-map-pin"
                   class="mt-0.5 size-3.5 shrink-0"
-                  aria-hidden="true"
+                  aria-label="Venue"
                 />
-                <span>{{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}</span>
+                <span>{{ groupMeta }}</span>
               </p>
             </a>
             <NuxtLink
@@ -172,20 +263,24 @@ const eventPath = computed(() => `/e/${props.event.id}`);
               <p :class="titleClass">
                 {{ event.name }}
               </p>
-              <p :class="metaClass">
+              <p
+                v-if="groupMeta"
+                :class="metaClass"
+                data-testid="event-card-meta"
+              >
                 <UIcon
-                  v-if="isHero"
+                  v-if="showPlaceIcon"
                   name="i-lucide-map-pin"
                   class="mt-0.5 size-3.5 shrink-0"
-                  aria-hidden="true"
+                  aria-label="Venue"
                 />
-                <span>{{ [formatEventDateLabel(event), event.place].filter(Boolean).join(' · ') }}</span>
+                <span>{{ groupMeta }}</span>
               </p>
             </NuxtLink>
             <AppAttendanceChip
-              v-if="!readonly && event.kind === 'single_night' && concerts.length > 0"
+              v-if="showAttendance && event.kind === 'single_night' && concerts.length > 0 && !nightIsPast"
               :status="eventsStore.eventGoingStatus(event.id)"
-              :is-past="concerts.length > 0 && concerts.every(row => eventsStore.concertIsPast(row))"
+              :is-past="false"
               :disabled="eventsStore.isEventGoingBusy(event.id)"
               @click="void eventsStore.cycleEventGoing(event.id)"
             />
@@ -212,14 +307,21 @@ const eventPath = computed(() => `/e/${props.event.id}`);
                     {{ row.artist }}
                   </p>
                   <p
-                    v-if="row.time"
+                    v-if="showRowClock && row.time"
                     class="text-[13px] text-muted"
                   >
                     {{ formatConcertClock(row.time) }}
                   </p>
                 </div>
+                <AppSeenToggle
+                  v-if="showAttendance && eventsStore.concertIsPast(row)"
+                  :seen="eventsStore.concertSeen(row)"
+                  :artist="row.artist"
+                  :disabled="eventsStore.isAttendanceBusy(row.id)"
+                  @click="void eventsStore.toggleSeen(row)"
+                />
                 <AppAttendanceChip
-                  v-if="!readonly && event.kind === 'festival'"
+                  v-else-if="showAttendance && event.kind === 'festival'"
                   :status="eventsStore.attendanceStatus(row.id)"
                   :is-past="eventsStore.concertIsPast(row)"
                   :disabled="eventsStore.isAttendanceBusy(row.id)"

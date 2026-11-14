@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { McpToolJson } from '../../../server/utils/mcp-log-tools';
+import { OAUTH_GRANT_ACCESS, OAUTH_GRANT_REVOKE_HELPER } from '../../../shared/domain/oauth-grants';
 import { waitForNuxtHydration } from './wait-for-hydration';
 
 type ToolContent = {
@@ -127,7 +128,12 @@ export const revokeMcpGrant = async (page: Page, clientName: string) => {
   await waitForNuxtHydration(page);
   const row = page.getByTestId('oauth-grant').filter({ hasText: clientName });
   await expect(row).toBeVisible();
-  await row.getByTestId('oauth-grant-revoke').click();
+  await expect(page.getByRole('list', { name: 'Connected clients' })).toBeVisible();
+  await expect(row.getByTestId('oauth-grant-name')).toHaveText(clientName);
+  await expect(row.getByText(OAUTH_GRANT_ACCESS)).toBeVisible();
+  await expect(row.getByTestId('oauth-grant-connected-on')).toHaveText(/^\s*Connected \d{1,2} \w{3} \d{4}$/);
+  await expect(page.getByTestId('oauth-grant-revoke-helper')).toHaveText(OAUTH_GRANT_REVOKE_HELPER);
+  await row.getByRole('button', { name: `Revoke ${clientName}` }).click();
   await expect(row).toHaveCount(0);
 };
 

@@ -4,8 +4,6 @@ import { definePageMeta } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEventsStore } from '@/stores/events';
-import { useAgentChatStore } from '@/stores/agent-chat';
-import { isCompactBill } from '@/utils/concert-groups';
 
 definePageMeta({
   middleware: 'auth'
@@ -13,38 +11,15 @@ definePageMeta({
 
 const addSheet = useAddConcertSheetStore();
 const eventsStore = useEventsStore();
-const agentChat = useAgentChatStore();
-const { isReady: isAssistantReady } = storeToRefs(agentChat);
 const { featuredEvents, lastNightEvent, homeStats, error, loading } = storeToRefs(eventsStore);
 const hasFeatured = computed(() => featuredEvents.value.length > 0);
 const showSkeleton = computed(() => loading.value && !error.value);
 const homeEyebrow = computed(() => {
-  if (showSkeleton.value || error.value) {
+  if (showSkeleton.value || error.value || hasFeatured.value) {
     return '';
   }
 
-  return hasFeatured.value ? 'Coming up' : 'Your journal';
-});
-const featuredLead = computed(() => {
-  const names = featuredEvents.value.slice(0, 2).map((event) => {
-    const concerts = eventsStore.concertsForEvent(event.id);
-    const first = concerts[0];
-    const label = isCompactBill(concerts) && first?.artist?.trim()
-      ? first.artist.trim()
-      : event.name.trim();
-
-    return label;
-  }).filter(Boolean);
-
-  if (names.length === 2) {
-    return `${names[0]} and ${names[1]} are waiting.`;
-  }
-
-  if (names.length === 1) {
-    return `${names[0]} is waiting.`;
-  }
-
-  return '';
+  return 'Your journal';
 });
 
 const retryLoad = () => {
@@ -70,21 +45,6 @@ if (import.meta.server) {
       <h1 class="text-[34px] font-bold tracking-tight leading-tight">
         Home
       </h1>
-      <UButton
-        v-if="isAssistantReady"
-        label="Ask assistant"
-        color="neutral"
-        variant="outline"
-        class="mt-3"
-        data-testid="home-assistant-action"
-        @click="agentChat.open = true"
-      />
-      <p
-        v-if="hasFeatured && featuredLead"
-        class="mt-2 max-w-[36ch] text-[15px] leading-[1.45] text-muted"
-      >
-        {{ featuredLead }}
-      </p>
     </header>
 
     <AppListSkeleton
@@ -133,16 +93,9 @@ if (import.meta.server) {
         data-testid="home-featured"
         class="space-y-3"
       >
-        <div class="flex items-center justify-between gap-3 px-0.5">
-          <h2 class="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-            Coming up
-          </h2>
-          <span
-            class="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 text-xs font-semibold tabular-nums"
-          >
-            {{ featuredEvents.length }}
-          </span>
-        </div>
+        <h2 class="px-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+          Coming up
+        </h2>
         <div class="space-y-3">
           <AppEventCard
             v-for="(event, index) in featuredEvents"
@@ -151,6 +104,7 @@ if (import.meta.server) {
             :concerts="eventsStore.concertsForEvent(event.id)"
             :variant="index === 0 ? 'hero' : 'default'"
             featured
+            hide-attendance
           />
         </div>
       </section>
@@ -171,6 +125,7 @@ if (import.meta.server) {
           :event="lastNightEvent"
           :concerts="eventsStore.concertsForEvent(lastNightEvent.id)"
           variant="memory"
+          hide-attendance
         />
       </section>
 
