@@ -48,7 +48,7 @@ export const formatDateStack = (start: string, end?: string): DateStackParts => 
   const sameYear = start.slice(0, 4) === end.slice(0, 4);
 
   return {
-    weekday: sameMonth ? '' : (sameYear ? startParts.year : `${startParts.year}${RANGE_DASH}${endParts.year}`),
+    weekday: '',
     day: `${startParts.day}${RANGE_DASH}${endParts.day}`,
     month: sameMonth ? startParts.month : `${startParts.month}${RANGE_DASH}${endParts.month}`,
     year: sameYear ? startParts.year : `${startParts.year}${RANGE_DASH}${endParts.year}`,

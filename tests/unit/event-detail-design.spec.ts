@@ -11,7 +11,10 @@ describe('Event page Live Pulse header', () => {
     expect(header).toMatch(/<AppDateStack[\s\S]*:date="currentEvent\.start_date"[\s\S]*:end-date="currentEvent\.end_date"[\s\S]*size="lg"/);
     expect(header).toMatch(/<h1[\s\S]*currentEvent\.name/);
     expect(header).toMatch(/i-lucide-map-pin/);
-    expect(header).toMatch(/eventLead/);
+    expect(header).toMatch(/currentEvent\.place/);
+    expect(header).toMatch(/sr-only/);
+    expect(header).toMatch(/formatEventDateLabel\(currentEvent\)/);
+    expect(header).not.toMatch(/\{\{ eventLead \}\}/);
     expect(header).toMatch(/Edit event/);
     expect(header).toMatch(/Share event/);
   });
@@ -42,6 +45,8 @@ describe('Event page owner notes', () => {
     expect(page).toMatch(/canCollapseDays/);
     expect(page).toMatch(/currentEvent\.value\?\.kind === 'festival' && billGroups\.value\.length > 1/);
     expect(page).toMatch(/aria-expanded/);
+    expect(page).toMatch(/i-lucide-chevron-up/);
+    expect(page).toMatch(/i-lucide-chevron-down/);
     expect(page).toMatch(/dayConcertCountLabel/);
     expect(page).toMatch(/v-show="!canCollapseDays \|\| isDayOpen\(group\.date\)"/);
     expect(page).toMatch(/collapsedDays\.value = new Set\(\)/);

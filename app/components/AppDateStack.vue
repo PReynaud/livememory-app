@@ -24,5 +24,9 @@ const parts = computed(() => formatDateStack(props.date, props.endDate));
     >{{ parts.weekday }}</span>
     <span class="lm-date-stack-day">{{ parts.day }}</span>
     <span class="lm-date-stack-month">{{ parts.month }}</span>
+    <span
+      v-if="parts.range && parts.year"
+      class="lm-date-stack-year"
+    >{{ parts.year }}</span>
   </div>
 </template>

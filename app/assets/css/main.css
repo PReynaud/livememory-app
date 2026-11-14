@@ -141,11 +141,16 @@ html {
 }
 
 .lm-date-stack-weekday,
-.lm-date-stack-month {
+.lm-date-stack-month,
+.lm-date-stack-year {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.lm-date-stack-year {
+  margin-top: 3px;
 }
 
 .lm-date-stack-day {
@@ -181,7 +186,8 @@ html {
 }
 
 .lm-date-stack[data-range="true"] .lm-date-stack-weekday,
-.lm-date-stack[data-range="true"] .lm-date-stack-month {
+.lm-date-stack[data-range="true"] .lm-date-stack-month,
+.lm-date-stack[data-range="true"] .lm-date-stack-year {
   letter-spacing: 0.02em;
 }
 
