@@ -84,6 +84,23 @@ export const formatConcertClock = (time: string | null): string => {
   return time.slice(0, 5);
 };
 
+export const earliestConcertClock = (concerts: Array<Pick<ConcertRecord, 'date' | 'time'>>): string => {
+  const timed = concerts.filter(concert => concert.time);
+  if (!timed.length) {
+    return '';
+  }
+
+  const first = [...timed].sort((left, right) => {
+    return `${left.date}T${left.time}`.localeCompare(`${right.date}T${right.time}`);
+  })[0];
+
+  return formatConcertClock(first?.time ?? null);
+};
+
+export const formatVenueLine = (venue: string | null | undefined, city: string | null | undefined) => {
+  return [venue?.trim(), city?.trim()].filter(Boolean).join(' · ');
+};
+
 export const isCompactBill = (concerts: ConcertRecord[]) => {
   return concerts.length === 1;
 };

@@ -243,7 +243,7 @@ describe('shared list surfaces', () => {
 
     const card = read('app/components/AppEventCard.vue');
     expect(card).toMatch(/readonly\?: boolean/);
-    expect(card).toMatch(/v-if="!readonly"/);
+    expect(card).toMatch(/showAttendance = computed\(\(\) => !props\.readonly/);
     expect(card).toMatch(/eventPath/);
     expect(card).toMatch(/:href="eventPath"/);
     expect(card).toMatch(/:to="eventPath"/);

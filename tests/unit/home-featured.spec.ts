@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { concertRefsForLastNight, concertRefsForSouvenirs, selectLastNightEvent, souvenirStats } from '../../shared/domain/home';
 import { selectFeaturedEvents, type EventRecord } from '../../shared/domain/events';
+import { earliestConcertClock, formatVenueLine } from '../../app/utils/concert-groups';
 
 const read = (relative: string) => readFileSync(resolve(process.cwd(), relative), 'utf8');
 
@@ -313,6 +314,36 @@ describe('Home Live Pulse hero', () => {
   });
 });
 
+describe('Home Coming up card anatomy', () => {
+  it('keeps the earliest clock for the date stack and ignores untimed rows', () => {
+    expect(earliestConcertClock([])).toBe('');
+    expect(earliestConcertClock([{ date: '2026-11-17', time: null }])).toBe('');
+    expect(earliestConcertClock([
+      { date: '2026-11-17', time: '21:30:00' },
+      { date: '2026-11-17', time: null },
+      { date: '2026-11-17', time: '19:00:00' }
+    ])).toBe('19:00');
+  });
+
+  it('formats the meta line as venue then city, with whichever one exists', () => {
+    expect(formatVenueLine('Bataclan', 'Paris')).toBe('Bataclan · Paris');
+    expect(formatVenueLine('', 'Paris')).toBe('Paris');
+    expect(formatVenueLine('Bataclan', '  ')).toBe('Bataclan');
+    expect(formatVenueLine(null, null)).toBe('');
+  });
+
+  it('shows one date badge with the time beside it and no day header or row clock on featured nights', () => {
+    const card = read('app/components/AppEventCard.vue');
+    expect(card).toMatch(/hideAttendance\?: boolean/);
+    expect(card).toMatch(/earliestConcertClock/);
+    expect(card).toMatch(/data-testid="event-card-time"/);
+    expect(card).toMatch(/formatVenueLine\(concertStageName\.value, concert\.value\.place\)/);
+    expect(card).toMatch(/formatVenueLine\(sharedStageName\.value, props\.event\.place\)/);
+    expect(card).toMatch(/if \(props\.featured && isNight\.value\) \{\s*return false;/);
+    expect(card).toMatch(/v-if="showRowClock && row\.time"/);
+  });
+});
+
 describe('Home featured and stats surfaces', () => {
   it('fetches through the store, caps featured, and keeps stats non-tappable', () => {
     const home = read('app/pages/home.vue');
@@ -411,9 +442,9 @@ describe('Home featured and stats surfaces', () => {
     expect(card).not.toMatch(/for you|Pour vous|album/i);
   });
 
-  it('renders Coming up header, count, muted lead, souvenirs, and empty journal chrome', () => {
+  it('renders Coming up once, souvenirs, and empty journal chrome without a lead or capped count', () => {
     const home = read('app/pages/home.vue');
-    expect(home).toMatch(/Coming up/);
+    expect(home.match(/Coming up/g)).toHaveLength(1);
     expect(home).toMatch(/Last night/);
     expect(home).toMatch(/data-testid="home-last-night"/);
     expect(home).toMatch(/lastNightEvent/);
@@ -421,10 +452,10 @@ describe('Home featured and stats surfaces', () => {
     expect(home).toMatch(/Your souvenirs/);
     expect(home).toMatch(/Upcoming/);
     expect(home).toMatch(/home-souvenirs-heading/);
-    expect(home).toMatch(/is waiting\./);
-    expect(home).toMatch(/are waiting\./);
-    expect(home).toMatch(/isCompactBill/);
-    expect(home).toMatch(/featuredEvents\.length/);
+    expect(home).not.toMatch(/is waiting\.|are waiting\./);
+    expect(home).not.toMatch(/featuredLead/);
+    expect(home).not.toMatch(/featuredEvents\.length/);
+    expect(home.match(/hide-attendance/g)).toHaveLength(2);
     expect(home).toMatch(/UIcon/);
     expect(home).toMatch(/i-lucide-music/);
     expect(home).toMatch(/border-l/);

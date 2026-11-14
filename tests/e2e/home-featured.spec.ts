@@ -166,7 +166,7 @@ test('features the next 1–3 upcoming Events and keeps the rest of the log on C
   const featured = authenticatedPage.getByTestId('home-featured');
   await expect(featured).toBeVisible();
   await expect(featured.getByRole('heading', { name: 'Coming up' })).toBeVisible();
-  await expect(featured.getByText('3', { exact: true })).toBeVisible();
+  await expect(featured.locator('h2 + span')).toHaveCount(0);
   await expect(authenticatedPage.getByText('Your journal')).toHaveCount(0);
   await expect(featured.getByText('Empty Soon')).toBeVisible();
   await expect(featured.getByText('Second Night')).toBeVisible();
@@ -245,14 +245,47 @@ test('uses compact artist anatomy for one Concert and grouped Event name for two
   await expect(group.getByRole('link')).toContainText('Rock Week');
   await expect(group.getByText('Fontaines D.C.')).toBeVisible();
   await expect(group.getByText('LCD Soundsystem')).toBeVisible();
-  await expect(group.getByRole('button', { name: 'Mark as going' })).toHaveCount(2);
-  await expect(compact.getByRole('button', { name: 'Mark as going' })).toHaveCount(1);
-  await expect(authenticatedPage.getByText('Justice and Rock Week are waiting.')).toBeVisible();
+  await expect(featured.getByRole('button', { name: /Mark as going|Mark as attended/ })).toHaveCount(0);
+  await expect(featured.getByText(/Going/)).toHaveCount(0);
+  await expect(authenticatedPage.getByText(/are waiting\.|is waiting\./)).toHaveCount(0);
   await expect(authenticatedPage.getByRole('heading', { name: 'Coming up' })).toBeVisible();
+  await expect(authenticatedPage.getByText('Coming up', { exact: true })).toHaveCount(1);
+
+  await expect(compact.locator('.lm-date-stack')).toBeVisible();
+  await expect(compact.getByTestId('event-card-time')).toHaveText('20:15');
+  await expect(compact.getByTestId('event-card-meta')).toHaveText('Berlin');
+  await expect(compact.getByText('20:15')).toHaveCount(1);
+
+  await expect(group.getByText('22:00')).toBeVisible();
+  await expect(group.getByText('21:30')).toBeVisible();
   await expect(authenticatedPage.getByText('Your journal')).toHaveCount(0);
 
   await compact.getByRole('link').click();
   await expect(authenticatedPage).toHaveURL(new RegExp(`/e/${nightId}$`));
+});
+
+test('shows one date on a featured night: the badge with its time, no day header, no row clocks', async ({
+  authenticatedPage,
+  account
+}) => {
+  const session = await signIn(account);
+  const nightDate = addUtcDays(parisToday(), 4);
+  const nightId = await createEvent(session, { name: 'Metal Night', start: nightDate, place: 'Paris' });
+  await createConcert(session, { eventId: nightId, artist: 'Eluveitie', date: nightDate, place: 'Paris', time: '21:00' });
+  await createConcert(session, { eventId: nightId, artist: 'Wolfheart', date: nightDate, place: 'Paris', time: '19:00' });
+
+  await reloadHome(authenticatedPage);
+
+  const hero = authenticatedPage.getByTestId('home-featured').locator('[data-variant="hero"]');
+  await expect(hero.getByRole('link')).toContainText('Metal Night');
+  await expect(hero.locator('.lm-date-stack')).toBeVisible();
+  await expect(hero.getByTestId('event-card-time')).toHaveText('19:00');
+  await expect(hero.getByTestId('event-card-meta')).toHaveText('Paris');
+  await expect(hero.getByText('21:00')).toHaveCount(0);
+  await expect(hero.getByText(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) \d+ \w+$/)).toHaveCount(0);
+  await expect(hero.getByText('Eluveitie')).toBeVisible();
+  await expect(hero.getByText('Wolfheart')).toBeVisible();
+  await expect(hero.getByRole('button', { name: /Mark as/ })).toHaveCount(0);
 });
 
 test('counts effective attended, owned Events, and going; past nights leave featured', async ({
