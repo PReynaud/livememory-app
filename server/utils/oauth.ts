@@ -3,7 +3,10 @@ import { isAllowedRedirectUri } from '../../shared/domain/oauth-redirect';
 
 export { isAllowedRedirectUri } from '../../shared/domain/oauth-redirect';
 
-export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+// ChatGPT and other MCP clients keep one refresh token and may present it
+// again while a long import is still using the previous access token.
+// Thirty days is the minimum the product keeps a client connected without a new Allow.
+export const ACCESS_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const AUTHORIZATION_CODE_TTL_MS = 10 * 60 * 1000;
 
 const ACCESS_TOKEN_TTL_MS = ACCESS_TOKEN_TTL_SECONDS * 1000;
@@ -463,14 +466,13 @@ const exchangeRefreshToken = async (
   }
 
   const accessToken = newOpaqueSecret();
-  const nextRefresh = newOpaqueSecret();
   const accessExpiresAt = new Date(now.getTime() + ACCESS_TOKEN_TTL_MS).toISOString();
   const userId = await store.rotateRefreshToken({
     refreshTokenHash: hashOpaqueSecret(fields.refreshToken),
     clientId: fields.clientId,
     accessTokenHash: hashOpaqueSecret(accessToken),
     accessExpiresAt,
-    nextRefreshTokenHash: hashOpaqueSecret(nextRefresh)
+    nextRefreshTokenHash: hashOpaqueSecret(fields.refreshToken)
   });
   if (!userId) {
     return fail(401, 'invalid_grant', 'The refresh token is not valid.');
@@ -483,7 +485,7 @@ const exchangeRefreshToken = async (
       access_token: accessToken,
       token_type: 'Bearer',
       expires_in: ACCESS_TOKEN_TTL_SECONDS,
-      refresh_token: nextRefresh
+      refresh_token: fields.refreshToken
     }
   };
 };

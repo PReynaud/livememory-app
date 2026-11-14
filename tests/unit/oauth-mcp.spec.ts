@@ -44,6 +44,8 @@ type MemoryGrant = {
   clientId: string;
   accessTokenHash: string | null;
   accessExpiresAt: string | null;
+  previousAccessTokenHash: string | null;
+  previousAccessExpiresAt: string | null;
   refreshTokenHash: string | null;
   previousRefreshTokenHash: string | null;
 };
@@ -126,6 +128,8 @@ const createMemoryOauthStore = (clock: () => Date) => {
           clientId: code.clientId,
           accessTokenHash: input.accessTokenHash,
           accessExpiresAt: input.accessExpiresAt,
+          previousAccessTokenHash: null,
+          previousAccessExpiresAt: null,
           refreshTokenHash: input.refreshTokenHash,
           previousRefreshTokenHash: null
         });
@@ -145,35 +149,43 @@ const createMemoryOauthStore = (clock: () => Date) => {
       return { status: 'ok', userId: code.userId, grantId };
     },
     lookupAccessUserId: async (accessTokenHash) => {
-      const grant = grants.find(entry => entry.accessTokenHash === accessTokenHash);
-      if (!grant?.accessExpiresAt || new Date(grant.accessExpiresAt).getTime() <= clock().getTime()) {
+      const now = clock().getTime();
+      const matches = grants.filter((entry) => {
+        const current = entry.accessTokenHash === accessTokenHash
+          && entry.accessExpiresAt
+          && new Date(entry.accessExpiresAt).getTime() > now;
+        const previous = entry.previousAccessTokenHash === accessTokenHash
+          && entry.previousAccessExpiresAt
+          && new Date(entry.previousAccessExpiresAt).getTime() > now;
+        return current || previous;
+      });
+      if (matches.length !== 1) {
         return null;
       }
 
-      return grant.userId;
+      return matches[0]?.userId ?? null;
     },
     rotateRefreshToken: async (input) => {
-      const replayIndex = grants.findIndex(entry => (
-        entry.previousRefreshTokenHash === input.refreshTokenHash
-        && entry.clientId === input.clientId
+      const matches = grants.filter(entry => (
+        entry.clientId === input.clientId
+        && (
+          entry.refreshTokenHash === input.refreshTokenHash
+          || entry.previousRefreshTokenHash === input.refreshTokenHash
+        )
       ));
-      if (replayIndex >= 0) {
-        grants.splice(replayIndex, 1);
+      if (matches.length !== 1) {
         return null;
       }
 
-      const grant = grants.find(entry => (
-        entry.refreshTokenHash === input.refreshTokenHash
-        && entry.clientId === input.clientId
-      ));
+      const grant = matches[0];
       if (!grant) {
         return null;
       }
 
-      grant.previousRefreshTokenHash = grant.refreshTokenHash;
+      grant.previousAccessTokenHash = grant.accessTokenHash;
+      grant.previousAccessExpiresAt = grant.accessExpiresAt;
       grant.accessTokenHash = input.accessTokenHash;
       grant.accessExpiresAt = input.accessExpiresAt;
-      grant.refreshTokenHash = input.nextRefreshTokenHash;
       return grant.userId;
     }
   };
@@ -343,7 +355,7 @@ describe('OAuth connect, PKCE, and revoke', () => {
     expect(memory.grants.every(grant => !JSON.stringify(grant).includes(once.code))).toBe(true);
   });
 
-  it('returns access and refresh tokens, expires access after one hour, and revokes only that user', async () => {
+  it('returns a 30-day access token, keeps the same refresh token, and revokes only that user', async () => {
     let now = new Date('2026-10-11T10:00:00.000Z');
     const memory = createMemoryOauthStore(() => now);
     const registered = await registerOauthClient(memory.store, {
@@ -379,6 +391,7 @@ describe('OAuth connect, PKCE, and revoke', () => {
         throw new Error('token failed');
       }
 
+      expect(ACCESS_TOKEN_TTL_SECONDS).toBe(30 * 24 * 60 * 60);
       expect(tokens.body.expires_in).toBe(ACCESS_TOKEN_TTL_SECONDS);
       expect(tokens.body.token_type).toBe('Bearer');
       expect(JSON.stringify(memory.grants)).not.toContain(tokens.body.access_token);
@@ -401,19 +414,41 @@ describe('OAuth connect, PKCE, and revoke', () => {
       return;
     }
 
-    const staleRefresh = await exchangeOauthToken(memory.store, {
+    expect(rotated.body.refresh_token).toBe(first.refresh_token);
+    expect(rotated.body.expires_in).toBe(ACCESS_TOKEN_TTL_SECONDS);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(first.access_token))).toBe(USER_A);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBe(USER_A);
+
+    const replayed = await exchangeOauthToken(memory.store, {
       grant_type: 'refresh_token',
       refresh_token: first.refresh_token,
       client_id: registered.body.client_id
     }, now);
-    expect(staleRefresh.ok).toBe(false);
-    if (!staleRefresh.ok) {
-      expect(staleRefresh.status).toBe(401);
-      expect(staleRefresh.body).not.toHaveProperty('access_token');
+    expect(replayed.ok).toBe(true);
+    if (!replayed.ok) {
+      return;
     }
+
+    expect(replayed.body.refresh_token).toBe(first.refresh_token);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(first.access_token))).toBeNull();
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBe(USER_A);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(replayed.body.access_token))).toBe(USER_A);
 
     now = new Date(now.getTime() + (ACCESS_TOKEN_TTL_SECONDS + 60) * 1000);
     expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBeNull();
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(replayed.body.access_token))).toBeNull();
+
+    const renewed = await exchangeOauthToken(memory.store, {
+      grant_type: 'refresh_token',
+      refresh_token: first.refresh_token,
+      client_id: registered.body.client_id
+    }, now);
+    expect(renewed.ok).toBe(true);
+    if (!renewed.ok) {
+      return;
+    }
+
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(renewed.body.access_token))).toBe(USER_A);
 
     now = new Date('2026-10-11T10:00:00.000Z');
     const again = await connect(USER_A);
@@ -434,6 +469,72 @@ describe('OAuth connect, PKCE, and revoke', () => {
     }
 
     expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(second.access_token))).toBe(USER_B);
+  });
+
+  it('expires the previous access token on its original clock and accepts a retired refresh hash', async () => {
+    let now = new Date('2026-10-11T10:00:00.000Z');
+    const issuedAt = now.getTime();
+    const memory = createMemoryOauthStore(() => now);
+    const registered = await registerOauthClient(memory.store, {
+      client_name: 'ChatGPT',
+      redirect_uris: [REDIRECT]
+    });
+    expect(registered.ok).toBe(true);
+    if (!registered.ok) {
+      return;
+    }
+
+    const codeVerifier = freshVerifier();
+    const allowed = await decideOauthAuthorization(
+      memory.store,
+      allowInput(registered.body.client_id, USER_A, codeVerifier),
+      now
+    );
+    expect(allowed.ok).toBe(true);
+    if (!allowed.ok) {
+      return;
+    }
+
+    const tokens = await exchangeOauthToken(memory.store, {
+      grant_type: 'authorization_code',
+      code: codeFromRedirect(allowed.redirect),
+      redirect_uri: REDIRECT,
+      client_id: registered.body.client_id,
+      code_verifier: codeVerifier
+    }, now);
+    expect(tokens.ok).toBe(true);
+    if (!tokens.ok) {
+      return;
+    }
+
+    now = new Date(issuedAt + 10 * 24 * 60 * 60 * 1000);
+    const rotated = await exchangeOauthToken(memory.store, {
+      grant_type: 'refresh_token',
+      refresh_token: tokens.body.refresh_token,
+      client_id: registered.body.client_id
+    }, now);
+    expect(rotated.ok).toBe(true);
+    if (!rotated.ok) {
+      return;
+    }
+
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(tokens.body.access_token))).toBe(USER_A);
+    now = new Date(issuedAt + (ACCESS_TOKEN_TTL_SECONDS * 1000) + 1000);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(tokens.body.access_token))).toBeNull();
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBe(USER_A);
+
+    const retired = 'retired-refresh-token';
+    const grant = memory.grants.find(entry => entry.refreshTokenHash === hashOpaqueSecret(tokens.body.refresh_token));
+    expect(grant).toBeTruthy();
+    grant!.previousRefreshTokenHash = hashOpaqueSecret(retired);
+    const fromRetired = await exchangeOauthToken(memory.store, {
+      grant_type: 'refresh_token',
+      refresh_token: retired,
+      client_id: registered.body.client_id
+    }, now);
+    expect(fromRetired.ok).toBe(true);
+    expect(memory.grants).toHaveLength(1);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBe(USER_A);
   });
 
   it('deny redirects with access_denied and stores no code', async () => {
@@ -641,17 +742,15 @@ describe('OAuth connect, PKCE, and revoke', () => {
     }, now);
     expect(replay.ok).toBe(false);
     expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBe(USER_A);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(redeemed.body.access_token))).toBe(USER_A);
 
-    const killed = await exchangeOauthToken(memory.store, {
+    const refreshedAgain = await exchangeOauthToken(memory.store, {
       grant_type: 'refresh_token',
       refresh_token: redeemed.body.refresh_token,
       client_id: registered.body.client_id
     }, now);
-    expect(killed.ok).toBe(false);
-    if (!killed.ok) {
-      expect(killed.status).toBe(401);
-    }
-    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBeNull();
+    expect(refreshedAgain.ok).toBe(true);
+    expect(await memory.store.lookupAccessUserId(hashOpaqueSecret(rotated.body.access_token))).toBe(USER_A);
 
     const secondVerifier = freshVerifier();
     const secondAllow = await decideOauthAuthorization(
@@ -912,5 +1011,14 @@ describe('OAuth schema', () => {
     const mcpConfig = read('.cursor/mcp.json');
     expect(mcpConfig).not.toContain('Authorization');
     expect(mcpConfig).toContain('/api/mcp');
+
+    const durable = read('supabase/migrations/20261114180000_oauth_access_token_thirty_days.sql');
+    const rotate = durable.slice(durable.indexOf('function public.rotate_oauth_refresh_token'));
+    expect(rotate).not.toMatch(/delete from public\.oauth_grants/);
+    expect(rotate).toMatch(/previous_refresh_token_hash = p_refresh_hash/);
+    expect(rotate).toMatch(/previous_access_token_hash = access_token_hash/);
+    expect(rotate).not.toMatch(/refresh_token_hash = p_next_refresh_hash/);
+    expect(durable).toMatch(/previous_access_token_hash = p_token_hash/);
+    expect(durable).toMatch(/previous_access_expires_at > pg_catalog\.now\(\)/);
   });
 });
