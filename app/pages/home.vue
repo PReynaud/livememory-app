@@ -4,7 +4,6 @@ import { definePageMeta } from '#imports';
 import { storeToRefs } from 'pinia';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
 import { useEventsStore } from '@/stores/events';
-import { useAgentChatStore } from '@/stores/agent-chat';
 
 definePageMeta({
   middleware: 'auth'
@@ -12,8 +11,6 @@ definePageMeta({
 
 const addSheet = useAddConcertSheetStore();
 const eventsStore = useEventsStore();
-const agentChat = useAgentChatStore();
-const { isReady: isAssistantReady } = storeToRefs(agentChat);
 const { featuredEvents, lastNightEvent, homeStats, error, loading } = storeToRefs(eventsStore);
 const hasFeatured = computed(() => featuredEvents.value.length > 0);
 const showSkeleton = computed(() => loading.value && !error.value);
@@ -48,15 +45,6 @@ if (import.meta.server) {
       <h1 class="text-[34px] font-bold tracking-tight leading-tight">
         Home
       </h1>
-      <UButton
-        v-if="isAssistantReady"
-        label="Ask assistant"
-        color="neutral"
-        variant="outline"
-        class="mt-3"
-        data-testid="home-assistant-action"
-        @click="agentChat.open = true"
-      />
     </header>
 
     <AppListSkeleton

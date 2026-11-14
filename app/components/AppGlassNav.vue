@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from '#imports';
+import { storeToRefs } from 'pinia';
 import { useAddConcertSheetStore } from '@/stores/add-concert-sheet';
+import { useAgentChatStore } from '@/stores/agent-chat';
 
 const route = useRoute();
 const addSheet = useAddConcertSheetStore();
+const agentChat = useAgentChatStore();
+const { isReady: isAssistantReady, open: assistantOpen } = storeToRefs(agentChat);
 
 const links = [
   { to: '/home', label: 'Home', icon: 'i-lucide-house' },
@@ -67,6 +71,28 @@ const pillClass = (active: boolean) => active
         />
       </span>
       Add
+    </button>
+
+    <button
+      v-if="isAssistantReady"
+      type="button"
+      aria-label="Ask assistant"
+      :aria-expanded="assistantOpen ? 'true' : 'false'"
+      data-testid="nav-assistant-action"
+      class="flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium lg:min-w-0"
+      :class="itemClass(assistantOpen)"
+      @click="agentChat.open = true"
+    >
+      <span
+        class="flex h-7 w-12 items-center justify-center rounded-full"
+        :class="pillClass(assistantOpen)"
+      >
+        <UIcon
+          name="i-lucide-sparkles"
+          class="size-5"
+        />
+      </span>
+      Assistant
     </button>
 
     <NuxtLink
