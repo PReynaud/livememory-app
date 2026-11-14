@@ -4,7 +4,7 @@ import { invokeLogTool, toMcpToolResult, type McpToolName } from './mcp-log-tool
 
 const eventKindSchema = z.enum(['single_night', 'festival']);
 const confirmChoiceSchema = z.enum(['attach', 'create']);
-const attendanceStatusSchema = z.enum(['going', 'attended']);
+const attendanceStatusSchema = z.enum(['going', 'attended', 'missed']);
 
 const createEventShape = {
   kind: eventKindSchema.describe('single_night or festival'),
@@ -160,16 +160,16 @@ export const createLiveMemoryMcpServer = (client: unknown) => {
   server.registerTool('list_attendance', {
     title: 'List attendance',
     description:
-      'List the acting User\'s effective Attendance (going or attended). Past stored going reads as attended.'
+      'List the acting User\'s effective Attendance (going, attended, or missed). Past concerts on visible Events read as attended unless marked missed.'
   }, async () => run('list_attendance', {}, client));
 
   server.registerTool('set_attendance', {
     title: 'Set attendance',
     description:
-      'Set the acting User\'s Attendance on a Concert they can see. going, attended, or use clear_attendance to unset.',
+      'Set the acting User\'s Attendance on a Concert they can see. going, attended, missed (past only, not seen), or use clear_attendance to unset.',
     inputSchema: {
       concertId: z.string().describe('Concert id'),
-      status: attendanceStatusSchema.describe('going or attended')
+      status: attendanceStatusSchema.describe('going, attended, or missed')
     }
   }, async args => run('set_attendance', args, client));
 

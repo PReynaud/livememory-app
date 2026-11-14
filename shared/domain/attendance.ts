@@ -3,10 +3,21 @@ import { fail, ok, type DomainError, type DomainResult } from './result';
 
 export const ATTENDANCE_STATUS = {
   going: 'going',
-  attended: 'attended'
+  attended: 'attended',
+  missed: 'missed'
 } as const;
 
 export type AttendanceStatus = (typeof ATTENDANCE_STATUS)[keyof typeof ATTENDANCE_STATUS];
+
+export const isAttendanceStatus = (value: unknown): value is AttendanceStatus => {
+  return value === ATTENDANCE_STATUS.going
+    || value === ATTENDANCE_STATUS.attended
+    || value === ATTENDANCE_STATUS.missed;
+};
+
+export const isConcertSeen = (isPast: boolean, status: AttendanceStatus | null | undefined) => {
+  return isPast && status !== ATTENDANCE_STATUS.missed;
+};
 
 export const isNightGoingPressed = (statuses: Array<AttendanceStatus | null | undefined>) => {
   if (!statuses.length) {
@@ -18,12 +29,14 @@ export const isNightGoingPressed = (statuses: Array<AttendanceStatus | null | un
 
 export const ATTENDANCE_RULE = {
   futureAttended: 'future_attended',
+  futureMissed: 'future_missed',
   attendedToGoing: 'attended_to_going',
   festivalAttendAll: 'festival_attend_all'
 } as const;
 
 export const ATTENDANCE_RULE_MESSAGE = {
   futureAttended: 'Cannot mark a future concert as attended.',
+  futureMissed: 'Cannot mark a future concert as not seen.',
   attendedToGoing: 'Cannot change attended to going.',
   festivalAttendAll: 'Attend this night is only for a single-night Event.'
 } as const;
@@ -146,6 +159,13 @@ const mapWriteError = (error: QueryError): DomainError => {
     };
   }
 
+  if (/future_missed/i.test(text)) {
+    return {
+      ruleId: ATTENDANCE_RULE.futureMissed,
+      message: ATTENDANCE_RULE_MESSAGE.futureMissed
+    };
+  }
+
   if (/attended_to_going/i.test(text)) {
     return {
       ruleId: ATTENDANCE_RULE.attendedToGoing,
@@ -229,8 +249,8 @@ export const setAttendance = async (
   }
 
   const status = input.status;
-  if (status !== ATTENDANCE_STATUS.going && status !== ATTENDANCE_STATUS.attended) {
-    return fail('persist_failed', 'Attendance must be going or attended');
+  if (!isAttendanceStatus(status)) {
+    return fail('persist_failed', 'Attendance must be going, attended, or missed');
   }
 
   const existing = await client.from('attendance').select('*').eq('concert_id', concertId).maybeSingle();

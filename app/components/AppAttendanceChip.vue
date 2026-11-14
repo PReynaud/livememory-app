@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 const props = defineProps<{
-  status: 'going' | 'attended' | null;
+  status: 'going' | 'attended' | 'missed' | null;
   isPast: boolean;
   disabled?: boolean;
 }>();
@@ -13,7 +13,7 @@ defineEmits<{
 
 const confirmed = computed(() => props.status === 'going' || props.status === 'attended');
 const displayStatus = computed(() => {
-  if (props.status) {
+  if (props.status === 'going' || props.status === 'attended') {
     return props.status;
   }
 

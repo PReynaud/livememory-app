@@ -67,7 +67,7 @@ export const createEmbeddedMcpServer = (
   server.registerTool('delete_concert', { inputSchema: { concertId: z.string(), confirm: z.boolean().optional() } },
     args => call('delete_concert', args, client, allowedOperations));
   server.registerTool('set_attendance', {
-    inputSchema: { concertId: z.string(), status: z.enum(['going', 'attended']) }
+    inputSchema: { concertId: z.string(), status: z.enum(['going', 'attended', 'missed']) }
   }, args => call('set_attendance', args, client, allowedOperations));
   server.registerTool('clear_attendance', { inputSchema: { concertId: z.string() } },
     args => call('clear_attendance', args, client, allowedOperations));

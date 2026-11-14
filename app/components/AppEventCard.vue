@@ -28,6 +28,7 @@ const compact = computed(() => isCompactBill(props.concerts));
 const concert = computed(() => props.concerts[0] ?? null);
 const showAttendance = computed(() => !props.readonly && !props.hideAttendance);
 const isNight = computed(() => props.event.kind === 'single_night');
+const nightIsPast = computed(() => props.concerts.every(row => eventsStore.concertIsPast(row)));
 const stageNameFor = (row: ConcertRecord) => {
   if (row.stage_name) {
     return row.stage_name;
@@ -190,8 +191,15 @@ const eventPath = computed(() => `/e/${props.event.id}`);
               {{ event.name }}
             </p>
           </NuxtLink>
+          <AppSeenToggle
+            v-if="showAttendance && eventsStore.concertIsPast(concert)"
+            :seen="eventsStore.concertSeen(concert)"
+            :artist="concert.artist"
+            :disabled="eventsStore.isAttendanceBusy(concert.id)"
+            @click="void eventsStore.toggleSeen(concert)"
+          />
           <AppAttendanceChip
-            v-if="showAttendance"
+            v-else-if="showAttendance"
             :status="eventsStore.attendanceStatus(concert.id)"
             :is-past="eventsStore.concertIsPast(concert)"
             :disabled="eventsStore.isAttendanceBusy(concert.id)"
@@ -245,9 +253,9 @@ const eventPath = computed(() => `/e/${props.event.id}`);
               </p>
             </NuxtLink>
             <AppAttendanceChip
-              v-if="showAttendance && event.kind === 'single_night' && concerts.length > 0"
+              v-if="showAttendance && event.kind === 'single_night' && concerts.length > 0 && !nightIsPast"
               :status="eventsStore.eventGoingStatus(event.id)"
-              :is-past="concerts.length > 0 && concerts.every(row => eventsStore.concertIsPast(row))"
+              :is-past="false"
               :disabled="eventsStore.isEventGoingBusy(event.id)"
               @click="void eventsStore.cycleEventGoing(event.id)"
             />
@@ -280,8 +288,15 @@ const eventPath = computed(() => `/e/${props.event.id}`);
                     {{ formatConcertClock(row.time) }}
                   </p>
                 </div>
+                <AppSeenToggle
+                  v-if="showAttendance && eventsStore.concertIsPast(row)"
+                  :seen="eventsStore.concertSeen(row)"
+                  :artist="row.artist"
+                  :disabled="eventsStore.isAttendanceBusy(row.id)"
+                  @click="void eventsStore.toggleSeen(row)"
+                />
                 <AppAttendanceChip
-                  v-if="showAttendance && event.kind === 'festival'"
+                  v-else-if="showAttendance && event.kind === 'festival'"
                   :status="eventsStore.attendanceStatus(row.id)"
                   :is-past="eventsStore.concertIsPast(row)"
                   :disabled="eventsStore.isAttendanceBusy(row.id)"

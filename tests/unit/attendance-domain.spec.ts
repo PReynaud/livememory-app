@@ -6,13 +6,16 @@ import {
   ATTENDANCE_RULE_MESSAGE,
   attendThisNight,
   clearAttendance,
+  isAttendanceStatus,
   isConcertPast,
+  isConcertSeen,
   isNightGoingPressed,
   listMyAttendance,
   setAttendance,
   type AttendanceRecord,
   type AttendanceClient
 } from '../../shared/domain/attendance';
+import { selectLastNightEvent, souvenirStats } from '../../shared/domain/home';
 
 const migrationsDir = resolve(process.cwd(), 'supabase/migrations');
 
@@ -171,7 +174,7 @@ const createMockAttendanceClient = (options?: {
                   id: `cccccccc-cccc-4ccc-8ccc-${String(rows.length).padStart(12, '0')}`,
                   user_id: String(row.user_id ?? 'user-1'),
                   concert_id: String(row.concert_id),
-                  status: row.status === 'attended' ? 'attended' : 'going'
+                  status: row.status === 'attended' || row.status === 'missed' ? row.status as AttendanceRecord['status'] : 'going'
                 };
                 rows.push(created);
                 return { data: created, error: null };
@@ -206,7 +209,7 @@ const createMockAttendanceClient = (options?: {
 
                   const updated: AttendanceRecord = {
                     ...rows[index]!,
-                    status: row.status === 'attended' ? 'attended' : 'going'
+                    status: row.status === 'attended' || row.status === 'missed' ? row.status as AttendanceRecord['status'] : 'going'
                   };
                   rows[index] = updated;
                   return { data: updated, error: null };
@@ -276,6 +279,46 @@ describe('attendance migration kernel', () => {
     const viewBody = sql.match(/create(?:\s+or\s+replace)?\s+view public\.attendance_effective[\s\S]*/i)?.[0] ?? '';
     expect(viewBody).not.toMatch(/update\s+public\.attendance/i);
     expect(viewBody).not.toMatch(/insert\s+into\s+public\.attendance/i);
+  });
+});
+
+describe('seen by default', () => {
+  it('reads a past concert as seen unless it is marked missed, and never an upcoming one', () => {
+    expect(isConcertSeen(true, null)).toBe(true);
+    expect(isConcertSeen(true, 'attended')).toBe(true);
+    expect(isConcertSeen(true, 'going')).toBe(true);
+    expect(isConcertSeen(true, 'missed')).toBe(false);
+    expect(isConcertSeen(false, null)).toBe(false);
+    expect(isConcertSeen(false, 'going')).toBe(false);
+  });
+
+  it('accepts going, attended, and missed only', () => {
+    expect(isAttendanceStatus('going')).toBe(true);
+    expect(isAttendanceStatus('attended')).toBe(true);
+    expect(isAttendanceStatus('missed')).toBe(true);
+    expect(isAttendanceStatus('maybe')).toBe(false);
+    expect(isAttendanceStatus(null)).toBe(false);
+  });
+
+  it('migrates missed (past only) and rebuilds the effective and shared list views from visible concerts', () => {
+    const migration = readMigrations().find(file => file.name.includes('attendance_seen_by_default'));
+    const sql = migration?.sql ?? '';
+    expect(sql).toMatch(/check \(status in \('going', 'attended', 'missed'\)\)/);
+    expect(sql).toMatch(/new\.status = 'missed' and not is_past[\s\S]*future_missed/);
+
+    const effective = sql.slice(sql.indexOf('view public.attendance_effective'), sql.indexOf('view public.shared_list_concerts'));
+    expect(effective).toMatch(/security_invoker = true/);
+    expect(effective).toMatch(/from public\.concerts\s+left join public\.attendance/);
+    expect(effective).toMatch(/attendance\.user_id = \(select auth\.uid\(\)\)/);
+    expect(effective).toMatch(/when attendance\.status = 'missed' then 'missed'/);
+    expect(effective).toMatch(/when public\.concert_is_past\(concerts\.date, concerts\."time"\) then 'attended'/);
+
+    const shared = sql.slice(sql.indexOf('view public.shared_list_concerts'));
+    expect(shared).toMatch(/events\.owner_id = profiles\.id/);
+    expect(shared).toMatch(/event_members\.user_id = profiles\.id/);
+    expect(shared).toMatch(/left join public\.attendance/);
+    expect(shared).toMatch(/\) in \('going', 'attended'\)/);
+    expect(shared).toMatch(/revoke all on table public\.shared_list_concerts from public, anon, authenticated/);
   });
 });
 
@@ -418,6 +461,62 @@ describe('setAttendance / clearAttendance / listMyAttendance', () => {
     expect(result.error?.ruleId).toBe(ATTENDANCE_RULE.attendedToGoing);
     expect(result.error?.message).toBe(ATTENDANCE_RULE_MESSAGE.attendedToGoing);
     expect(updates[0]).toMatchObject({ status: 'going' });
+  });
+
+  it('stores missed on a past concert so it reads as not seen', async () => {
+    const { client, inserts } = createMockAttendanceClient();
+
+    const result = await setAttendance(client, {
+      concertId: 'concert-past',
+      status: 'missed'
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.status).toBe('missed');
+    expect(inserts[0]).toMatchObject({ concert_id: 'concert-past', status: 'missed' });
+  });
+
+  it('updates a stored attended row to missed', async () => {
+    const { client, updates } = createMockAttendanceClient({ rows: [attendedRow] });
+
+    const result = await setAttendance(client, {
+      concertId: 'concert-past',
+      status: 'missed'
+    });
+
+    expect(result.error).toBeNull();
+    expect(updates[0]).toMatchObject({ status: 'missed' });
+  });
+
+  it('rejects future missed with a named rule', async () => {
+    const { client } = createMockAttendanceClient({
+      insertError: {
+        code: 'P0001',
+        message: 'future_missed',
+        details: 'Cannot mark a future concert as not seen.'
+      }
+    });
+
+    const result = await setAttendance(client, {
+      concertId: 'concert-future',
+      status: 'missed'
+    });
+
+    expect(result.data).toBeNull();
+    expect(result.error?.ruleId).toBe(ATTENDANCE_RULE.futureMissed);
+    expect(result.error?.message).toBe(ATTENDANCE_RULE_MESSAGE.futureMissed);
+  });
+
+  it('rejects an unknown status before writing', async () => {
+    const { client, inserts } = createMockAttendanceClient();
+
+    const result = await setAttendance(client, {
+      concertId: 'concert-past',
+      status: 'maybe' as AttendanceRecord['status']
+    });
+
+    expect(result.error?.message).toBe('Attendance must be going, attended, or missed');
+    expect(inserts).toHaveLength(0);
   });
 
   it('returns the written row when the effective read fails after a successful insert', async () => {
@@ -619,5 +718,69 @@ describe('attendance stays off pages and the store query path', () => {
     expect(chip).toMatch(/click\.stop/);
     expect(chip).not.toMatch(/bg-\[var\(--muted\)\]/);
     expect(chip).not.toMatch(/Set|On the bill|Skipped/);
+  });
+});
+
+describe('eye toggle replaces the Attended chip on past concerts', () => {
+  const read = (relative: string) => readFileSync(resolve(process.cwd(), relative), 'utf8');
+
+  it('draws an eye button with a stable name, pressed state, and the crossed eye when not seen', () => {
+    const toggle = read('app/components/AppSeenToggle.vue');
+    expect(toggle).toMatch(/<button/);
+    expect(toggle).toMatch(/type="button"/);
+    expect(toggle).toMatch(/:aria-pressed="seen"/);
+    expect(toggle).toMatch(/`Seen: \$\{props\.artist\}`/);
+    expect(toggle).toMatch(/'i-lucide-eye' : 'i-lucide-eye-off'/);
+    expect(toggle).toMatch(/Mark as not seen/);
+    expect(toggle).toMatch(/Mark as seen/);
+    expect(toggle).toMatch(/size-11/);
+    expect(toggle).toMatch(/focus-visible/);
+    expect(toggle).toMatch(/click\.stop/);
+  });
+
+  it('shows the eye on past rows of the card and the Event page, and keeps Going on upcoming ones', () => {
+    const card = read('app/components/AppEventCard.vue');
+    expect(card).toMatch(/<AppSeenToggle\s+v-if="showAttendance && eventsStore\.concertIsPast\(concert\)"/);
+    expect(card).toMatch(/<AppSeenToggle\s+v-if="showAttendance && eventsStore\.concertIsPast\(row\)"/);
+    expect(card).toMatch(/toggleSeen/);
+    expect(card).toMatch(/concerts\.length > 0 && !nightIsPast/);
+
+    const eventPage = read('app/pages/e/[id].vue');
+    expect(eventPage).toMatch(/<AppSeenToggle\s+v-if="eventsStore\.concertIsPast\(concert\)"/);
+    expect(eventPage).toMatch(/hasConcerts\.value && !nightIsPast\.value/);
+
+    const store = read('app/stores/events.ts');
+    const toggleSeen = store.slice(store.indexOf('const toggleSeen ='), store.indexOf('const attendThisNight ='));
+    expect(toggleSeen).toMatch(/status: 'missed'/);
+    expect(toggleSeen).toMatch(/clearAttendance/);
+    expect(toggleSeen).toMatch(/wasSeen \? 'missed' : 'attended'/);
+    expect(toggleSeen).toMatch(/ensureLastNightBillLoaded/);
+    expect(toggleSeen).toMatch(/finally/);
+  });
+
+  it('keeps a missed concert out of souvenirs and Last night', () => {
+    const night = {
+      id: 'event-1',
+      owner_id: 'owner-1',
+      kind: 'single_night' as const,
+      name: 'Past Night',
+      start_date: '2026-08-10',
+      end_date: '2026-08-10',
+      place: 'Paris'
+    };
+    const stats = souvenirStats({
+      events: [night],
+      concerts: [{ id: 'c-seen', event_id: night.id }, { id: 'c-missed', event_id: night.id }],
+      statuses: { 'c-seen': 'attended', 'c-missed': 'missed' },
+      now: new Date('2026-08-19T12:00:00Z')
+    });
+    expect(stats.attended).toBe(1);
+    expect(stats.events).toBe(1);
+
+    expect(selectLastNightEvent(
+      [night],
+      [{ id: 'c-missed', event_id: night.id, date: night.start_date, time: null }],
+      { 'c-missed': 'missed' }
+    )).toBeNull();
   });
 });

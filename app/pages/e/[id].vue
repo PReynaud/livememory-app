@@ -71,7 +71,7 @@ const eventLead = computed(() => {
   return [formatEventDateLabel(currentEvent.value), currentEvent.value.place].filter(Boolean).join(' · ');
 });
 const showNightGoingChip = computed(() => {
-  return currentEvent.value?.kind === 'single_night' && hasConcerts.value;
+  return currentEvent.value?.kind === 'single_night' && hasConcerts.value && !nightIsPast.value;
 });
 const nightIsPast = computed(() => {
   return hasConcerts.value && currentConcerts.value.every(row => eventsStore.concertIsPast(row));
@@ -367,8 +367,15 @@ const leaveThisEvent = async () => {
                       {{ concertMeta(concert) }}
                     </p>
                   </div>
+                  <AppSeenToggle
+                    v-if="eventsStore.concertIsPast(concert)"
+                    :seen="eventsStore.concertSeen(concert)"
+                    :artist="concert.artist"
+                    :disabled="eventsStore.isAttendanceBusy(concert.id)"
+                    @click="void eventsStore.toggleSeen(concert)"
+                  />
                   <AppAttendanceChip
-                    v-if="currentEvent.kind === 'festival'"
+                    v-else-if="currentEvent.kind === 'festival'"
                     :status="eventsStore.attendanceStatus(concert.id)"
                     :is-past="eventsStore.concertIsPast(concert)"
                     :disabled="eventsStore.isAttendanceBusy(concert.id)"
