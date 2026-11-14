@@ -86,11 +86,11 @@ describe('embedded agent boundaries', () => {
     expect(mcp).not.toMatch(/agent-capability/);
   });
 
-  it('renders Home only for a healthy connection and refreshes after confirmation', () => {
-    const home = read('app/pages/home.vue');
+  it('renders the menu assistant only for a healthy connection and refreshes after confirmation', () => {
+    const nav = read('app/components/AppGlassNav.vue');
     const sheet = read('app/components/AppAiChatSheet.vue');
     const styles = read('app/assets/css/main.css');
-    expect(home).toMatch(/v-if="isAssistantReady"/);
+    expect(nav).toMatch(/v-if="isAssistantReady"/);
     expect(sheet).toMatch(/agent-chat-confirm/);
     expect(sheet).toMatch(/events\.fetchEvents/);
     expect(sheet).toMatch(/data-testid="agent-chat-images"/);
