@@ -13,8 +13,26 @@ export type OauthClientName = {
 
 export const OAUTH_GRANT_COLUMNS = 'id, client_id, created_at, oauth_clients(client_name)';
 export const OAUTH_CLIENT_COLUMNS = 'id, client_name';
-export const OAUTH_GRANTS_HELPER = 'Clients you allow can act as you until you revoke them.';
+export const OAUTH_GRANTS_HELPER
+  = 'Apps you allowed through MCP, such as ChatGPT or Claude. Each one can read and change your concert journal as you.';
 export const OAUTH_GRANTS_EMPTY = 'No connected clients.';
+export const OAUTH_GRANT_ACCESS = 'Reads and edits your Events, Concerts, and Attendance.';
+export const OAUTH_GRANT_REVOKE_HELPER
+  = 'Revoke cuts the app off right away. Nothing in your journal is deleted. You can connect it again later.';
+
+export const formatGrantConnectedOn = (createdAt: string): string => {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Europe/Paris'
+  }).format(date);
+};
 
 type QueryError = {
   message: string;
