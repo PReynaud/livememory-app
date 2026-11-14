@@ -107,7 +107,8 @@ test('adds a festival concert on a picked day and groups it', async ({ authentic
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
   await expect(compact.getByText('The Last Dinner Party')).toBeVisible();
-  await expect(compact.getByText('22/08/2026 · Paris')).toBeVisible();
+  await expect(compact.getByTestId('event-card-meta')).toHaveText('Paris');
+  await expect(compact.getByTestId('event-card-date')).toHaveText('22/08/2026');
   await expect(compact.getByText('Rock Week')).toBeVisible();
   await expect(authenticatedPage.getByText('Saturday 22 Aug')).toHaveCount(0);
 });

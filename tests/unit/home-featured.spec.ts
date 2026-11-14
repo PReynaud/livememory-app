@@ -442,6 +442,14 @@ describe('Home featured and stats surfaces', () => {
     expect(card).not.toMatch(/for you|Pour vous|album/i);
   });
 
+  it('drops the date from the meta line whenever the date badge is shown, keeping it for screen readers', () => {
+    const card = read('app/components/AppEventCard.vue');
+    expect(card).toMatch(/return stackDate\.value\s*\?\s*props\.event\.place/);
+    expect(card).toMatch(/if \(stackDate\.value\) \{\s*return \[formatVenueLine\(concertStageName\.value, concert\.value\.place\), formatConcertClock\(concert\.value\.time\)\]/);
+    expect(card).toMatch(/class="sr-only"\s*data-testid="event-card-date"/);
+    expect(card).toMatch(/stackDateLabel/);
+  });
+
   it('renders Coming up once, souvenirs, and empty journal chrome without a lead or capped count', () => {
     const home = read('app/pages/home.vue');
     expect(home.match(/Coming up/g)).toHaveLength(1);

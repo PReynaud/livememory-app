@@ -49,8 +49,8 @@ authTest('creates a festival, lists it on Concerts, and opens an empty Bill', as
   await gotoConcertsPeriod(authenticatedPage, 'past');
   const festivalGroup = authenticatedPage.getByRole('link', { name: /Rock Week/ });
   await authExpect(festivalGroup).toBeVisible();
-  await authExpect(festivalGroup.getByText('20/08/2026 – 22/08/2026')).toBeVisible();
-  await authExpect(festivalGroup.getByText('Paris')).toBeVisible();
+  await authExpect(festivalGroup.getByTestId('event-card-meta')).toHaveText('Paris');
+  await authExpect(authenticatedPage.locator('[data-event-card="group"]').filter({ hasText: 'Rock Week' }).getByTestId('event-card-date')).toHaveText('20/08/2026 – 22/08/2026');
 
   await festivalGroup.click();
   await authExpect(authenticatedPage).toHaveURL(new RegExp(`/e/${festivalId}$`));
@@ -74,8 +74,8 @@ authTest('creates a single_night with one date and lists a header-only group', a
   await gotoConcertsPeriod(authenticatedPage, 'past');
   const nightGroup = authenticatedPage.getByRole('link', { name: /Club Night/ });
   await authExpect(nightGroup).toBeVisible();
-  await authExpect(nightGroup.getByText('10/08/2026')).toBeVisible();
-  await authExpect(nightGroup.getByText('Berlin')).toBeVisible();
+  await authExpect(nightGroup.getByTestId('event-card-meta')).toHaveText('Berlin');
+  await authExpect(authenticatedPage.locator('[data-event-card="group"]').filter({ hasText: 'Club Night' }).getByTestId('event-card-date')).toHaveText('10/08/2026');
 });
 
 authTest('stays on the festival form for inverted dates and missing required fields', async ({ authenticatedPage }) => {

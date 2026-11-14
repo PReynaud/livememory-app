@@ -62,14 +62,35 @@ const compactMeta = computed(() => {
     return '';
   }
 
-  return props.featured
-    ? formatVenueLine(concertStageName.value, concert.value.place)
-    : formatConcertMetaLine(concert.value, concertStageName.value);
+  if (props.featured) {
+    return formatVenueLine(concertStageName.value, concert.value.place);
+  }
+
+  if (stackDate.value) {
+    return [formatVenueLine(concertStageName.value, concert.value.place), formatConcertClock(concert.value.time)]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  return formatConcertMetaLine(concert.value, concertStageName.value);
 });
 const groupMeta = computed(() => {
-  return props.featured
-    ? formatVenueLine(sharedStageName.value, props.event.place)
+  if (props.featured) {
+    return formatVenueLine(sharedStageName.value, props.event.place);
+  }
+
+  return stackDate.value
+    ? props.event.place
     : [formatEventDateLabel(props.event), props.event.place].filter(Boolean).join(' · ');
+});
+const stackDateLabel = computed(() => {
+  if (!stackDate.value) {
+    return '';
+  }
+
+  return compact.value && concert.value
+    ? formatEventDateLabel({ start_date: concert.value.date, end_date: concert.value.date })
+    : formatEventDateLabel(props.event);
 });
 const titleClass = computed(() => {
   if (isHero.value) {
@@ -119,6 +140,10 @@ const eventPath = computed(() => `/e/${props.event.id}`);
           :date="stackDate"
           :size="isHero ? 'lg' : 'sm'"
         />
+        <span
+          class="sr-only"
+          data-testid="event-card-date"
+        >{{ stackDateLabel }}</span>
         <span
           v-if="stackClock"
           class="text-[13px] font-semibold tabular-nums text-muted"

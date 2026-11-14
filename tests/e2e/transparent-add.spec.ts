@@ -20,7 +20,8 @@ test('logs a past one-performer show from nav Add without picking an Event', asy
   const compact = authenticatedPage.locator('[data-event-card="compact"]');
   await expect(compact).toBeVisible();
   await expect(compact.getByRole('link')).toContainText('Justice');
-  await expect(compact.getByText('10/08/2026 · Berlin · 20:15')).toBeVisible();
+  await expect(compact.getByTestId('event-card-meta')).toHaveText('Berlin · 20:15');
+  await expect(compact.getByTestId('event-card-date')).toHaveText('10/08/2026');
   await expect(compact.getByText('Concerts on 10/08/2026 at Berlin')).toBeVisible();
   await expect(authenticatedPage.locator('[data-event-card="group"]')).toHaveCount(0);
 
